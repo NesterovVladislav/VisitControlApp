@@ -1,0 +1,30 @@
+# Cursor Rules for VisitControlApp
+
+## Memory Bank
+
+Этот проект использует систему Memory Bank для сохранения контекста между сессиями.
+
+**Файлы Memory Bank:**
+- `memory-bank/projectbrief.md` — краткое описание и цели проекта
+- `memory-bank/productContext.md` — контекст продукта, проблемы, которые он решает
+- `memory-bank/techContext.md` — технический стек и настройка
+- `memory-bank/systemPatterns.md` — архитектурные паттерны и соглашения
+- `memory-bank/activeContext.md` — текущий фокус работы
+- `memory-bank/progress.md` — прогресс и статус проекта
+
+### Правила работы с Memory Bank
+
+1. **В начале сессии** — прочитай файлы Memory Bank для понимания контекста
+2. **При значимых изменениях** — обнови соответствующие файлы:
+   - Новые технологии → `techContext.md`
+   - Новые паттерны → `systemPatterns.md`
+   - Изменение фокуса → `activeContext.md`
+   - Завершение задач → `progress.md`
+3. **В конце сессии** — обнови `activeContext.md` с текущим состоянием
+
+## Общие правила
+
+- Используй TypeScript для всего кода
+- Следуй соглашениям Expo и React Native
+- Компоненты именуй в kebab-case
+- Отвечай на русском языке
