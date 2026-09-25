@@ -23,6 +23,7 @@
     },
     "plugins": [
       "expo-router",
+      "expo-secure-store",
       [
         "expo-local-authentication",
         {
@@ -40,8 +41,7 @@
             "backgroundColor": "#000000"
           }
         }
-      ],
-      "./plugins/with-cleartext-traffic"
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

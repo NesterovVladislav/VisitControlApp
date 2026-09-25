@@ -1,5 +1,5 @@
 import { AxiosError } from 'axios';
-import { runSaga } from 'redux-saga';
+import { runSaga, stdChannel } from 'redux-saga';
 
 jest.mock('../../services/auth/protected-session', () => ({
   protectedSessionRepository: {
@@ -69,6 +69,7 @@ import {
   submitBiometricPreferenceSaga,
   unlockWithBiometricsSaga,
   unlockWithPinSaga,
+  watchLogin,
 } from './auth';
 
 const readyRecord = {
@@ -151,9 +152,12 @@ describe('auth sagas', () => {
   });
 
   it('restores a complete session in the locked phase', async () => {
-    mockRepository.load.mockResolvedValue(readyRecord);
+    mockRepository.load.mockResolvedValue({ ...readyRecord, failedPinAttempts: 2 });
     const dispatched = await runWorker(bootstrapSessionSaga);
-    expect(dispatched).toContainEqual(bootstrapLocked({ biometricsEnabled: true }));
+    expect(dispatched).toContainEqual(bootstrapLocked({
+      biometricsEnabled: true,
+      remainingPinAttempts: 3,
+    }));
     expect(mockApi.getMe).not.toHaveBeenCalled();
     expect(getAuthToken()).toBeNull();
   });
@@ -184,7 +188,34 @@ describe('auth sagas', () => {
     expect(mockApi.getMe).not.toHaveBeenCalled();
   });
 
-  it('clears an in-memory token when persistence after login fails', async () => {
+it('does not run two credential logins concurrently', async () => {
+  let finishLogin: ((token: string) => void) | undefined;
+  mockApi.login.mockImplementationOnce(
+    () => new Promise<string>((resolve) => { finishLogin = resolve; }),
+  );
+  const channel = stdChannel();
+  const task = runSaga(
+    {
+      channel,
+      dispatch: jest.fn(),
+      getState: () => ({ auth: { sessionEpoch: 1 } }),
+    },
+    watchLogin,
+  );
+
+  channel.put(loginStart({ email: 'first@example.invalid', password: '' }));
+  await Promise.resolve();
+  channel.put(loginStart({ email: 'second@example.invalid', password: '' }));
+  await Promise.resolve();
+
+  expect(mockApi.login).toHaveBeenCalledTimes(1);
+  finishLogin?.('synthetic-token');
+  await Promise.resolve();
+  task.cancel();
+  await task.toPromise();
+});
+
+it('clears an in-memory token when persistence after login fails', async () => {
     mockRepository.beginSession.mockRejectedValue(new Error('write'));
     const dispatched = await runWorker(
       loginSaga,
@@ -311,7 +342,10 @@ describe('auth sagas', () => {
     mockRepository.load.mockResolvedValue(readyRecord);
     const dispatched = await runWorker(retryProtectedStorageSaga);
     expect(mockApi.login).not.toHaveBeenCalled();
-    expect(dispatched).toContainEqual(bootstrapLocked({ biometricsEnabled: true }));
+    expect(dispatched).toContainEqual(bootstrapLocked({
+      biometricsEnabled: true,
+      remainingPinAttempts: 5,
+    }));
   });
 
   it('clears persistent and in-memory state on explicit logout', async () => {

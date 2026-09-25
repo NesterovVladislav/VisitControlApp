@@ -5,6 +5,7 @@ import {
   select,
   takeEvery,
   takeLatest,
+  takeLeading,
 } from 'redux-saga/effects';
 
 import { visitControlApi } from '../../services/api';
@@ -28,6 +29,7 @@ import {
   completePinSetup,
   loginFailure,
   loginStart,
+  MAX_PIN_ATTEMPTS,
   logoutCompleted,
   logoutRequested,
   pinSetupCompleted,
@@ -123,7 +125,13 @@ export function* bootstrapSessionSaga() {
       yield put(bootstrapPinSetupRequired());
       return;
     }
-    yield put(bootstrapLocked({ biometricsEnabled: record.biometricsEnabled }));
+    yield put(bootstrapLocked({
+      biometricsEnabled: record.biometricsEnabled,
+      remainingPinAttempts: Math.max(
+        0,
+        MAX_PIN_ATTEMPTS - record.failedPinAttempts,
+      ),
+    }));
   } catch {
     yield* failProtectedStorage();
   }
@@ -314,7 +322,7 @@ export function resetAuthSagaStateForTests(): void {
 export function* watchLogin() {
   yield takeLatest(bootstrapSession.type, bootstrapSessionSaga);
   yield takeLatest(retryProtectedStorage.type, retryProtectedStorageSaga);
-  yield takeLatest(loginStart.type, loginSaga);
+  yield takeLeading(loginStart.type, loginSaga);
   yield takeLatest(completePinSetup.type, completePinSetupSaga);
   yield takeLatest(submitBiometricPreference.type, submitBiometricPreferenceSaga);
   yield takeLatest(unlockWithPin.type, unlockWithPinSaga);

@@ -72,7 +72,17 @@ describe('UnlockScreen', () => {
     expect(mockDispatch).toHaveBeenCalledWith(unlockWithPin({ pin: '1234' }));
   });
 
-  it('warns before the fifth failed attempt', async () => {
+it('allows switching to full sign-in from the normal lock screen', async () => {
+  authState = { ...authState, biometricsEnabled: false };
+  const screen = await render(<UnlockScreen />);
+
+  await fireEvent.press(screen.getByRole('button', { name: 'Войти по email и паролю' }));
+  expect(mockDispatch).toHaveBeenCalledWith(
+    logoutRequested({ reason: 'switchAccount' }),
+  );
+});
+
+it('warns before the fifth failed attempt', async () => {
     authState = { ...authState, biometricsEnabled: false, remainingPinAttempts: 1 };
     const screen = await render(<UnlockScreen />);
     expect(screen.getByText('Последняя попытка')).toBeTruthy();

@@ -52,10 +52,14 @@ describe('auth reducer state machine', () => {
       sessionEpoch: 1,
     });
 
-    const locked = reducer(initialAuthState, bootstrapLocked({ biometricsEnabled: true }));
+    const locked = reducer(initialAuthState, bootstrapLocked({
+      biometricsEnabled: true,
+      remainingPinAttempts: 3,
+    }));
     expect(locked).toMatchObject({
       phase: 'locked',
       biometricsEnabled: true,
+      remainingPinAttempts: 3,
       sessionEpoch: 1,
     });
   });
@@ -94,8 +98,15 @@ describe('auth reducer state machine', () => {
     const locked = reducer(authenticated, lockSession());
     expect(locked).toMatchObject({ phase: 'locked', user: null, isLoading: false });
 
-    const validating = reducer(locked, validationStarted());
-    expect(validating).toMatchObject({ phase: 'validating', isLoading: true });
+    const validating = reducer(
+      { ...locked, remainingPinAttempts: 2 },
+      validationStarted(),
+    );
+    expect(validating).toMatchObject({
+      phase: 'validating',
+      isLoading: true,
+      remainingPinAttempts: 5,
+    });
 
     const unavailable = reducer(validating, sessionValidationUnavailable('Нет сети'));
     expect(unavailable).toMatchObject({
@@ -106,7 +117,22 @@ describe('auth reducer state machine', () => {
     });
   });
 
-  it('keeps protected phases closed while commands are in progress', () => {
+it('locks an in-flight validation and invalidates its result', () => {
+  const validating = {
+    ...initialAuthState,
+    phase: 'validating' as const,
+    isLoading: true,
+    sessionEpoch: 4,
+  };
+
+  expect(reducer(validating, lockSession())).toMatchObject({
+    phase: 'locked',
+    isLoading: false,
+    sessionEpoch: 5,
+  });
+});
+
+it('keeps protected phases closed while commands are in progress', () => {
     const locked = { ...initialAuthState, phase: 'locked' as const, isLoading: false };
     expect(reducer(locked, unlockWithPin({ pin: '1234' }))).toMatchObject({
       phase: 'locked',

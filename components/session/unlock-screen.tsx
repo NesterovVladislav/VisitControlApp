@@ -85,6 +85,14 @@ export function UnlockScreen() {
           disabled={isLoading}
           onSubmit={(pin) => dispatch(unlockWithPin({ pin }))}
         />
+        <Pressable
+          accessibilityRole="button"
+          disabled={isLoading}
+          onPress={() => dispatch(logoutRequested({ reason: 'switchAccount' }))}
+          style={styles.secondaryButton}
+        >
+          <Text style={styles.secondaryButtonText}>Войти по email и паролю</Text>
+        </Pressable>
         {biometricsEnabled ? (
           <Pressable
             accessibilityRole="button"

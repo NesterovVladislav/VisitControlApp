@@ -5,31 +5,36 @@ import {
   disableProtectedScreenPrivacy,
   enableProtectedScreenPrivacy,
 } from '../services/auth/screen-privacy';
-import { shouldLockAfterBackground } from '../services/auth/session-lock';
+import {
+  SessionTimestamp,
+  shouldLockAfterBackground,
+} from '../services/auth/session-lock';
 import { useAppDispatch } from '../store';
 import { lockSession } from '../store/reducers/auth';
 import { AuthPhase } from '../store/types/auth';
 
-const monotonicNow = () => performance.now();
+const currentTimestamp = (): SessionTimestamp => ({
+  monotonicMs: performance.now(),
+  wallClockMs: Date.now(),
+});
+
+const tracksBackgroundTimeout = (phase: AuthPhase): boolean =>
+  phase === 'authenticated' ||
+  phase === 'validating' ||
+  phase === 'validationUnavailable';
 
 export function useSessionLifecycle(phase: AuthPhase): {
   privacyShieldVisible: boolean;
 } {
   const dispatch = useAppDispatch();
   const phaseRef = useRef(phase);
-  const backgroundStartedAt = useRef<number | null>(null);
+  const backgroundStartedAt = useRef<SessionTimestamp | null>(null);
   const [appIsInactive, setAppIsInactive] = useState(
     AppState.currentState !== 'active',
   );
   const [nativePrivacyFailed, setNativePrivacyFailed] = useState(false);
 
   phaseRef.current = phase;
-
-  useEffect(() => {
-    if (phase !== 'authenticated') {
-      backgroundStartedAt.current = null;
-    }
-  }, [phase]);
 
   useEffect(() => {
     let active = true;
@@ -54,11 +59,8 @@ export function useSessionLifecycle(phase: AuthPhase): {
     const handleAppStateChange = (nextState: AppStateStatus) => {
       if (nextState !== 'active') {
         setAppIsInactive(true);
-        if (
-          phaseRef.current === 'authenticated' &&
-          backgroundStartedAt.current === null
-        ) {
-          backgroundStartedAt.current = monotonicNow();
+        if (backgroundStartedAt.current === null) {
+          backgroundStartedAt.current = currentTimestamp();
         }
         return;
       }
@@ -66,8 +68,8 @@ export function useSessionLifecycle(phase: AuthPhase): {
       const startedAt = backgroundStartedAt.current;
       backgroundStartedAt.current = null;
       if (
-        phaseRef.current === 'authenticated' &&
-        shouldLockAfterBackground(startedAt, monotonicNow())
+        tracksBackgroundTimeout(phaseRef.current) &&
+        shouldLockAfterBackground(startedAt, currentTimestamp())
       ) {
         dispatch(lockSession());
       }

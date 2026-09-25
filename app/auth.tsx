@@ -16,7 +16,7 @@ import { LoginCredentials } from '../store/types/auth';
 export default function AuthScreen() {
   const router = useRouter();
   const dispatch = useAppDispatch();
-  const { isLoading, error } = useAppSelector((state) => state.auth);
+  const { isLoading, error, notice } = useAppSelector((state) => state.auth);
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -70,6 +70,8 @@ export default function AuthScreen() {
     <View style={styles.container}>
       <View style={styles.form}>
         <Text style={styles.title}>Авторизация</Text>
+
+        {notice ? <Text style={styles.notice}>{notice}</Text> : null}
 
         <View style={styles.inputContainer}>
           <Text style={styles.label}>Email</Text>
@@ -172,6 +174,11 @@ const styles = StyleSheet.create({
     marginBottom: 32,
     textAlign: 'center',
     color: '#333',
+  },
+  notice: {
+    color: '#5D6B7A',
+    marginBottom: 20,
+    textAlign: 'center',
   },
   inputContainer: {
     marginBottom: 20,

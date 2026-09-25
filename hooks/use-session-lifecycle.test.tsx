@@ -15,6 +15,7 @@ import {
 } from '../services/auth/screen-privacy';
 import { useAppDispatch } from '../store';
 import { lockSession } from '../store/reducers/auth';
+import { AuthPhase } from '../store/types/auth';
 import { useSessionLifecycle } from './use-session-lifecycle';
 
 const mockUseAppDispatch = useAppDispatch as jest.MockedFunction<typeof useAppDispatch>;
@@ -28,15 +29,18 @@ const mockDisablePrivacy = disableProtectedScreenPrivacy as jest.MockedFunction<
 describe('useSessionLifecycle', () => {
   let appStateHandler: ((state: AppStateStatus) => void) | undefined;
   let now: number;
+  let wallClockNow: number;
   const dispatch = jest.fn();
 
   beforeEach(() => {
     jest.clearAllMocks();
     now = 1_000;
+    wallClockNow = 10_000;
     mockUseAppDispatch.mockReturnValue(dispatch);
     mockEnablePrivacy.mockResolvedValue(true);
     mockDisablePrivacy.mockResolvedValue(true);
     jest.spyOn(performance, 'now').mockImplementation(() => now);
+    jest.spyOn(Date, 'now').mockImplementation(() => wallClockNow);
     jest.spyOn(AppState, 'addEventListener').mockImplementation((_event, handler) => {
       appStateHandler = handler;
       return { remove: jest.fn() };
@@ -66,6 +70,7 @@ describe('useSessionLifecycle', () => {
     await waitFor(() => expect(mockEnablePrivacy).toHaveBeenCalled());
     await act(() => appStateHandler?.('background'));
     now = 300_999;
+    wallClockNow = 309_999;
     await act(() => appStateHandler?.('active'));
 
     expect(dispatch).not.toHaveBeenCalled();
@@ -77,6 +82,7 @@ describe('useSessionLifecycle', () => {
     await waitFor(() => expect(mockEnablePrivacy).toHaveBeenCalled());
     await act(() => appStateHandler?.('background'));
     now = 301_000;
+    wallClockNow = 310_000;
     await act(() => appStateHandler?.('active'));
 
     expect(dispatch).toHaveBeenCalledWith(lockSession());
@@ -88,8 +94,10 @@ describe('useSessionLifecycle', () => {
     await waitFor(() => expect(mockEnablePrivacy).toHaveBeenCalled());
     await act(() => appStateHandler?.('inactive'));
     now = 200_000;
+    wallClockNow = 209_000;
     await act(() => appStateHandler?.('background'));
     now = 301_000;
+    wallClockNow = 310_000;
     await act(() => appStateHandler?.('active'));
 
     expect(dispatch).toHaveBeenCalledWith(lockSession());
@@ -104,5 +112,22 @@ describe('useSessionLifecycle', () => {
   it('disables native privacy for the unauthenticated phase', async () => {
     await renderHook(() => useSessionLifecycle('unauthenticated'));
     await waitFor(() => expect(mockDisablePrivacy).toHaveBeenCalledTimes(1));
+  });
+
+  it('locks when a backgrounded lock screen moves into validation', async () => {
+    const { result, rerender } = await renderHook(
+      ({ phase }: { phase: AuthPhase }) => useSessionLifecycle(phase),
+      { initialProps: { phase: 'locked' as AuthPhase } },
+    );
+    await waitFor(() => expect(mockEnablePrivacy).toHaveBeenCalled());
+
+    await act(() => appStateHandler?.('background'));
+    await rerender({ phase: 'validating' });
+    now = 2_000;
+    wallClockNow = 310_000;
+    await act(() => appStateHandler?.('active'));
+
+    expect(dispatch).toHaveBeenCalledWith(lockSession());
+    expect(result.current.privacyShieldVisible).toBe(false);
   });
 });

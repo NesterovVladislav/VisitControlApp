@@ -6,13 +6,32 @@ import {
 describe('session lock timeout', () => {
   it('uses an exact five-minute threshold', () => {
     expect(SESSION_LOCK_TIMEOUT_MS).toBe(300_000);
-    expect(shouldLockAfterBackground(1_000, 300_999)).toBe(false);
-    expect(shouldLockAfterBackground(1_000, 301_000)).toBe(true);
-    expect(shouldLockAfterBackground(1_000, 301_001)).toBe(true);
+    const startedAt = { monotonicMs: 1_000, wallClockMs: 10_000 };
+    expect(shouldLockAfterBackground(startedAt, {
+      monotonicMs: 300_999,
+      wallClockMs: 309_999,
+    })).toBe(false);
+    expect(shouldLockAfterBackground(startedAt, {
+      monotonicMs: 301_000,
+      wallClockMs: 310_000,
+    })).toBe(true);
+  });
+
+  it('locks when wall-clock time includes device sleep excluded by the monotonic clock', () => {
+    expect(shouldLockAfterBackground(
+      { monotonicMs: 1_000, wallClockMs: 10_000 },
+      { monotonicMs: 2_000, wallClockMs: 310_000 },
+    )).toBe(true);
   });
 
   it('does not lock for missing or backwards timestamps', () => {
-    expect(shouldLockAfterBackground(null, 301_000)).toBe(false);
-    expect(shouldLockAfterBackground(10_000, 9_000)).toBe(false);
+    expect(shouldLockAfterBackground(null, {
+      monotonicMs: 301_000,
+      wallClockMs: 310_000,
+    })).toBe(false);
+    expect(shouldLockAfterBackground(
+      { monotonicMs: 10_000, wallClockMs: 10_000 },
+      { monotonicMs: 9_000, wallClockMs: 9_000 },
+    )).toBe(false);
   });
 });

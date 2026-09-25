@@ -7,7 +7,7 @@ import {
   User,
 } from '../types/auth';
 
-const MAX_PIN_ATTEMPTS = 5;
+export const MAX_PIN_ATTEMPTS = 5;
 
 export const initialAuthState: AuthState = {
   phase: 'bootstrapping',
@@ -61,7 +61,10 @@ const authSlice = createSlice({
     },
     bootstrapLocked: (
       state,
-      action: PayloadAction<{ biometricsEnabled: boolean }>,
+      action: PayloadAction<{
+        biometricsEnabled: boolean;
+        remainingPinAttempts: number;
+      }>,
     ) => {
       state.phase = 'locked';
       state.setupStep = null;
@@ -71,7 +74,7 @@ const authSlice = createSlice({
       state.user = null;
       state.biometricsAvailable = false;
       state.biometricsEnabled = action.payload.biometricsEnabled;
-      state.remainingPinAttempts = MAX_PIN_ATTEMPTS;
+      state.remainingPinAttempts = action.payload.remainingPinAttempts;
       state.sessionEpoch += 1;
     },
     loginStart: (state, _action: PayloadAction<LoginCredentials>) => {
@@ -134,6 +137,7 @@ const authSlice = createSlice({
       state.isLoading = true;
       state.error = null;
       state.user = null;
+      state.remainingPinAttempts = MAX_PIN_ATTEMPTS;
     },
     validationSucceeded: (state, action: PayloadAction<User>) => {
       state.phase = 'authenticated';
@@ -170,11 +174,16 @@ const authSlice = createSlice({
       state.user = null;
     },
     lockSession: (state) => {
-      if (state.phase !== 'authenticated') return;
+      if (
+        state.phase !== 'authenticated' &&
+        state.phase !== 'validating' &&
+        state.phase !== 'validationUnavailable'
+      ) return;
       state.phase = 'locked';
       state.isLoading = false;
       state.error = null;
       state.user = null;
+      state.sessionEpoch += 1;
     },
     logoutRequested: (
       state,
