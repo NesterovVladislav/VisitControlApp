@@ -1,7 +1,4 @@
-/**
- * Токен текущей сессии. Пока хранится только в памяти: после перезапуска приложения нужен повторный вход.
- * TODO: хранить в expo-secure-store и восстанавливать сессию при старте (этап 1 в docs/backend-integration.md).
- */
+/** Токен разблокированной сессии; постоянное хранение изолировано в protected-session. */
 let token: string | null = null;
 let unauthorizedHandler: (() => void) | null = null;
 
