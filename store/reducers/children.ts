@@ -6,7 +6,7 @@ import {
   MarkVisitRequest,
   VisitStatus,
 } from '../types/children';
-import { logout } from './auth';
+import { logoutCompleted } from './auth';
 
 const initialState: ChildrenState = {
   items: [],
@@ -101,7 +101,7 @@ const childrenSlice = createSlice({
     },
   },
   extraReducers: (builder) => {
-    builder.addCase(logout, () => initialState);
+    builder.addCase(logoutCompleted, () => initialState);
   },
 });
 

@@ -16,25 +16,11 @@ import { LoginCredentials } from '../store/types/auth';
 export default function AuthScreen() {
   const router = useRouter();
   const dispatch = useAppDispatch();
-  const { isLoading, error, isAuthenticated } = useAppSelector(
-    (state) => state.auth
-  );
-
-  // Отладочное логирование состояния
-  useEffect(() => {
-    console.log('[Auth Screen] State changed:', { isLoading, error, isAuthenticated });
-  }, [isLoading, error, isAuthenticated]);
+  const { isLoading, error, notice } = useAppSelector((state) => state.auth);
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-
-  // После входа — главный экран родителя
-  useEffect(() => {
-    if (isAuthenticated) {
-      router.replace('/children');
-    }
-  }, [isAuthenticated, router]);
 
   // Показываем Alert при ошибке
   useEffect(() => {
@@ -51,8 +37,6 @@ export default function AuthScreen() {
   }, [error, dispatch]);
 
   const handleLogin = () => {
-    console.log('[Auth Screen] Handle login called');
-
     // Валидация полей
     if (!email.trim()) {
       Alert.alert('Ошибка', 'Пожалуйста, введите email');
@@ -86,6 +70,8 @@ export default function AuthScreen() {
     <View style={styles.container}>
       <View style={styles.form}>
         <Text style={styles.title}>Авторизация</Text>
+
+        {notice ? <Text style={styles.notice}>{notice}</Text> : null}
 
         <View style={styles.inputContainer}>
           <Text style={styles.label}>Email</Text>
@@ -188,6 +174,11 @@ const styles = StyleSheet.create({
     marginBottom: 32,
     textAlign: 'center',
     color: '#333',
+  },
+  notice: {
+    color: '#5D6B7A',
+    marginBottom: 20,
+    textAlign: 'center',
   },
   inputContainer: {
     marginBottom: 20,

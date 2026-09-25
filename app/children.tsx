@@ -1,5 +1,5 @@
 import { useFocusEffect } from '@react-navigation/native';
-import { Redirect, Stack } from 'expo-router';
+import { Stack } from 'expo-router';
 import React, { useCallback, useEffect, useRef } from 'react';
 import {
   ActivityIndicator,
@@ -14,7 +14,7 @@ import {
 } from 'react-native';
 import ChildCard, { markActionLabel } from '../components/child-card';
 import { useAppDispatch, useAppSelector } from '../store';
-import { logout } from '../store/reducers/auth';
+import { logoutRequested } from '../store/reducers/auth';
 import {
   clearMarkError,
   loadChildrenStart,
@@ -26,7 +26,7 @@ import { Child, isInKindergarten } from '../store/types/children';
 
 export default function ChildrenScreen() {
   const dispatch = useAppDispatch();
-  const { isAuthenticated, user } = useAppSelector((state) => state.auth);
+  const { user } = useAppSelector((state) => state.auth);
   const { items, listStatus, refreshing, statusById, markingIds, markError } = useAppSelector(
     (state) => state.children
   );
@@ -62,10 +62,6 @@ export default function ChildrenScreen() {
     }
   }, [markError, dispatch]);
 
-  if (!isAuthenticated) {
-    return <Redirect href="/auth" />;
-  }
-
   function confirmMark(child: Child) {
     const seenStatus = statusById[child.id]?.value;
     if (!seenStatus) {
@@ -86,7 +82,11 @@ export default function ChildrenScreen() {
   function confirmLogout() {
     Alert.alert('Выйти из аккаунта?', undefined, [
       { text: 'Отмена', style: 'cancel' },
-      { text: 'Выйти', style: 'destructive', onPress: () => dispatch(logout()) },
+      {
+        text: 'Выйти',
+        style: 'destructive',
+        onPress: () => dispatch(logoutRequested({ reason: 'user' })),
+      },
     ]);
   }
 

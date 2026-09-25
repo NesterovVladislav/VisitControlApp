@@ -23,6 +23,13 @@
     },
     "plugins": [
       "expo-router",
+      "expo-secure-store",
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "Разрешите Visit Control использовать Face ID для входа в приложение"
+        }
+      ],
       [
         "expo-splash-screen",
         {
@@ -34,8 +41,7 @@
             "backgroundColor": "#000000"
           }
         }
-      ],
-      "./plugins/with-cleartext-traffic"
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

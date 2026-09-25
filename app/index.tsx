@@ -1,6 +1,15 @@
-import { Redirect } from "expo-router";
+import { Redirect } from 'expo-router';
+
+import { useAppSelector } from '../store';
 
 export default function Index() {
-  // Перенаправляем на экран авторизации при старте приложения
-  return <Redirect href="/auth" />;
+  const phase = useAppSelector((state) => state.auth.phase);
+
+  if (phase === 'authenticated') {
+    return <Redirect href="/children" />;
+  }
+  if (phase === 'unauthenticated') {
+    return <Redirect href="/auth" />;
+  }
+  return null;
 }
