@@ -91,6 +91,7 @@ The root session gate owns navigation and exposes one of these explicit states:
 - `validating`: local unlock succeeded and `GET /user` is checking the backend session.
 - `authenticated`: local unlock and backend validation both succeeded.
 - `validationUnavailable`: validation failed because of connectivity, timeout, or a server error; allow retry or full sign-in.
+- `storageUnavailable`: the installation marker or protected storage failed; keep all navigation unmounted and allow a storage retry.
 
 The root gate, rather than individual screens, decides which navigation tree is mounted. This prevents protected data from appearing briefly before authentication state is known.
 
@@ -112,7 +113,7 @@ The PIN itself is never stored. The verifier is derived with `expo-crypto`. A sa
 
 The service provides narrow operations such as load, begin setup, complete setup, verify PIN, record failure, reset failures, update biometric preference, and clear. Callers do not manipulate storage keys directly.
 
-On first launch after a fresh installation, an installation marker is compared with protected storage. If platform uninstall behaviour leaves an old Keychain record behind, the stale record is cleared rather than silently restoring a previous installation.
+On first launch after a fresh installation, a non-secret AsyncStorage installation marker is compared with protected storage. If platform uninstall behaviour leaves an old Keychain record behind, the stale record is cleared rather than silently restoring a previous installation. Storage failures fail closed in `storageUnavailable`; no protected or public navigation is mounted until retry succeeds.
 
 ### In-memory token bridge
 
@@ -133,7 +134,7 @@ Biometric cancellation or failure returns to PIN entry and never consumes a PIN 
 
 ### Lifecycle lock controller
 
-A single `AppState` listener owns the privacy shield, monotonic background timestamp, and five-minute decision. Screen components do not implement independent timers.
+A single `AppState` listener owns the privacy shield, monotonic background timestamp, and five-minute decision. `expo-screen-capture` provides native app-switcher/screen protection while a protected session exists, and the opaque React shield remains a UI fallback. Screen components do not implement independent timers.
 
 ### API session expiry handler
 
@@ -178,6 +179,10 @@ These failures do not prove expiry. The client retains the saved session, keeps 
 - Retry session validation.
 - Sign in with email and password, which explicitly clears the saved session.
 
+### Protected storage errors
+
+Installation-marker or SecureStore errors keep navigation unmounted, clear any token already placed in memory, and show a dedicated retry action. The client never falls back to an unprotected remembered session.
+
 ### Biometric errors
 
 - User cancellation: remain on PIN screen.
@@ -187,7 +192,7 @@ These failures do not prove expiry. The client retains the saved session, keeps 
 
 ## Platform Configuration
 
-- Add `expo-secure-store`, `expo-local-authentication`, and `expo-crypto` using Expo SDK 54-compatible versions.
+- Add `expo-secure-store`, `expo-local-authentication`, `expo-crypto`, `expo-screen-capture`, and AsyncStorage using Expo SDK 54-compatible versions.
 - Configure the LocalAuthentication plugin and a human-readable Face ID usage message in the Expo application configuration.
 - Use `disableDeviceFallback: true` so a device passcode does not replace the application's PIN flow.
 - Request strong biometric security on Android.
@@ -206,7 +211,8 @@ Automated coverage must include:
 - reset of failed attempts after successful PIN or biometric unlock;
 - bootstrap transitions for missing, incomplete, and complete records;
 - foreground return just below, at, and above five minutes;
-- privacy shield behaviour;
+- privacy shield and native app-switcher protection behaviour;
+- fresh-install marker handling and protected-storage failure/retry;
 - successful `GET /user` restoration;
 - `401` cleanup and idempotence;
 - offline, timeout, and `5xx` retry state without session deletion;
@@ -236,6 +242,7 @@ No test may contain real credentials. Manual credentials are supplied interactiv
 - Backend `401` removes the local session and clearly requests full sign-in.
 - Connectivity and `5xx` failures retain the session and support retry.
 - Logout removes every local authentication artifact.
+- Protected-storage failure never exposes public or protected navigation and supports a safe retry.
 - The feature works on both iOS and Android with platform-appropriate biometric behaviour.
 - Existing sign-in, registration, and protected application flows continue to work.
 
