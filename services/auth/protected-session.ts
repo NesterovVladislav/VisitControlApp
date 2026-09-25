@@ -38,6 +38,7 @@ export interface ProtectedSessionRepository {
   beginSession(token: string): Promise<ProtectedSessionRecord>;
   completePinSetup(pin: string): Promise<ProtectedSessionRecord>;
   verifyPin(pin: string): Promise<PinAttemptResult>;
+  resetFailedPinAttempts(): Promise<ProtectedSessionRecord>;
   setBiometricsEnabled(enabled: boolean): Promise<ProtectedSessionRecord>;
   clear(): Promise<void>;
 }
@@ -171,6 +172,14 @@ export function createProtectedSessionRepository(
 
       await persist({ ...record, failedPinAttempts });
       return { kind: 'failure', remainingAttempts: MAX_FAILED_PIN_ATTEMPTS - failedPinAttempts };
+    }),
+
+    resetFailedPinAttempts: () => serialize(async () => {
+      const record = await requireRecord();
+      if (record.status !== 'ready') throw new Error('Protected session is not ready');
+      return record.failedPinAttempts === 0
+        ? record
+        : persist({ ...record, failedPinAttempts: 0 });
     }),
 
     setBiometricsEnabled: (enabled) => serialize(async () => {

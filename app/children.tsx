@@ -14,7 +14,7 @@ import {
 } from 'react-native';
 import ChildCard, { markActionLabel } from '../components/child-card';
 import { useAppDispatch, useAppSelector } from '../store';
-import { logout } from '../store/reducers/auth';
+import { logoutRequested } from '../store/reducers/auth';
 import {
   clearMarkError,
   loadChildrenStart,
@@ -26,7 +26,7 @@ import { Child, isInKindergarten } from '../store/types/children';
 
 export default function ChildrenScreen() {
   const dispatch = useAppDispatch();
-  const { isAuthenticated, user } = useAppSelector((state) => state.auth);
+  const { phase, user } = useAppSelector((state) => state.auth);
   const { items, listStatus, refreshing, statusById, markingIds, markError } = useAppSelector(
     (state) => state.children
   );
@@ -62,7 +62,7 @@ export default function ChildrenScreen() {
     }
   }, [markError, dispatch]);
 
-  if (!isAuthenticated) {
+  if (phase !== 'authenticated') {
     return <Redirect href="/auth" />;
   }
 
@@ -86,7 +86,11 @@ export default function ChildrenScreen() {
   function confirmLogout() {
     Alert.alert('Выйти из аккаунта?', undefined, [
       { text: 'Отмена', style: 'cancel' },
-      { text: 'Выйти', style: 'destructive', onPress: () => dispatch(logout()) },
+      {
+        text: 'Выйти',
+        style: 'destructive',
+        onPress: () => dispatch(logoutRequested({ reason: 'user' })),
+      },
     ]);
   }
 

@@ -187,4 +187,16 @@ describe('ProtectedSessionRepository', () => {
     await repository.load();
     expect(getSpy).toHaveBeenCalledWith(PROTECTED_SESSION_STORAGE_KEY);
   });
+
+  it('resets persisted PIN failures after biometric success', async () => {
+    const storage = new MemoryStorage();
+    const repository = createProtectedSessionRepository(storage, pinCrypto);
+    await repository.beginSession('jwt');
+    await repository.completePinSetup('1234');
+    await repository.verifyPin('9999');
+    await expect(repository.resetFailedPinAttempts()).resolves.toMatchObject({
+      failedPinAttempts: 0,
+    });
+    await expect(repository.load()).resolves.toMatchObject({ failedPinAttempts: 0 });
+  });
 });

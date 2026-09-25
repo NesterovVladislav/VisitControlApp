@@ -16,14 +16,7 @@ import { LoginCredentials } from '../store/types/auth';
 export default function AuthScreen() {
   const router = useRouter();
   const dispatch = useAppDispatch();
-  const { isLoading, error, isAuthenticated } = useAppSelector(
-    (state) => state.auth
-  );
-
-  // Отладочное логирование состояния
-  useEffect(() => {
-    console.log('[Auth Screen] State changed:', { isLoading, error, isAuthenticated });
-  }, [isLoading, error, isAuthenticated]);
+  const { isLoading, error, phase } = useAppSelector((state) => state.auth);
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -31,10 +24,10 @@ export default function AuthScreen() {
 
   // После входа — главный экран родителя
   useEffect(() => {
-    if (isAuthenticated) {
+    if (phase === 'authenticated') {
       router.replace('/children');
     }
-  }, [isAuthenticated, router]);
+  }, [phase, router]);
 
   // Показываем Alert при ошибке
   useEffect(() => {
@@ -51,8 +44,6 @@ export default function AuthScreen() {
   }, [error, dispatch]);
 
   const handleLogin = () => {
-    console.log('[Auth Screen] Handle login called');
-
     // Валидация полей
     if (!email.trim()) {
       Alert.alert('Ошибка', 'Пожалуйста, введите email');

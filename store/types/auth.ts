@@ -19,21 +19,28 @@ export interface LoginCredentials {
   password: string;
 }
 
-/**
- * Результат входа: токен из POST /token и профиль из GET /user
- */
-export interface AuthResponse {
-  token: string;
-  user: User;
-}
+export type AuthPhase =
+  | 'bootstrapping'
+  | 'unauthenticated'
+  | 'pinSetupRequired'
+  | 'locked'
+  | 'validating'
+  | 'authenticated'
+  | 'validationUnavailable'
+  | 'storageUnavailable';
 
-/**
- * Состояние авторизации в Redux store
- */
+export type SetupStep = 'createPin' | 'offerBiometrics' | null;
+export type LogoutReason = 'user' | 'switchAccount' | 'expired';
+
 export interface AuthState {
-  isAuthenticated: boolean;
+  phase: AuthPhase;
+  setupStep: SetupStep;
   isLoading: boolean;
   error: string | null;
+  notice: string | null;
   user: User | null;
-  token: string | null;
+  biometricsAvailable: boolean;
+  biometricsEnabled: boolean;
+  remainingPinAttempts: number;
+  sessionEpoch: number;
 }
