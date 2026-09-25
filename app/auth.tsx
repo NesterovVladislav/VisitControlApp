@@ -29,10 +29,10 @@ export default function AuthScreen() {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
 
-  // Навигация на меню при успешной авторизации
+  // После входа — главный экран родителя
   useEffect(() => {
     if (isAuthenticated) {
-      router.replace('/menu');
+      router.replace('/children');
     }
   }, [isAuthenticated, router]);
 
@@ -77,10 +77,7 @@ export default function AuthScreen() {
       password: password.trim(),
     };
 
-    console.log('[Auth Screen] Dispatching loginStart with:', credentials);
-    const action = loginStart(credentials);
-    console.log('[Auth Screen] Action:', action);
-    dispatch(action);
+    dispatch(loginStart(credentials));
   };
 
   const isFormDisabled = isLoading;
@@ -145,6 +142,17 @@ export default function AuthScreen() {
           ) : (
             <Text style={styles.buttonText}>Войти</Text>
           )}
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.registerLink}
+          onPress={() => router.push('/register')}
+          disabled={isFormDisabled}
+          accessibilityRole="link"
+        >
+          <Text style={styles.registerText}>
+            Нет аккаунта? <Text style={styles.registerTextAccent}>Зарегистрироваться</Text>
+          </Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -237,5 +245,17 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: '600',
+  },
+  registerLink: {
+    marginTop: 20,
+    alignItems: 'center',
+  },
+  registerText: {
+    fontSize: 14,
+    color: '#666',
+  },
+  registerTextAccent: {
+    color: '#007AFF',
+    fontWeight: '500',
   },
 });

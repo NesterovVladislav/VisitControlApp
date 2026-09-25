@@ -1,50 +1,52 @@
 import { call, put, takeLatest } from 'redux-saga/effects';
 import { PayloadAction } from '@reduxjs/toolkit';
-import { loginStart, loginSuccess, loginFailure } from '../reducers/auth';
+import { loginStart, loginSuccess, loginFailure, logout } from '../reducers/auth';
 import { visitControlApi } from '../../services/api';
-import { LoginCredentials, AuthResponse } from '../types/auth';
+import { clearAuthToken, setAuthToken } from '../../services/auth/auth-token';
+import { LoginCredentials, User } from '../types/auth';
 import { ApiError } from '../../services/errors/api-error';
 
-/**
- * Saga для обработки авторизации
- */
-function* loginSaga(action: PayloadAction<LoginCredentials>) {
-  try {
-    console.log('[Auth Saga] Login started with credentials:', action.payload);
+export const AUTH_ERRORS = {
+  wrongCredentials: 'Неверный email или пароль',
+  network: 'Нет соединения с сервером. Проверьте интернет и попробуйте ещё раз',
+  generic: 'Не удалось войти. Попробуйте позже',
+} as const;
 
-    // Вызываем API метод авторизации
-    // Ретраи и таймауты обрабатываются на уровне API клиента
-    const response: AuthResponse = yield call(
-      visitControlApi.auth,
-      action.payload
-    );
-
-    console.log('[Auth Saga] Login success:', response);
-
-    // При успехе диспатчим success action
-    yield put(loginSuccess(response));
-  } catch (error) {
-    console.error('[Auth Saga] Login error:', error);
-
-    // Обрабатываем ошибку
-    let errorMessage = 'Авторизация не удалась. Пожалуйста, попробуйте еще раз.';
-
-    if (error instanceof ApiError) {
-      // Используем сообщение из API ошибки, если доступно
-      errorMessage = error.getErrorMessage() || errorMessage;
-    } else if (error instanceof Error) {
-      errorMessage = error.message;
-    }
-
-    // Диспатчим failure action с сообщением об ошибке
-    yield put(loginFailure(errorMessage));
+function toLoginError(error: unknown): string {
+  if (!(error instanceof ApiError)) {
+    return AUTH_ERRORS.generic;
   }
+  if (error.isNetworkError || error.isTimeoutError) {
+    return AUTH_ERRORS.network;
+  }
+  if (error.status === 401 || error.status === 400) {
+    return AUTH_ERRORS.wrongCredentials;
+  }
+  return AUTH_ERRORS.generic;
 }
 
 /**
- * Watcher saga для отслеживания действий авторизации
+ * Вход: POST /token, затем GET /user — без профиля экранам не хватает своего external_key.
+ * Учётные данные и профиль в лог не пишем.
  */
+function* loginSaga(action: PayloadAction<LoginCredentials>) {
+  try {
+    const token: string = yield call([visitControlApi, visitControlApi.login], action.payload);
+    setAuthToken(token);
+    const user: User = yield call([visitControlApi, visitControlApi.getMe]);
+    yield put(loginSuccess({ token, user }));
+  } catch (error) {
+    clearAuthToken();
+    console.warn('[Auth Saga] Login failed', error instanceof ApiError ? error.status : 'unknown');
+    yield put(loginFailure(toLoginError(error)));
+  }
+}
+
+function logoutSaga() {
+  clearAuthToken();
+}
+
 export function* watchLogin() {
-  console.log('[Auth Saga] Watcher started, listening for:', loginStart.type);
   yield takeLatest(loginStart.type, loginSaga);
+  yield takeLatest(logout.type, logoutSaga);
 }

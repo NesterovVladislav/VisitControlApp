@@ -16,8 +16,9 @@ export interface BackendConfig {
  */
 export const BACKENDS: Record<string, BackendConfig> = {
   visitControlServer: {
-    host: 'localhost',
-    port: 8080,
+    // Снаружи бэкенд доступен только через Caddy на 80-м порту: Caddy снимает префикс /api
+    // и проксирует на backend:8080 внутри docker-сети. Порт 8080 наружу не открыт.
+    host: '93.77.168.178',
     protocol: 'http',
     basePath: '/api',
     timeout: 10000,

@@ -3,6 +3,8 @@ import createSagaMiddleware from 'redux-saga';
 import { useDispatch, useSelector, TypedUseSelectorHook } from 'react-redux';
 import rootReducer, { RootState } from './reducers';
 import { rootSaga } from './sagas';
+import { logout } from './reducers/auth';
+import { setUnauthorizedHandler } from '../services/auth/auth-token';
 
 // Создаем middleware для redux-saga
 const sagaMiddleware = createSagaMiddleware();
@@ -22,6 +24,13 @@ export const store = configureStore({
 
 // Запускаем rootSaga
 sagaMiddleware.run(rootSaga);
+
+// Сервер отверг токен — выходим из аккаунта
+setUnauthorizedHandler(() => {
+  if (store.getState().auth.isAuthenticated) {
+    store.dispatch(logout());
+  }
+});
 
 // Типизированные хуки для использования в компонентах
 export type AppDispatch = typeof store.dispatch;

@@ -16,6 +16,18 @@ export default function RootLayout() {
         <Stack>
           <Stack.Screen name="index" options={{ headerShown: false }} />
           <Stack.Screen name="auth" options={{ headerShown: false }} />
+          <Stack.Screen
+            name="register"
+            options={{ title: 'Регистрация', headerBackTitle: 'Назад' }}
+          />
+          <Stack.Screen
+            name="registration-sent"
+            options={{ headerShown: false, gestureEnabled: false }}
+          />
+          <Stack.Screen
+            name="children"
+            options={{ title: 'Мои дети', headerBackVisible: false, gestureEnabled: false }}
+          />
           <Stack.Screen name="menu" options={{ headerShown: false }} />
           <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
         </Stack>

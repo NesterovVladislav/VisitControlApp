@@ -1,9 +1,70 @@
-import { AxiosInstance, AxiosResponse } from 'axios';
-import { createApiClient } from './client';
+import { AxiosError, AxiosInstance, AxiosResponse } from 'axios';
+import { createApiClient, setupAuthToken } from './client';
 import { RequestConfig, ApiResponse } from './types';
 import { ApiError } from '../errors/api-error';
 import { retryRequest, createRetryConfig } from './retry';
-import { LoginCredentials, AuthResponse } from '../../store/types/auth';
+import { LoginCredentials, User } from '../../store/types/auth';
+import { Child, VisitStatus } from '../../store/types/children';
+import { getAuthToken, notifyUnauthorized } from '../auth/auth-token';
+import { PrivacyPolicy, RegistrationRequest } from '../../store/types/registration';
+
+// DTO бэкенда в snake_case живут только здесь, наружу отдаются модели в camelCase.
+
+interface AuthRequestDto {
+  username: string;
+  password: string;
+}
+
+interface AuthResponseDto {
+  access_token: string;
+}
+
+interface UserShortInfoDto {
+  external_key: string;
+  first_name: string;
+  surname: string;
+  patronymic?: string | null;
+}
+
+interface UserDto extends UserShortInfoDto {
+  email?: string | null;
+  gender?: 'MALE' | 'FEMALE' | null;
+  role: { role: string };
+}
+
+interface ChildRepresentativeDto {
+  child_external_key: string;
+  representative_external_key: string;
+  role: { role: string };
+  child?: UserShortInfoDto;
+}
+
+interface VisitDto {
+  visitor_external_key: string;
+  representative_external_key: string;
+  status: 'IN' | 'OUT';
+}
+
+function mapUser(dto: UserDto): User {
+  return {
+    id: dto.external_key,
+    email: dto.email ?? '',
+    firstName: dto.first_name,
+    surname: dto.surname,
+    patronymic: dto.patronymic ?? null,
+    gender: dto.gender ?? null,
+    role: dto.role.role,
+  };
+}
+
+function mapChild(dto: ChildRepresentativeDto): Child {
+  return {
+    id: dto.child_external_key,
+    firstName: dto.child?.first_name ?? '',
+    surname: dto.child?.surname ?? '',
+    linkRole: dto.role.role,
+  };
+}
 
 /**
  * Клиент для работы с visitControlServer API
@@ -13,6 +74,17 @@ class VisitControlApiClient {
 
   constructor() {
     this.client = createApiClient('visitControlServer');
+    setupAuthToken(this.client, getAuthToken);
+    // Сервер отверг токен сессии — выходим. 401 на сам POST /token (неверный пароль) сюда не относится:
+    // у этого запроса нет заголовка Authorization.
+    this.client.interceptors.response.use(undefined, (error) => {
+      const original = error instanceof ApiError ? error.originalError : null;
+      const hadToken = original instanceof AxiosError && Boolean(original.config?.headers?.Authorization);
+      if (error instanceof ApiError && error.status === 401 && hadToken) {
+        notifyUnauthorized();
+      }
+      return Promise.reject(error);
+    });
   }
 
   /**
@@ -152,42 +224,87 @@ class VisitControlApiClient {
   }
 
   /**
-   * Авторизация пользователя
-   * @param credentials - данные для входа (email, password)
-   * @returns данные авторизации (token, user)
+   * Вход: POST /token → access_token.
+   * Бэкенд ищет пользователя по email, но поле называется username.
+   * Без ретраев и без логирования: в теле пароль.
    */
-  async auth(credentials: LoginCredentials): Promise<AuthResponse> {
-    // Мок успешного ответа (пока всегда возвращает успех)
-    // TODO: Заменить на реальный запрос когда бэкенд будет готов
-    const mockResponse: AuthResponse = {
-      token: 'mock-token-' + Date.now(),
-      user: {
-        id: '1',
-        email: credentials.email,
-        name: 'Mock User',
-      },
-    };
-
-    // Возвращаем мок с небольшой задержкой для имитации запроса
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        resolve(mockResponse);
-      }, 100);
-    });
-
-    // Реальный код для запроса (закомментирован до готовности бэкенда):
-    /*
-    const requestConfig: RequestConfig = {
-      timeout: 500, // Таймаут 500ms
-      retries: 2, // 2 ретрая
-      retryDelay: 100, // Задержка между попытками 100ms
-    };
-
-    return retryRequest(
-      () => this.post<AuthResponse, LoginCredentials>('/auth', credentials, requestConfig),
-      createRetryConfig(2, 100)
+  async login(credentials: LoginCredentials): Promise<string> {
+    const response = await this.post<AuthResponseDto, AuthRequestDto>(
+      '/token',
+      { username: credentials.email, password: credentials.password },
+      { skipLogging: true }
     );
-    */
+    return response.access_token;
+  }
+
+  /**
+   * Текущий пользователь по токену.
+   */
+  async getMe(): Promise<User> {
+    const dto = await retryRequest(
+      () => this.get<UserDto>('/user', { skipLogging: true }),
+      createRetryConfig(2, 500)
+    );
+    return mapUser(dto);
+  }
+
+  /**
+   * Дети, привязанные к представителю.
+   */
+  async getMyChildren(representativeKey: string): Promise<Child[]> {
+    const links = await retryRequest(
+      () =>
+        this.get<ChildRepresentativeDto[]>('/child-representative/children', {
+          params: { representative_external_key: representativeKey },
+          skipLogging: true,
+        }),
+      createRetryConfig(2, 500)
+    );
+    return links.map(mapChild);
+  }
+
+  /**
+   * Статус по последней отметке ребёнка. Если отметок не было, сервер отвечает 200 с пустым телом.
+   */
+  async getActualStatus(childKey: string): Promise<VisitStatus> {
+    const dto = await retryRequest(
+      () => this.get<VisitDto | ''>(`/visit/actual_status/${childKey}`),
+      createRetryConfig(2, 500)
+    );
+    return dto && dto.status ? dto.status : 'NONE';
+  }
+
+  /**
+   * Отметка «привёл / забрал». Без ретраев: повтор после таймаута может записать вторую отметку.
+   */
+  async createVisit(childKey: string, representativeKey: string, status: 'IN' | 'OUT'): Promise<void> {
+    await this.post<VisitDto, VisitDto>('/visit', {
+      visitor_external_key: childKey,
+      representative_external_key: representativeKey,
+      status,
+    });
+  }
+
+  /**
+   * Текущая политика обработки персональных данных. Доступно без токена.
+   * GET безопасно повторять, поэтому при сетевых ошибках и 5xx делаем 2 ретрая.
+   */
+  async getPrivacyPolicy(): Promise<PrivacyPolicy> {
+    return retryRequest(
+      () => this.get<PrivacyPolicy>('/registration/policy'),
+      createRetryConfig(2, 500)
+    );
+  }
+
+  /**
+   * Заявка на регистрацию. Доступно без токена.
+   * Без ретраев: повтор после таймаута может создать вторую заявку.
+   * Без логирования: тело запроса содержит персональные данные.
+   */
+  async register(request: RegistrationRequest): Promise<void> {
+    await this.post<unknown, RegistrationRequest>('/registration', request, {
+      skipLogging: true,
+    });
   }
 
   /**

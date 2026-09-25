@@ -1,11 +1,14 @@
 /**
- * Данные пользователя
+ * Текущий пользователь из GET /user
  */
 export interface User {
   id: string;
   email: string;
-  name?: string;
-  [key: string]: unknown;
+  firstName: string;
+  surname: string;
+  patronymic: string | null;
+  gender: 'MALE' | 'FEMALE' | null;
+  role: string;
 }
 
 /**
@@ -17,7 +20,7 @@ export interface LoginCredentials {
 }
 
 /**
- * Ответ от API при успешной авторизации
+ * Результат входа: токен из POST /token и профиль из GET /user
  */
 export interface AuthResponse {
   token: string;
