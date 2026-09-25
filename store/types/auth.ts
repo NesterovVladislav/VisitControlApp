@@ -32,6 +32,17 @@ export type AuthPhase =
 export type SetupStep = 'createPin' | 'offerBiometrics' | null;
 export type LogoutReason = 'user' | 'switchAccount' | 'expired';
 
+/**
+ * Режим работы. Для администратора, который ещё и родитель, — что сейчас на экране.
+ * На права не влияет: токен и роль те же.
+ */
+export type AppMode = 'admin' | 'parent';
+
+export const ADMIN_ROLE = 'ADMIN';
+
+/**
+ * Состояние авторизации в Redux store
+ */
 export interface AuthState {
   phase: AuthPhase;
   setupStep: SetupStep;
@@ -43,4 +54,5 @@ export interface AuthState {
   biometricsEnabled: boolean;
   remainingPinAttempts: number;
   sessionEpoch: number;
+  mode: AppMode;
 }

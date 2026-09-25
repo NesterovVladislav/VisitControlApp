@@ -8,7 +8,8 @@ export interface SegmentedOption<T extends string> {
 }
 
 interface SegmentedControlProps<T extends string> {
-  label: string;
+  /** Подпись над переключателем, как у полей формы; без неё — только кнопки */
+  label?: string;
   options: SegmentedOption<T>[];
   value: T | null;
   onChange: (value: T) => void;
@@ -29,7 +30,7 @@ export default function SegmentedControl<T extends string>({
 }: SegmentedControlProps<T>) {
   return (
     <View style={styles.container}>
-      <Text style={styles.label}>{label}</Text>
+      {label ? <Text style={styles.label}>{label}</Text> : null}
       <View style={[styles.group, error && styles.groupError]} accessibilityRole="radiogroup">
         {options.map((option, index) => {
           const selected = option.value === value;

@@ -20,6 +20,7 @@ export const initialAuthState: AuthState = {
   biometricsEnabled: false,
   remainingPinAttempts: MAX_PIN_ATTEMPTS,
   sessionEpoch: 0,
+  mode: 'parent',
 };
 
 const authSlice = createSlice({
@@ -80,7 +81,11 @@ const authSlice = createSlice({
     loginStart: (state, _action: PayloadAction<LoginCredentials>) => {
       state.isLoading = true;
       state.error = null;
+      state.user = action.payload.user;
+      state.token = action.payload.token;
       state.notice = null;
+      // Режим пока не сохраняется между запусками, поэтому администратор начинает с рабочего режима
+      state.mode = action.payload.user.role === ADMIN_ROLE ? 'admin' : 'parent';
     },
     loginFailure: (state, action: PayloadAction<string>) => {
       state.phase = 'unauthenticated';
@@ -185,6 +190,20 @@ const authSlice = createSlice({
       state.user = null;
       state.sessionEpoch += 1;
     },
+    switchMode: (state, action: PayloadAction<AppMode>) => {
+      // Переключаться может только администратор, родитель всегда в режиме родителя
+      if (state.user?.role === ADMIN_ROLE) {
+        state.mode = action.payload;
+      }
+    },
+    logout: (state) => {
+      state.mode = 'parent';
+      state.isAuthenticated = false;
+      state.isLoading = false;
+      state.error = null;
+      state.user = null;
+      state.token = null;
+    },
     logoutRequested: (
       state,
       _action: PayloadAction<{ reason: Exclude<LogoutReason, 'expired'> }>,
@@ -215,6 +234,8 @@ const authSlice = createSlice({
   },
 });
 
+export const { loginStart, loginSuccess, loginFailure, switchMode, logout, clearError } =
+  authSlice.actions;
 export const {
   bootstrapSession,
   bootstrapUnauthenticated,

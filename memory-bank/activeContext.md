@@ -10,6 +10,9 @@
 - Изменён текст на главном экране на "Привет мир"
 - Реализован экран регистрации по `docs/registration-screen.md`: `app/register.tsx`, `app/registration-sent.tsx`, slice/saga `registration`, маски и валидация в `utils/`, компоненты `form-field`, `segmented-control`, `checkbox-row`. Пароль не вводится — приходит письмом после подтверждения администратором
 - Реализован экран «Мои дети» по `docs/children-screen.md` (`app/children.tsx`, slice/saga `children`) и реальный вход: `POST /token` → `GET /user`, токен в памяти (`services/auth/auth-token.ts`), Bearer и выход по 401 в `visit-control-api.ts`. SecureStore и восстановление сессии ещё не сделаны
+- Каркас раздела администратора по `docs/admin-screens.md`: `app/(admin)/` с пятью вкладками (пока заглушки `components/admin-placeholder.tsx`), переключение режимов `state.auth.mode` / `switchMode`: «Ещё» → «Режим родителя», в «Мои дети» меню «⋯» → «Режим администратора». Маршрут после входа выбирается по роли и режиму в `app/auth.tsx`
+- Вкладка «Посещение» администратора: `app/(admin)/visits/index.tsx`, slice/saga `visits` (`GET /group/children/present`, `GET /visit/list` с подгрузкой страниц), `utils/plural.ts`, `utils/visit-dates.ts`. Для админки пока тот же паттерн slice + saga, RTK Query не вводили
+- Вкладка «Заявки» администратора: `app/(admin)/requests/` (свой Stack, список + `[id]`), slice/saga `requests`, значок с числом заявок в `app/(admin)/_layout.tsx`. Подтверждение, отказ с причиной, повторная отправка пароля
 - Адрес бэкенда: `http://93.77.168.178/api` (через Caddy, порт 80; 8080 наружу закрыт)
 
 ## Следующие шаги

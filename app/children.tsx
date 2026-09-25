@@ -1,5 +1,5 @@
 import { useFocusEffect } from '@react-navigation/native';
-import { Stack } from 'expo-router';
+import { Stack, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useRef } from 'react';
 import {
   ActivityIndicator,
@@ -14,7 +14,7 @@ import {
 } from 'react-native';
 import ChildCard, { markActionLabel } from '../components/child-card';
 import { useAppDispatch, useAppSelector } from '../store';
-import { logoutRequested } from '../store/reducers/auth';
+import { logoutRequested, switchMode } from '../store/reducers/auth';
 import {
   clearMarkError,
   loadChildrenStart,
@@ -22,9 +22,11 @@ import {
   markVisitStart,
   refreshStatuses,
 } from '../store/reducers/children';
+import { ADMIN_ROLE } from '../store/types/auth';
 import { Child, isInKindergarten } from '../store/types/children';
 
 export default function ChildrenScreen() {
+  const router = useRouter();
   const dispatch = useAppDispatch();
   const { user } = useAppSelector((state) => state.auth);
   const { items, listStatus, refreshing, statusById, markingIds, markError } = useAppSelector(
@@ -90,14 +92,41 @@ export default function ChildrenScreen() {
     ]);
   }
 
+  const isAdmin = user?.role === ADMIN_ROLE;
+
+  // Администратор в режиме родителя: меню с возвратом в рабочий режим
+  function openMenu() {
+    Alert.alert(`${user?.firstName ?? ''} ${user?.surname ?? ''}`.trim(), undefined, [
+      {
+        text: 'Режим администратора',
+        onPress: () => {
+          dispatch(switchMode('admin'));
+          router.replace('/visits');
+        },
+      },
+      { text: 'Выйти', style: 'destructive', onPress: confirmLogout },
+      { text: 'Отмена', style: 'cancel' },
+    ]);
+  }
+
   const header = (
     <Stack.Screen
       options={{
-        headerRight: () => (
-          <TouchableOpacity onPress={confirmLogout} accessibilityRole="button" hitSlop={8}>
-            <Text style={styles.headerButton}>Выйти</Text>
-          </TouchableOpacity>
-        ),
+        headerRight: () =>
+          isAdmin ? (
+            <TouchableOpacity
+              onPress={openMenu}
+              accessibilityRole="button"
+              accessibilityLabel="Меню"
+              hitSlop={8}
+            >
+              <Text style={styles.headerMenu}>⋯</Text>
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity onPress={confirmLogout} accessibilityRole="button" hitSlop={8}>
+              <Text style={styles.headerButton}>Выйти</Text>
+            </TouchableOpacity>
+          ),
       }}
     />
   );
@@ -211,5 +240,11 @@ const styles = StyleSheet.create({
   headerButton: {
     color: '#007AFF',
     fontSize: 16,
+  },
+  headerMenu: {
+    color: '#007AFF',
+    fontSize: 24,
+    fontWeight: '700',
+    paddingHorizontal: 4,
   },
 });
