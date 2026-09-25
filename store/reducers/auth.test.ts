@@ -107,6 +107,19 @@ describe('auth reducer state machine', () => {
     expect(signedOut.user).toBeNull();
   });
 
+  it('restores the selected parent mode after unlocking the same administrator', () => {
+    const admin = { ...user, role: 'ADMIN' };
+    const authenticated = reducer(initialAuthState, validationSucceeded(admin));
+    const parentMode = reducer(authenticated, switchMode('parent'));
+    const locked = reducer(parentMode, lockSession());
+    const validating = reducer(locked, validationStarted());
+
+    expect(reducer(validating, validationSucceeded(admin)).mode).toBe('parent');
+    expect(
+      reducer(validating, validationSucceeded({ ...admin, id: 'another-admin' })).mode,
+    ).toBe('admin');
+  });
+
   it('does not allow a parent or a locked administrator to switch into admin mode', () => {
     const parent = reducer(initialAuthState, validationSucceeded(user));
     expect(reducer(parent, switchMode('admin')).mode).toBe('parent');

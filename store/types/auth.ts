@@ -55,4 +55,5 @@ export interface AuthState {
   remainingPinAttempts: number;
   sessionEpoch: number;
   mode: AppMode;
+  selectedModeOwnerId: string | null;
 }

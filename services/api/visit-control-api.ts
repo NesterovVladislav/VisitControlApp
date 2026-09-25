@@ -210,12 +210,20 @@ class VisitControlApiClient {
   constructor() {
     this.client = createApiClient('visitControlServer');
     setupAuthToken(this.client, getAuthToken);
-    // Сервер отверг токен сессии — выходим. 401 на сам POST /token (неверный пароль) сюда не относится:
-    // у этого запроса нет заголовка Authorization.
+    // Выходим только если сервер отверг токен текущей сессии. Запоздалый 401 от
+    // предыдущего аккаунта не должен завершать сессию нового пользователя.
     this.client.interceptors.response.use(undefined, (error) => {
       const original = error instanceof ApiError ? error.originalError : null;
-      const hadToken = original instanceof AxiosError && Boolean(original.config?.headers?.Authorization);
-      if (error instanceof ApiError && error.status === 401 && hadToken) {
+      const requestAuthorization = original instanceof AxiosError
+        ? original.config?.headers?.Authorization
+        : undefined;
+      const currentToken = getAuthToken();
+      if (
+        error instanceof ApiError &&
+        error.status === 401 &&
+        currentToken &&
+        requestAuthorization === `Bearer ${currentToken}`
+      ) {
         notifyUnauthorized();
       }
       return Promise.reject(error);

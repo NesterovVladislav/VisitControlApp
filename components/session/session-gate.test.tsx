@@ -87,6 +87,7 @@ const baseState: AuthState = {
   remainingPinAttempts: 5,
   sessionEpoch: 0,
   mode: 'parent',
+  selectedModeOwnerId: null,
 };
 let authState = baseState;
 

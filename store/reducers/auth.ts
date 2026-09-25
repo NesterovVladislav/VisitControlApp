@@ -23,6 +23,7 @@ export const initialAuthState: AuthState = {
   remainingPinAttempts: MAX_PIN_ATTEMPTS,
   sessionEpoch: 0,
   mode: 'parent',
+  selectedModeOwnerId: null,
 };
 
 const authSlice = createSlice({
@@ -148,7 +149,12 @@ const authSlice = createSlice({
       state.error = null;
       state.notice = null;
       state.user = action.payload;
-      state.mode = action.payload.role === ADMIN_ROLE ? 'admin' : 'parent';
+      const keepSelection = action.payload.role === ADMIN_ROLE &&
+        state.selectedModeOwnerId === action.payload.id;
+      state.mode = action.payload.role === ADMIN_ROLE
+        ? (keepSelection ? state.mode : 'admin')
+        : 'parent';
+      if (!keepSelection) state.selectedModeOwnerId = null;
       state.remainingPinAttempts = MAX_PIN_ATTEMPTS;
     },
     sessionValidationUnavailable: (state, action: PayloadAction<string>) => {
@@ -193,6 +199,7 @@ const authSlice = createSlice({
       // Переключаться может только администратор, родитель всегда в режиме родителя
       if (state.phase === 'authenticated' && state.user?.role === ADMIN_ROLE) {
         state.mode = action.payload;
+        state.selectedModeOwnerId = state.user.id;
       }
     },
     logoutRequested: (
