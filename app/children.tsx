@@ -1,5 +1,5 @@
 import { useFocusEffect } from '@react-navigation/native';
-import { Redirect, Stack } from 'expo-router';
+import { Stack } from 'expo-router';
 import React, { useCallback, useEffect, useRef } from 'react';
 import {
   ActivityIndicator,
@@ -26,7 +26,7 @@ import { Child, isInKindergarten } from '../store/types/children';
 
 export default function ChildrenScreen() {
   const dispatch = useAppDispatch();
-  const { phase, user } = useAppSelector((state) => state.auth);
+  const { user } = useAppSelector((state) => state.auth);
   const { items, listStatus, refreshing, statusById, markingIds, markError } = useAppSelector(
     (state) => state.children
   );
@@ -61,10 +61,6 @@ export default function ChildrenScreen() {
       ]);
     }
   }, [markError, dispatch]);
-
-  if (phase !== 'authenticated') {
-    return <Redirect href="/auth" />;
-  }
 
   function confirmMark(child: Child) {
     const seenStatus = statusById[child.id]?.value;

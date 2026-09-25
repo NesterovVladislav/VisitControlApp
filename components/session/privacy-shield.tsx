@@ -6,6 +6,7 @@ export function PrivacyShield() {
       accessibilityRole="progressbar"
       accessibilityLabel="Visit Control защищает данные"
       style={styles.container}
+      testID="privacy-shield"
     >
       <Text style={styles.title}>Visit Control</Text>
       <ActivityIndicator color="#ffffff" size="large" />

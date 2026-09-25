@@ -39,7 +39,7 @@ function byName(a: Child, b: Child): number {
   return `${a.firstName} ${a.surname}`.localeCompare(`${b.firstName} ${b.surname}`, 'ru');
 }
 
-function* loadStatusSaga(action: PayloadAction<string>) {
+export function* loadStatusSaga(action: PayloadAction<string>) {
   const childId = action.payload;
   const sessionEpoch: number = yield select(selectSessionEpoch);
   try {
@@ -53,7 +53,7 @@ function* loadStatusSaga(action: PayloadAction<string>) {
   }
 }
 
-function* loadChildrenSaga() {
+export function* loadChildrenSaga() {
   const sessionEpoch: number = yield select(selectSessionEpoch);
   const userId: string | null = yield select(selectUserId);
   if (!userId) {

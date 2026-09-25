@@ -16,18 +16,11 @@ import { LoginCredentials } from '../store/types/auth';
 export default function AuthScreen() {
   const router = useRouter();
   const dispatch = useAppDispatch();
-  const { isLoading, error, phase } = useAppSelector((state) => state.auth);
+  const { isLoading, error } = useAppSelector((state) => state.auth);
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-
-  // После входа — главный экран родителя
-  useEffect(() => {
-    if (phase === 'authenticated') {
-      router.replace('/children');
-    }
-  }, [phase, router]);
 
   // Показываем Alert при ошибке
   useEffect(() => {

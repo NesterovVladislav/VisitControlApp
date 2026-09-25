@@ -5,7 +5,7 @@ import createSagaMiddleware from 'redux-saga';
 import { setUnauthorizedHandler } from '../services/auth/auth-token';
 import { sanitizeReduxAction, sanitizeReduxState } from './devtools';
 import rootReducer, { RootState } from './reducers';
-import { bootstrapSession, sessionExpired } from './reducers/auth';
+import { sessionExpired } from './reducers/auth';
 import { rootSaga } from './sagas';
 
 const sagaMiddleware = createSagaMiddleware();
@@ -31,8 +31,6 @@ sagaMiddleware.run(rootSaga);
 setUnauthorizedHandler(() => {
   store.dispatch(sessionExpired());
 });
-
-store.dispatch(bootstrapSession());
 
 export type AppDispatch = typeof store.dispatch;
 export const useAppDispatch = () => useDispatch<AppDispatch>();
