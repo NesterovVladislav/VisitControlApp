@@ -402,9 +402,15 @@ git commit -m "feat: add protected session state machine"
 - [ ] **Step 1: Write exact threshold tests**
 
 ```ts
-expect(shouldLockAfterBackground(1_000, 300_999)).toBe(false);
-expect(shouldLockAfterBackground(1_000, 301_000)).toBe(true);
-expect(shouldLockAfterBackground(1_000, 301_001)).toBe(true);
+const startedAt = { monotonicMs: 1_000, wallClockMs: 10_000 };
+expect(shouldLockAfterBackground(startedAt, {
+  monotonicMs: 300_999,
+  wallClockMs: 309_999,
+})).toBe(false);
+expect(shouldLockAfterBackground(startedAt, {
+  monotonicMs: 301_000,
+  wallClockMs: 310_000,
+})).toBe(true);
 ```
 
 Hook tests must assert that inactive/background immediately shows the React shield, short resume hides it without dispatch, long resume dispatches `lockSession` before hiding it, and duplicate events do not reset the original timestamp. Native privacy tests assert protected phases call `preventScreenCaptureAsync('visit-control-session')`, iOS enables app-switcher protection, unauthenticated cleanup re-allows capture and disables iOS protection, and native failures retain the React shield without crashing.
@@ -417,7 +423,7 @@ Expected: FAIL because lifecycle modules are missing.
 
 - [ ] **Step 3: Implement the monotonic lifecycle controller**
 
-Use `performance.now()` through an injectable clock. Only an authenticated session records the background timestamp. Treat process restart as cold bootstrap rather than persisting the timestamp.
+Record both `performance.now()` and `Date.now()` on every transition away from active so Android deep sleep and protected phase changes cannot bypass the timeout. Use the larger valid elapsed duration. Treat process restart as cold bootstrap rather than persisting either timestamp.
 
 - [ ] **Step 4: Implement native and React privacy protection**
 

@@ -61,7 +61,7 @@ If the process is terminated after sign-in but before PIN creation is complete, 
 ### Background and foreground
 
 - On transition to inactive or background, the application immediately draws a privacy shield so protected data is not captured in the system application switcher.
-- The application records a monotonic in-process timestamp.
+- The application records both monotonic and wall-clock timestamps for every transition away from active, including transitions whose protected phase changes while backgrounded.
 - On return before 300,000 milliseconds, it removes the privacy shield without requiring unlock.
 - On return after 300,000 milliseconds, it changes the session to locked before removing the shield.
 - If the operating system killed the process, the next launch follows the cold-launch flow and therefore always locks.
@@ -134,7 +134,7 @@ Biometric cancellation or failure returns to PIN entry and never consumes a PIN 
 
 ### Lifecycle lock controller
 
-A single `AppState` listener owns the privacy shield, monotonic background timestamp, and five-minute decision. `expo-screen-capture` provides native app-switcher/screen protection while a protected session exists, and the opaque React shield remains a UI fallback. Screen components do not implement independent timers.
+A single `AppState` listener owns the privacy shield, dual background timestamps, and five-minute decision. `expo-screen-capture` provides native app-switcher/screen protection while a protected session exists, and the opaque React shield remains a UI fallback. Screen components do not implement independent timers.
 
 ### API session expiry handler
 
