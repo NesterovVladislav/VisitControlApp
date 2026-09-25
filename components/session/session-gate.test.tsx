@@ -86,6 +86,7 @@ const baseState: AuthState = {
   biometricsEnabled: false,
   remainingPinAttempts: 5,
   sessionEpoch: 0,
+  mode: 'parent',
 };
 let authState = baseState;
 
@@ -135,17 +136,20 @@ describe('SessionGate', () => {
     expect(publicGate.getByTestId('route-register')).toBeTruthy();
     expect(publicGate.queryByTestId('route-children')).toBeNull();
     expect(publicGate.queryByTestId('route-menu')).toBeNull();
+    expect(publicGate.queryByTestId('route-(admin)')).toBeNull();
 
     await publicGate.unmount();
     const lockedGate = await renderGate({ phase: 'locked' });
     expect(lockedGate.queryByTestId('route-register')).toBeNull();
     expect(lockedGate.queryByTestId('route-children')).toBeNull();
+    expect(lockedGate.queryByTestId('route-(admin)')).toBeNull();
   });
 
   it('mounts protected routes only after backend validation succeeds', async () => {
     const screen = await renderGate({ phase: 'authenticated' });
     expect(screen.getByTestId('route-children')).toBeTruthy();
     expect(screen.getByTestId('route-menu')).toBeTruthy();
+    expect(screen.getByTestId('route-(admin)')).toBeTruthy();
     expect(screen.queryByTestId('route-register')).toBeNull();
   });
 

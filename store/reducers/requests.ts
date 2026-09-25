@@ -5,7 +5,7 @@ import {
   RequestOutcome,
   RequestsState,
 } from '../types/requests';
-import { logout } from './auth';
+import { logoutCompleted } from './auth';
 
 const initialState: RequestsState = {
   items: [],
@@ -100,7 +100,7 @@ const requestsSlice = createSlice({
     },
   },
   extraReducers: (builder) => {
-    builder.addCase(logout, () => initialState);
+    builder.addCase(logoutCompleted, () => initialState);
   },
 });
 

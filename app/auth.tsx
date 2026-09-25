@@ -11,31 +11,15 @@ import {
 } from 'react-native';
 import { useAppDispatch, useAppSelector } from '../store';
 import { clearError, loginStart } from '../store/reducers/auth';
-import { ADMIN_ROLE, LoginCredentials } from '../store/types/auth';
+import { LoginCredentials } from '../store/types/auth';
 
 export default function AuthScreen() {
   const router = useRouter();
   const dispatch = useAppDispatch();
   const { isLoading, error, notice } = useAppSelector((state) => state.auth);
-  const { isLoading, error, isAuthenticated, user, mode } = useAppSelector(
-    (state) => state.auth
-  );
-
-  // Отладочное логирование состояния
-  useEffect(() => {
-    console.log('[Auth Screen] State changed:', { isLoading, error, isAuthenticated });
-  }, [isLoading, error, isAuthenticated]);
-
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-
-  // После входа: администратор — в рабочий режим или в режим родителя, родитель — на «Мои дети»
-  useEffect(() => {
-    if (isAuthenticated) {
-      router.replace(user?.role === ADMIN_ROLE && mode === 'admin' ? '/visits' : '/children');
-    }
-  }, [isAuthenticated, user, mode, router]);
 
   // Показываем Alert при ошибке
   useEffect(() => {

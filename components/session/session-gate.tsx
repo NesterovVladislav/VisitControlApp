@@ -31,6 +31,7 @@ function SessionNavigator({ phase }: { phase: AuthPhase }) {
         />
       </Stack.Protected>
       <Stack.Protected guard={protectedRoutes}>
+        <Stack.Screen name="(admin)" options={{ headerShown: false }} />
         <Stack.Screen
           name="children"
           options={{

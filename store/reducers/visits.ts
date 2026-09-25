@@ -1,6 +1,6 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import { Presence, VisitPage, VisitsState } from '../types/visits';
-import { logout } from './auth';
+import { logoutCompleted } from './auth';
 
 const initialState: VisitsState = {
   present: {
@@ -98,7 +98,7 @@ const visitsSlice = createSlice({
     },
   },
   extraReducers: (builder) => {
-    builder.addCase(logout, () => initialState);
+    builder.addCase(logoutCompleted, () => initialState);
   },
 });
 

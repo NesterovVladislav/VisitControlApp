@@ -1,6 +1,8 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 
 import {
+  ADMIN_ROLE,
+  AppMode,
   AuthState,
   LoginCredentials,
   LogoutReason,
@@ -81,11 +83,7 @@ const authSlice = createSlice({
     loginStart: (state, _action: PayloadAction<LoginCredentials>) => {
       state.isLoading = true;
       state.error = null;
-      state.user = action.payload.user;
-      state.token = action.payload.token;
       state.notice = null;
-      // Режим пока не сохраняется между запусками, поэтому администратор начинает с рабочего режима
-      state.mode = action.payload.user.role === ADMIN_ROLE ? 'admin' : 'parent';
     },
     loginFailure: (state, action: PayloadAction<string>) => {
       state.phase = 'unauthenticated';
@@ -150,6 +148,7 @@ const authSlice = createSlice({
       state.error = null;
       state.notice = null;
       state.user = action.payload;
+      state.mode = action.payload.role === ADMIN_ROLE ? 'admin' : 'parent';
       state.remainingPinAttempts = MAX_PIN_ATTEMPTS;
     },
     sessionValidationUnavailable: (state, action: PayloadAction<string>) => {
@@ -192,17 +191,9 @@ const authSlice = createSlice({
     },
     switchMode: (state, action: PayloadAction<AppMode>) => {
       // Переключаться может только администратор, родитель всегда в режиме родителя
-      if (state.user?.role === ADMIN_ROLE) {
+      if (state.phase === 'authenticated' && state.user?.role === ADMIN_ROLE) {
         state.mode = action.payload;
       }
-    },
-    logout: (state) => {
-      state.mode = 'parent';
-      state.isAuthenticated = false;
-      state.isLoading = false;
-      state.error = null;
-      state.user = null;
-      state.token = null;
     },
     logoutRequested: (
       state,
@@ -234,8 +225,6 @@ const authSlice = createSlice({
   },
 });
 
-export const { loginStart, loginSuccess, loginFailure, switchMode, logout, clearError } =
-  authSlice.actions;
 export const {
   bootstrapSession,
   bootstrapUnauthenticated,
@@ -256,6 +245,7 @@ export const {
   storageUnavailable,
   retryProtectedStorage,
   lockSession,
+  switchMode,
   logoutRequested,
   sessionExpired,
   logoutCompleted,

@@ -3,7 +3,7 @@ import React from 'react';
 import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useAppDispatch, useAppSelector } from '../../../store';
-import { logout, switchMode } from '../../../store/reducers/auth';
+import { logoutRequested, switchMode } from '../../../store/reducers/auth';
 
 export default function MoreScreen() {
   const router = useRouter();
@@ -18,7 +18,7 @@ export default function MoreScreen() {
   function confirmLogout() {
     Alert.alert('Выйти из аккаунта?', undefined, [
       { text: 'Отмена', style: 'cancel' },
-      { text: 'Выйти', style: 'destructive', onPress: () => dispatch(logout()) },
+      { text: 'Выйти', style: 'destructive', onPress: () => dispatch(logoutRequested({ reason: 'user' })) },
     ]);
   }
 

@@ -11,9 +11,9 @@ import { ADMIN_ROLE } from '../../store/types/auth';
  */
 export default function AdminLayout() {
   const dispatch = useAppDispatch();
-  const { isAuthenticated, user } = useAppSelector((state) => state.auth);
+  const { phase, user, mode } = useAppSelector((state) => state.auth);
   const pendingRequests = useAppSelector((state) => state.requests.total);
-  const isAdmin = isAuthenticated && user?.role === ADMIN_ROLE;
+  const isAdmin = phase === 'authenticated' && user?.role === ADMIN_ROLE && mode === 'admin';
 
   // Заявки грузим сразу, а не при открытии вкладки: число нужно для значка
   useEffect(() => {
@@ -22,10 +22,10 @@ export default function AdminLayout() {
     }
   }, [isAdmin, dispatch]);
 
-  if (!isAuthenticated) {
-    return <Redirect href="/auth" />;
+  if (phase !== 'authenticated') {
+    return null;
   }
-  if (user?.role !== ADMIN_ROLE) {
+  if (user?.role !== ADMIN_ROLE || mode !== 'admin') {
     return <Redirect href="/children" />;
   }
 

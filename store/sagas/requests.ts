@@ -1,5 +1,5 @@
 import { PayloadAction } from '@reduxjs/toolkit';
-import { call, put, takeLatest, takeLeading } from 'redux-saga/effects';
+import { call, put, select, takeLatest, takeLeading } from 'redux-saga/effects';
 import { visitControlApi } from '../../services/api';
 import { ApiError } from '../../services/errors/api-error';
 import {
@@ -15,6 +15,7 @@ import {
   resendPassword,
   resendPasswordSuccess,
 } from '../reducers/requests';
+import { RootState } from '../reducers';
 import { RegistrationRequestsPage, RegistrationRequestView } from '../types/requests';
 
 export const REQUEST_MESSAGES = {
@@ -22,14 +23,24 @@ export const REQUEST_MESSAGES = {
   generic: 'Не удалось выполнить действие. Попробуйте позже',
 } as const;
 
+const selectSessionEpoch = (state: RootState) => state.auth.sessionEpoch;
+
+function* isCurrentSession(expectedEpoch: number) {
+  const currentEpoch: number = yield select(selectSessionEpoch);
+  return currentEpoch === expectedEpoch;
+}
+
 function* loadRequestsSaga() {
+  const sessionEpoch: number = yield select(selectSessionEpoch);
   try {
     const page: RegistrationRequestsPage = yield call([
       visitControlApi,
       visitControlApi.getRegistrationRequests,
     ]);
+    if (!(yield* isCurrentSession(sessionEpoch))) return;
     yield put(loadRequestsSuccess(page));
   } catch (error) {
+    if (!(yield* isCurrentSession(sessionEpoch))) return;
     console.warn('[Requests Saga] Failed to load requests', error instanceof ApiError ? error.status : error);
     yield put(loadRequestsFailure());
   }
@@ -67,32 +78,41 @@ function* handleActionError(request: RegistrationRequestView, error: unknown) {
 
 function* approveSaga(action: PayloadAction<RegistrationRequestView>) {
   const request = action.payload;
+  const sessionEpoch: number = yield select(selectSessionEpoch);
   try {
     const passwordSent: boolean = yield call(
       [visitControlApi, visitControlApi.approveRegistration],
       request.id
     );
+    if (!(yield* isCurrentSession(sessionEpoch))) return;
     yield put(approveSuccess({ request, passwordSent }));
   } catch (error) {
+    if (!(yield* isCurrentSession(sessionEpoch))) return;
     yield call(handleActionError, request, error);
   }
 }
 
 function* rejectSaga(action: PayloadAction<{ request: RegistrationRequestView; reason: string | null }>) {
   const { request, reason } = action.payload;
+  const sessionEpoch: number = yield select(selectSessionEpoch);
   try {
     yield call([visitControlApi, visitControlApi.rejectRegistration], request.id, reason);
+    if (!(yield* isCurrentSession(sessionEpoch))) return;
     yield put(rejectSuccess(request));
   } catch (error) {
+    if (!(yield* isCurrentSession(sessionEpoch))) return;
     yield call(handleActionError, request, error);
   }
 }
 
 function* resendPasswordSaga(action: PayloadAction<string>) {
+  const sessionEpoch: number = yield select(selectSessionEpoch);
   try {
     const passwordSent: boolean = yield call([visitControlApi, visitControlApi.resetPassword], action.payload);
+    if (!(yield* isCurrentSession(sessionEpoch))) return;
     yield put(resendPasswordSuccess({ id: action.payload, passwordSent }));
   } catch (error) {
+    if (!(yield* isCurrentSession(sessionEpoch))) return;
     console.warn('[Requests Saga] Password reset failed', error instanceof ApiError ? error.status : error);
     yield put(requestActionFailure(toActionError(error)));
   }

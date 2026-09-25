@@ -20,7 +20,6 @@ import {
 } from '../../services/auth/protected-session';
 import { clearAuthToken, setAuthToken } from '../../services/auth/auth-token';
 import { loadChildrenStart } from '../reducers/children';
-import { ADMIN_ROLE, LoginCredentials, User } from '../types/auth';
 import { ApiError } from '../../services/errors/api-error';
 import { RootState } from '../reducers';
 import {
@@ -47,7 +46,7 @@ import {
   validationStarted,
   validationSucceeded,
 } from '../reducers/auth';
-import { LoginCredentials, LogoutReason, User } from '../types/auth';
+import { ADMIN_ROLE, LoginCredentials, LogoutReason, User } from '../types/auth';
 
 export const AUTH_ERRORS = {
   wrongCredentials: 'Неверный email или пароль',
@@ -94,7 +93,6 @@ function* validateProtectedRecord(record: ProtectedSessionRecord) {
     );
     if (currentEpoch !== expectedEpoch) return;
     yield put(validationSucceeded(user));
-    yield put(loginSuccess({ token, user }));
     // Администратору свои дети нужны сразу: по ним решаем, показывать ли переключатель в режим родителя.
     // Родителю список загрузит экран «Мои дети».
     if (user.role === ADMIN_ROLE) {

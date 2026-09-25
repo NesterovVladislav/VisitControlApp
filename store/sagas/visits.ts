@@ -13,25 +13,38 @@ import {
 import { RootState } from '../reducers';
 import { Presence, VisitPage } from '../types/visits';
 
+const selectSessionEpoch = (state: RootState) => state.auth.sessionEpoch;
+
+function* isCurrentSession(expectedEpoch: number) {
+  const currentEpoch: number = yield select(selectSessionEpoch);
+  return currentEpoch === expectedEpoch;
+}
+
 function logFailure(what: string, error: unknown) {
   console.warn(`[Visits Saga] Failed to load ${what}`, error instanceof ApiError ? error.status : error);
 }
 
 function* loadPresentSaga() {
+  const sessionEpoch: number = yield select(selectSessionEpoch);
   try {
     const presence: Presence = yield call([visitControlApi, visitControlApi.getPresence]);
+    if (!(yield* isCurrentSession(sessionEpoch))) return;
     yield put(loadPresentSuccess(presence));
   } catch (error) {
+    if (!(yield* isCurrentSession(sessionEpoch))) return;
     logFailure('present children', error);
     yield put(loadPresentFailure());
   }
 }
 
 function* loadJournalPage(page: number) {
+  const sessionEpoch: number = yield select(selectSessionEpoch);
   try {
     const result: VisitPage = yield call([visitControlApi, visitControlApi.getVisits], page);
+    if (!(yield* isCurrentSession(sessionEpoch))) return;
     yield put(loadJournalSuccess(result));
   } catch (error) {
+    if (!(yield* isCurrentSession(sessionEpoch))) return;
     logFailure(`journal page ${page}`, error);
     yield put(loadJournalFailure({ page }));
   }

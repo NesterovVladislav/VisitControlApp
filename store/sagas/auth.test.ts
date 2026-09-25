@@ -38,6 +38,7 @@ const mockPromptForBiometricUnlock = promptForBiometricUnlock as jest.MockedFunc
 const mockApi = visitControlApi as jest.Mocked<typeof visitControlApi>;
 
 import { clearAuthToken, getAuthToken } from '../../services/auth/auth-token';
+import { loadChildrenStart } from '../reducers/children';
 import { ApiError } from '../../services/errors/api-error';
 import {
   bootstrapLocked,
@@ -264,6 +265,25 @@ it('clears an in-memory token when persistence after login fails', async () => {
     expect(mockRepository.setBiometricsEnabled).toHaveBeenCalledWith(true);
     expect(getAuthToken()).toBe('saved-jwt');
     expect(dispatched).toContainEqual(validationSucceeded(user));
+  });
+
+  it('does not report validation failure after a successful backend response', async () => {
+    const dispatched = await runWorker(unlockWithPinSaga, unlockWithPin({ pin: '1234' }));
+    expect(dispatched).toContainEqual(validationSucceeded(user));
+    expect(dispatched).not.toContainEqual(
+      expect.objectContaining({ type: sessionValidationUnavailable.type }),
+    );
+  });
+
+  it('loads an administrator children after validating the backend session', async () => {
+    const admin = { ...user, role: 'ADMIN' };
+    mockApi.getMe.mockResolvedValue(admin);
+    const dispatched = await runWorker(unlockWithPinSaga, unlockWithPin({ pin: '1234' }));
+    expect(dispatched).toContainEqual(validationSucceeded(admin));
+    expect(dispatched).toContainEqual(loadChildrenStart());
+    expect(dispatched).not.toContainEqual(
+      expect.objectContaining({ type: sessionValidationUnavailable.type }),
+    );
   });
 
   it('unlocks with a correct PIN and validates the backend session', async () => {

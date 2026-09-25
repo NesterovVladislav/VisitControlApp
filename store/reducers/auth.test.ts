@@ -13,6 +13,7 @@ import reducer, {
   pinSetupCompleted,
   sessionExpired,
   sessionValidationUnavailable,
+  switchMode,
   storageUnavailable,
   submitBiometricPreference,
   unlockWithBiometrics,
@@ -86,6 +87,35 @@ describe('auth reducer state machine', () => {
     expect(JSON.stringify(offer)).not.toContain('1234');
     expect(offer).not.toHaveProperty('token');
     expect(offer).not.toHaveProperty('password');
+  });
+
+  it('starts an authenticated administrator in admin mode and lets them switch to parent mode', () => {
+    const admin = { ...user, role: 'ADMIN' };
+    const authenticated = reducer(initialAuthState, validationSucceeded(admin));
+    expect(authenticated).toMatchObject({
+      phase: 'authenticated',
+      user: admin,
+      mode: 'admin',
+    });
+
+    const parentMode = reducer(authenticated, switchMode('parent'));
+    expect(parentMode.mode).toBe('parent');
+    expect(parentMode.user).toEqual(admin);
+
+    const signedOut = reducer(parentMode, logoutCompleted({ reason: 'user' }));
+    expect(signedOut.mode).toBe('parent');
+    expect(signedOut.user).toBeNull();
+  });
+
+  it('does not allow a parent or a locked administrator to switch into admin mode', () => {
+    const parent = reducer(initialAuthState, validationSucceeded(user));
+    expect(reducer(parent, switchMode('admin')).mode).toBe('parent');
+
+    const lockedAdmin = reducer(
+      reducer(initialAuthState, validationSucceeded({ ...user, role: 'ADMIN' })),
+      lockSession(),
+    );
+    expect(reducer(lockedAdmin, switchMode('parent')).mode).toBe('admin');
   });
 
   it('handles lock, validation success, and retryable validation failure', () => {
