@@ -3,8 +3,11 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useAppDispatch, useAppSelector } from '../../store';
 import { submitBiometricPreference } from '../../store/reducers/auth';
+import { makeStyles, usePalette } from '../../hooks/use-palette';
 
 export function BiometricSetupScreen() {
+  const c = usePalette();
+  const styles = useStyles();
   const dispatch = useAppDispatch();
   const { biometricsAvailable, isLoading } = useAppSelector((state) => state.auth);
 
@@ -24,7 +27,7 @@ export function BiometricSetupScreen() {
             : 'На этом устройстве подходящая биометрия недоступна. Используйте PIN-код.'}
         </Text>
         {isLoading ? (
-          <ActivityIndicator color="#1D3557" size="large" />
+          <ActivityIndicator color={c.ink} size="large" />
         ) : biometricsAvailable ? (
           <>
             <Pressable
@@ -56,25 +59,27 @@ export function BiometricSetupScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  safeArea: { backgroundColor: '#FFFFFF', flex: 1 },
-  content: { flex: 1, justifyContent: 'center', padding: 24 },
-  title: { color: '#1D3557', fontSize: 28, fontWeight: '700', textAlign: 'center' },
-  description: {
-    color: '#5D6B7A',
-    fontSize: 16,
-    lineHeight: 24,
-    marginBottom: 32,
-    marginTop: 12,
-    textAlign: 'center',
-  },
-  primaryButton: {
-    alignItems: 'center',
-    backgroundColor: '#1D6FF2',
-    borderRadius: 12,
-    padding: 16,
-  },
-  primaryButtonText: { color: '#FFFFFF', fontSize: 17, fontWeight: '600' },
-  secondaryButton: { alignItems: 'center', marginTop: 12, padding: 16 },
-  secondaryButtonText: { color: '#1D6FF2', fontSize: 17, fontWeight: '600' },
-});
+const useStyles = makeStyles((c) =>
+  StyleSheet.create({
+    safeArea: { backgroundColor: c.card, flex: 1 },
+    content: { flex: 1, justifyContent: 'center', padding: 24 },
+    title: { color: c.ink, fontSize: 28, fontWeight: '700', textAlign: 'center' },
+    description: {
+      color: c.inkSecondary,
+      fontSize: 16,
+      lineHeight: 24,
+      marginBottom: 32,
+      marginTop: 12,
+      textAlign: 'center',
+    },
+    primaryButton: {
+      alignItems: 'center',
+      backgroundColor: c.accent,
+      borderRadius: 12,
+      padding: 16,
+    },
+    primaryButtonText: { color: c.onPrimary, fontSize: 17, fontWeight: '600' },
+    secondaryButton: { alignItems: 'center', marginTop: 12, padding: 16 },
+    secondaryButtonText: { color: c.accent, fontSize: 17, fontWeight: '600' },
+  })
+);

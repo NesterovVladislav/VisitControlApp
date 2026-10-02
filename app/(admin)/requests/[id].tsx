@@ -23,6 +23,7 @@ import { RegistrationRequestView, RequestOutcome } from '../../../store/types/re
 import { ageOn, formatPhone } from '../../../utils/input-masks';
 import { plural } from '../../../utils/plural';
 import { fullName, submittedAt } from '../../../utils/registration-request-format';
+import { makeStyles, usePalette } from '../../../hooks/use-palette';
 
 const REASON_MAX_LENGTH = 500;
 
@@ -51,6 +52,8 @@ function genderText(gender: RegistrationRequestView['gender']): string {
  * После действия заявка уходит из списка, а экран показывает результат из state.requests.outcomes.
  */
 export default function RequestScreen() {
+  const c = usePalette();
+  const styles = useStyles();
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const dispatch = useAppDispatch();
@@ -137,7 +140,7 @@ export default function RequestScreen() {
               value={reason}
               onChangeText={setReason}
               placeholder="Например: не нашли ребёнка с такой фамилией"
-              placeholderTextColor="#999"
+              placeholderTextColor={c.placeholder}
               multiline
               maxLength={REASON_MAX_LENGTH}
               editable={!busy}
@@ -155,7 +158,7 @@ export default function RequestScreen() {
               accessibilityRole="button"
               accessibilityState={{ disabled: busy, busy }}
             >
-              {busy ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Отклонить заявку</Text>}
+              {busy ? <ActivityIndicator color={c.onPrimary} /> : <Text style={styles.buttonText}>Отклонить заявку</Text>}
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.linkButton}
@@ -174,7 +177,7 @@ export default function RequestScreen() {
               accessibilityRole="button"
               accessibilityState={{ disabled: busy, busy }}
             >
-              {busy ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Подтвердить</Text>}
+              {busy ? <ActivityIndicator color={c.onPrimary} /> : <Text style={styles.buttonText}>Подтвердить</Text>}
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.linkButton}
@@ -200,6 +203,8 @@ function OutcomeView({
   busy: boolean;
   onDone: () => void;
 }) {
+  const c = usePalette();
+  const styles = useStyles();
   const dispatch = useAppDispatch();
   const { request } = outcome;
 
@@ -237,7 +242,7 @@ function OutcomeView({
           disabled={busy}
         >
           {busy ? (
-            <ActivityIndicator color="#fff" />
+            <ActivityIndicator color={c.onPrimary} />
           ) : (
             <Text style={styles.buttonText}>Отправить пароль ещё раз</Text>
           )}
@@ -250,126 +255,128 @@ function OutcomeView({
   );
 }
 
-const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-    backgroundColor: '#f5f5f5',
-  },
-  container: {
-    padding: 20,
-    width: '100%',
-    maxWidth: 440,
-    alignSelf: 'center',
-  },
-  center: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#f5f5f5',
-    padding: 24,
-  },
-  card: {
-    backgroundColor: '#fff',
-    borderRadius: 10,
-    padding: 20,
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  name: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 8,
-  },
-  field: {
-    marginTop: 12,
-  },
-  fieldLabel: {
-    fontSize: 13,
-    color: '#888',
-  },
-  fieldValue: {
-    marginTop: 2,
-    fontSize: 16,
-    color: '#333',
-  },
-  reasonInput: {
-    marginTop: 8,
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
-    minHeight: 96,
-    textAlignVertical: 'top',
-    color: '#333',
-  },
-  counter: {
-    marginTop: 4,
-    fontSize: 12,
-    color: '#999',
-    textAlign: 'right',
-  },
-  hint: {
-    marginTop: 4,
-    marginBottom: 8,
-    fontSize: 13,
-    color: '#666',
-    textAlign: 'center',
-    lineHeight: 18,
-  },
-  button: {
-    backgroundColor: '#007AFF',
-    borderRadius: 8,
-    padding: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 8,
-    minHeight: 50,
-  },
-  fullWidth: {
-    alignSelf: 'stretch',
-  },
-  buttonDanger: {
-    backgroundColor: '#D32F2F',
-  },
-  buttonDisabled: {
-    backgroundColor: '#ccc',
-  },
-  buttonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  linkButton: {
-    marginTop: 12,
-    paddingVertical: 10,
-    alignItems: 'center',
-  },
-  linkText: {
-    color: '#007AFF',
-    fontSize: 16,
-    fontWeight: '500',
-  },
-  dangerText: {
-    color: '#D32F2F',
-  },
-  outcomeTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 8,
-    textAlign: 'center',
-  },
-  message: {
-    fontSize: 16,
-    color: '#666',
-    textAlign: 'center',
-    lineHeight: 22,
-    marginBottom: 8,
-  },
-});
+const useStyles = makeStyles((c) =>
+  StyleSheet.create({
+    screen: {
+      flex: 1,
+      backgroundColor: c.background,
+    },
+    container: {
+      padding: 20,
+      width: '100%',
+      maxWidth: 440,
+      alignSelf: 'center',
+    },
+    center: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+      backgroundColor: c.background,
+      padding: 24,
+    },
+    card: {
+      backgroundColor: c.card,
+      borderRadius: 10,
+      padding: 20,
+      marginBottom: 16,
+      shadowColor: c.shadow,
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.1,
+      shadowRadius: 4,
+      elevation: 3,
+    },
+    name: {
+      fontSize: 20,
+      fontWeight: '600',
+      color: c.text,
+      marginBottom: 8,
+    },
+    field: {
+      marginTop: 12,
+    },
+    fieldLabel: {
+      fontSize: 13,
+      color: c.textTertiary,
+    },
+    fieldValue: {
+      marginTop: 2,
+      fontSize: 16,
+      color: c.text,
+    },
+    reasonInput: {
+      marginTop: 8,
+      borderWidth: 1,
+      borderColor: c.border,
+      borderRadius: 8,
+      padding: 12,
+      fontSize: 16,
+      minHeight: 96,
+      textAlignVertical: 'top',
+      color: c.text,
+    },
+    counter: {
+      marginTop: 4,
+      fontSize: 12,
+      color: c.textTertiary,
+      textAlign: 'right',
+    },
+    hint: {
+      marginTop: 4,
+      marginBottom: 8,
+      fontSize: 13,
+      color: c.textSecondary,
+      textAlign: 'center',
+      lineHeight: 18,
+    },
+    button: {
+      backgroundColor: c.primary,
+      borderRadius: 8,
+      padding: 16,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginTop: 8,
+      minHeight: 50,
+    },
+    fullWidth: {
+      alignSelf: 'stretch',
+    },
+    buttonDanger: {
+      backgroundColor: c.danger,
+    },
+    buttonDisabled: {
+      backgroundColor: c.disabled,
+    },
+    buttonText: {
+      color: c.onPrimary,
+      fontSize: 16,
+      fontWeight: '600',
+    },
+    linkButton: {
+      marginTop: 12,
+      paddingVertical: 10,
+      alignItems: 'center',
+    },
+    linkText: {
+      color: c.primary,
+      fontSize: 16,
+      fontWeight: '500',
+    },
+    dangerText: {
+      color: c.danger,
+    },
+    outcomeTitle: {
+      fontSize: 20,
+      fontWeight: '600',
+      color: c.text,
+      marginBottom: 8,
+      textAlign: 'center',
+    },
+    message: {
+      fontSize: 16,
+      color: c.textSecondary,
+      textAlign: 'center',
+      lineHeight: 22,
+      marginBottom: 8,
+    },
+  })
+);

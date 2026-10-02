@@ -1,6 +1,7 @@
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { formFieldStyles } from './form-field';
+import { useFormFieldStyles } from './form-field';
+import { makeStyles } from '../hooks/use-palette';
 
 interface CheckboxRowProps {
   checked: boolean;
@@ -25,6 +26,8 @@ export default function CheckboxRow({
   error,
   disabled = false,
 }: CheckboxRowProps) {
+  const styles = useStyles();
+  const formFieldStyles = useFormFieldStyles();
   return (
     <View style={styles.container}>
       <View style={styles.row}>
@@ -48,43 +51,45 @@ export default function CheckboxRow({
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    marginBottom: 16,
-  },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-  },
-  box: {
-    width: 22,
-    height: 22,
-    borderWidth: 2,
-    borderColor: '#999',
-    borderRadius: 4,
-    marginRight: 10,
-    marginTop: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#fff',
-  },
-  boxChecked: {
-    borderColor: '#007AFF',
-    backgroundColor: '#007AFF',
-  },
-  boxError: {
-    borderColor: '#D32F2F',
-  },
-  checkmark: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '700',
-    lineHeight: 16,
-  },
-  label: {
-    flex: 1,
-    fontSize: 14,
-    color: '#333',
-    lineHeight: 20,
-  },
-});
+const useStyles = makeStyles((c) =>
+  StyleSheet.create({
+    container: {
+      marginBottom: 16,
+    },
+    row: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+    },
+    box: {
+      width: 22,
+      height: 22,
+      borderWidth: 2,
+      borderColor: c.textTertiary,
+      borderRadius: 4,
+      marginRight: 10,
+      marginTop: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: c.card,
+    },
+    boxChecked: {
+      borderColor: c.primary,
+      backgroundColor: c.primary,
+    },
+    boxError: {
+      borderColor: c.danger,
+    },
+    checkmark: {
+      color: c.onPrimary,
+      fontSize: 14,
+      fontWeight: '700',
+      lineHeight: 16,
+    },
+    label: {
+      flex: 1,
+      fontSize: 14,
+      color: c.text,
+      lineHeight: 20,
+    },
+  })
+);

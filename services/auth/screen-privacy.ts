@@ -5,10 +5,23 @@ export const SCREEN_PRIVACY_KEY = 'visit-control-session';
 
 let privacyQueue: Promise<boolean> = Promise.resolve(true);
 
+/**
+ * Скриншоты разрешены только в явно помеченной тестовой сборке (EXPO_PUBLIC_ALLOW_SCREENSHOTS=1),
+ * чтобы снимать экраны для проверки. Защита переключателя приложений на iOS и защитный экран
+ * при сворачивании остаются. В production флаг не включать: на экранах персональные данные детей.
+ */
+export function screenshotsAllowed(): boolean {
+  return process.env.EXPO_PUBLIC_ALLOW_SCREENSHOTS === '1';
+}
+
 async function applyScreenPrivacy(enabled: boolean): Promise<boolean> {
   try {
     if (enabled) {
-      await ScreenCapture.preventScreenCaptureAsync(SCREEN_PRIVACY_KEY);
+      if (screenshotsAllowed()) {
+        await ScreenCapture.allowScreenCaptureAsync(SCREEN_PRIVACY_KEY);
+      } else {
+        await ScreenCapture.preventScreenCaptureAsync(SCREEN_PRIVACY_KEY);
+      }
       if (Platform.OS === 'ios') {
         await ScreenCapture.enableAppSwitcherProtectionAsync(1);
       }

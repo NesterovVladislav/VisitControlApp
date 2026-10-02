@@ -22,10 +22,13 @@ import {
   markVisitStart,
   refreshStatuses,
 } from '../store/reducers/children';
-import { ADMIN_ROLE } from '../store/types/auth';
+import { ADMIN_ROLE, isStaffRole } from '../store/types/auth';
 import { Child, isInKindergarten } from '../store/types/children';
+import { makeStyles, usePalette } from '../hooks/use-palette';
 
 export default function ChildrenScreen() {
+  const c = usePalette();
+  const styles = useStyles();
   const router = useRouter();
   const dispatch = useAppDispatch();
   const { user } = useAppSelector((state) => state.auth);
@@ -92,19 +95,22 @@ export default function ChildrenScreen() {
     ]);
   }
 
-  const isAdmin = user?.role === ADMIN_ROLE;
+  const isStaff = isStaffRole(user?.role);
 
-  // Администратор в режиме родителя: меню с возвратом в рабочий режим
+  // Android показывает в Alert не больше трёх кнопок. Персонал выходит из профиля или из «Ещё»,
+  // поэтому у него вместо «Выйти» — возврат в рабочий режим.
   function openMenu() {
     Alert.alert(`${user?.firstName ?? ''} ${user?.surname ?? ''}`.trim(), undefined, [
-      {
-        text: 'Режим администратора',
-        onPress: () => {
-          dispatch(switchMode('admin'));
-          router.replace('/visits');
-        },
-      },
-      { text: 'Выйти', style: 'destructive', onPress: confirmLogout },
+      { text: 'Профиль', onPress: () => router.push('/profile') },
+      isStaff
+        ? {
+            text: user?.role === ADMIN_ROLE ? 'Режим администратора' : 'Режим сотрудника',
+            onPress: () => {
+              dispatch(switchMode('admin'));
+              router.replace('/visits');
+            },
+          }
+        : { text: 'Выйти', style: 'destructive', onPress: confirmLogout },
       { text: 'Отмена', style: 'cancel' },
     ]);
   }
@@ -112,21 +118,16 @@ export default function ChildrenScreen() {
   const header = (
     <Stack.Screen
       options={{
-        headerRight: () =>
-          isAdmin ? (
-            <TouchableOpacity
-              onPress={openMenu}
-              accessibilityRole="button"
-              accessibilityLabel="Меню"
-              hitSlop={8}
-            >
-              <Text style={styles.headerMenu}>⋯</Text>
-            </TouchableOpacity>
-          ) : (
-            <TouchableOpacity onPress={confirmLogout} accessibilityRole="button" hitSlop={8}>
-              <Text style={styles.headerButton}>Выйти</Text>
-            </TouchableOpacity>
-          ),
+        headerRight: () => (
+          <TouchableOpacity
+            onPress={openMenu}
+            accessibilityRole="button"
+            accessibilityLabel="Меню"
+            hitSlop={8}
+          >
+            <Text style={styles.headerMenu}>⋯</Text>
+          </TouchableOpacity>
+        ),
       }}
     />
   );
@@ -135,7 +136,7 @@ export default function ChildrenScreen() {
     return (
       <View style={styles.center}>
         {header}
-        <ActivityIndicator size="large" color="#007AFF" />
+        <ActivityIndicator size="large" color={c.primary} />
       </View>
     );
   }
@@ -195,56 +196,54 @@ export default function ChildrenScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  list: {
-    flex: 1,
-    backgroundColor: '#f5f5f5',
-  },
-  container: {
-    padding: 20,
-    width: '100%',
-    maxWidth: 440,
-    alignSelf: 'center',
-  },
-  emptyContainer: {
-    flexGrow: 1,
-    justifyContent: 'center',
-    padding: 20,
-  },
-  center: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#f5f5f5',
-    padding: 20,
-  },
-  empty: {
-    alignItems: 'center',
-  },
-  message: {
-    fontSize: 16,
-    color: '#666',
-    textAlign: 'center',
-    lineHeight: 22,
-    marginBottom: 16,
-  },
-  secondaryButton: {
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-  },
-  secondaryButtonText: {
-    color: '#007AFF',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  headerButton: {
-    color: '#007AFF',
-    fontSize: 16,
-  },
-  headerMenu: {
-    color: '#007AFF',
-    fontSize: 24,
-    fontWeight: '700',
-    paddingHorizontal: 4,
-  },
-});
+const useStyles = makeStyles((c) =>
+  StyleSheet.create({
+    list: {
+      flex: 1,
+      backgroundColor: c.background,
+    },
+    container: {
+      padding: 20,
+      width: '100%',
+      maxWidth: 440,
+      alignSelf: 'center',
+    },
+    emptyContainer: {
+      flexGrow: 1,
+      justifyContent: 'center',
+      padding: 20,
+    },
+    center: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+      backgroundColor: c.background,
+      padding: 20,
+    },
+    empty: {
+      alignItems: 'center',
+    },
+    message: {
+      fontSize: 16,
+      color: c.textSecondary,
+      textAlign: 'center',
+      lineHeight: 22,
+      marginBottom: 16,
+    },
+    secondaryButton: {
+      paddingVertical: 10,
+      paddingHorizontal: 20,
+    },
+    secondaryButtonText: {
+      color: c.primary,
+      fontSize: 16,
+      fontWeight: '600',
+    },
+    headerMenu: {
+      color: c.primary,
+      fontSize: 24,
+      fontWeight: '700',
+      paddingHorizontal: 4,
+    },
+  })
+);

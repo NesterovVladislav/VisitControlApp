@@ -12,8 +12,11 @@ import {
 import { useAppDispatch, useAppSelector } from '../store';
 import { clearError, loginStart } from '../store/reducers/auth';
 import { LoginCredentials } from '../store/types/auth';
+import { makeStyles, usePalette } from '../hooks/use-palette';
 
 export default function AuthScreen() {
+  const c = usePalette();
+  const styles = useStyles();
   const router = useRouter();
   const dispatch = useAppDispatch();
   const { isLoading, error, notice } = useAppSelector((state) => state.auth);
@@ -77,7 +80,7 @@ export default function AuthScreen() {
           <TextInput
             style={[styles.input, isFormDisabled && styles.inputDisabled]}
             placeholder="Введите email"
-            placeholderTextColor="#999"
+            placeholderTextColor={c.placeholder}
             value={email}
             onChangeText={setEmail}
             keyboardType="email-address"
@@ -97,7 +100,7 @@ export default function AuthScreen() {
                 isFormDisabled && styles.inputDisabled,
               ]}
               placeholder="Введите пароль"
-              placeholderTextColor="#999"
+              placeholderTextColor={c.placeholder}
               value={password}
               onChangeText={setPassword}
               secureTextEntry={!showPassword}
@@ -123,7 +126,7 @@ export default function AuthScreen() {
           disabled={isFormDisabled}
         >
           {isLoading ? (
-            <ActivityIndicator color="#fff" />
+            <ActivityIndicator color={c.onPrimary} />
           ) : (
             <Text style={styles.buttonText}>Войти</Text>
           )}
@@ -144,108 +147,110 @@ export default function AuthScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#f5f5f5',
-    padding: 20,
-  },
-  form: {
-    width: '100%',
-    maxWidth: 400,
-    backgroundColor: '#fff',
-    borderRadius: 10,
-    padding: 24,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
+const useStyles = makeStyles((c) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+      backgroundColor: c.background,
+      padding: 20,
     },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: 32,
-    textAlign: 'center',
-    color: '#333',
-  },
-  notice: {
-    color: '#5D6B7A',
-    marginBottom: 20,
-    textAlign: 'center',
-  },
-  inputContainer: {
-    marginBottom: 20,
-  },
-  label: {
-    fontSize: 14,
-    fontWeight: '600',
-    marginBottom: 8,
-    color: '#333',
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
-    backgroundColor: '#fff',
-    color: '#333',
-  },
-  passwordContainer: {
-    position: 'relative',
-  },
-  passwordInput: {
-    paddingRight: 80,
-  },
-  eyeButton: {
-    position: 'absolute',
-    right: 12,
-    top: 12,
-    paddingVertical: 4,
-    paddingHorizontal: 8,
-  },
-  eyeButtonText: {
-    color: '#007AFF',
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  inputDisabled: {
-    backgroundColor: '#f0f0f0',
-    color: '#999',
-  },
-  button: {
-    backgroundColor: '#007AFF',
-    borderRadius: 8,
-    padding: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 8,
-    minHeight: 50,
-  },
-  buttonDisabled: {
-    backgroundColor: '#ccc',
-  },
-  buttonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  registerLink: {
-    marginTop: 20,
-    alignItems: 'center',
-  },
-  registerText: {
-    fontSize: 14,
-    color: '#666',
-  },
-  registerTextAccent: {
-    color: '#007AFF',
-    fontWeight: '500',
-  },
-});
+    form: {
+      width: '100%',
+      maxWidth: 400,
+      backgroundColor: c.card,
+      borderRadius: 10,
+      padding: 24,
+      shadowColor: c.shadow,
+      shadowOffset: {
+        width: 0,
+        height: 2,
+      },
+      shadowOpacity: 0.1,
+      shadowRadius: 4,
+      elevation: 3,
+    },
+    title: {
+      fontSize: 24,
+      fontWeight: 'bold',
+      marginBottom: 32,
+      textAlign: 'center',
+      color: c.text,
+    },
+    notice: {
+      color: c.inkSecondary,
+      marginBottom: 20,
+      textAlign: 'center',
+    },
+    inputContainer: {
+      marginBottom: 20,
+    },
+    label: {
+      fontSize: 14,
+      fontWeight: '600',
+      marginBottom: 8,
+      color: c.text,
+    },
+    input: {
+      borderWidth: 1,
+      borderColor: c.border,
+      borderRadius: 8,
+      padding: 12,
+      fontSize: 16,
+      backgroundColor: c.card,
+      color: c.text,
+    },
+    passwordContainer: {
+      position: 'relative',
+    },
+    passwordInput: {
+      paddingRight: 80,
+    },
+    eyeButton: {
+      position: 'absolute',
+      right: 12,
+      top: 12,
+      paddingVertical: 4,
+      paddingHorizontal: 8,
+    },
+    eyeButtonText: {
+      color: c.primary,
+      fontSize: 14,
+      fontWeight: '500',
+    },
+    inputDisabled: {
+      backgroundColor: c.fill,
+      color: c.textTertiary,
+    },
+    button: {
+      backgroundColor: c.primary,
+      borderRadius: 8,
+      padding: 16,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginTop: 8,
+      minHeight: 50,
+    },
+    buttonDisabled: {
+      backgroundColor: c.disabled,
+    },
+    buttonText: {
+      color: c.onPrimary,
+      fontSize: 16,
+      fontWeight: '600',
+    },
+    registerLink: {
+      marginTop: 20,
+      alignItems: 'center',
+    },
+    registerText: {
+      fontSize: 14,
+      color: c.textSecondary,
+    },
+    registerTextAccent: {
+      color: c.primary,
+      fontWeight: '500',
+    },
+  })
+);

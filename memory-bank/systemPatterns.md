@@ -96,8 +96,19 @@ export const newBackendApi = new NewBackendApiClient();
 - Методы для проверки типа ошибки: `isNetworkError()`, `isUnauthorizedError()`, и т.д.
 
 ### Стилизация
-<!-- Опиши подход к стилям -->
-- Inline styles (по умолчанию)
+- Светлая и тёмная тема: выбор в «Профиле» (`services/theme/theme-preference.ts`, `Appearance.setColorScheme`).
+- **Цвета — только из палитры** `constants/palette.ts`, hex в стилях не писать: иначе в тёмной теме экран останется светлым.
+- Стили экрана:
+  ```ts
+  const useStyles = makeStyles((c) => StyleSheet.create({ screen: { backgroundColor: c.background } }));
+  function Screen() {
+    const styles = useStyles(); // в каждом компоненте, который берёт styles
+    const c = usePalette();     // для цветов в JSX: иконки, ActivityIndicator, placeholderTextColor
+  }
+  ```
+  (`hooks/use-palette.ts`). Общие стили — тоже хуки: `useVisitListStyles`, `useGardenStyles`, `useFormFieldStyles`.
+- Нужен новый цвет — токен в обе палитры `Palette`, а не hex на месте.
+- У `Text` всегда задавать `color`: по умолчанию он чёрный и в тёмной теме не виден.
 
 ## Соглашения по коду
 
@@ -124,6 +135,8 @@ export default function ComponentName() {
 - Маски и валидация — чистые функции в `utils/`
 - Методы `visitControlApi`, использующие `this`, вызываются в saga как `call([visitControlApi, visitControlApi.method], ...)`
 - Запросы с персональными данными отправляются с `skipLogging: true`; неидемпотентные POST не ретраятся
+- Action с паролем или PIN добавляется в `SECRET_ACTION_TYPES` (`store/devtools.ts`), пароли не хранятся в state
+- Личные данные пользователя (ФИО, дата рождения, пол, телефон, email) сам пользователь не меняет: только заявкой на проверку администратору
 
 ## Паттерны для будущего использования
 <!-- Добавляй сюда паттерны по мере развития проекта -->

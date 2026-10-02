@@ -97,6 +97,8 @@ const user = {
   firstName: 'Parent',
   surname: 'Example',
   patronymic: null,
+  birthDate: null,
+  phone: null,
   gender: null,
   role: 'PARENT',
 };
@@ -284,6 +286,14 @@ it('clears an in-memory token when persistence after login fails', async () => {
     expect(dispatched).not.toContainEqual(
       expect.objectContaining({ type: sessionValidationUnavailable.type }),
     );
+  });
+
+  it('loads an employee children too: an employee can also be a parent', async () => {
+    const employee = { ...user, role: 'EMPLOYEE' };
+    mockApi.getMe.mockResolvedValue(employee);
+    const dispatched = await runWorker(unlockWithPinSaga, unlockWithPin({ pin: '1234' }));
+    expect(dispatched).toContainEqual(validationSucceeded(employee));
+    expect(dispatched).toContainEqual(loadChildrenStart());
   });
 
   it('unlocks with a correct PIN and validates the backend session', async () => {

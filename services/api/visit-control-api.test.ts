@@ -1,7 +1,7 @@
 import { AxiosAdapter, AxiosError, AxiosRequestConfig, AxiosResponse, InternalAxiosRequestConfig } from 'axios';
 
 import { clearAuthToken, setAuthToken, setUnauthorizedHandler } from '../auth/auth-token';
-import { visitControlApi } from './visit-control-api';
+import { mapRegistrationRequest, visitControlApi } from './visit-control-api';
 
 type TestClient = { client: { defaults: { adapter?: AxiosAdapter } } };
 
@@ -68,5 +68,25 @@ describe('API session expiry', () => {
     })).rejects.toMatchObject({ status: 401 });
 
     expect(expired).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('registration request mapping', () => {
+  const dto = {
+    external_key: 'r-1',
+    surname: 'Иванова',
+    first_name: 'Анна',
+    email: 'anna@example.com',
+    created: '2026-09-29T07:40:00',
+  };
+
+  // Стенд отдаёт LocalDate массивом: экран заявки падал на birthDate.split
+  it('turns a birth date array from the server into YYYY-MM-DD', () => {
+    expect(mapRegistrationRequest({ ...dto, birth_date: [1990, 5, 3] }).birthDate).toBe('1990-05-03');
+  });
+
+  it('keeps a birth date string and a missing one', () => {
+    expect(mapRegistrationRequest({ ...dto, birth_date: '1990-05-03' }).birthDate).toBe('1990-05-03');
+    expect(mapRegistrationRequest(dto).birthDate).toBeNull();
   });
 });

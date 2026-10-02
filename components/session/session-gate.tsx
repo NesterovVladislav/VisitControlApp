@@ -40,6 +40,18 @@ function SessionNavigator({ phase }: { phase: AuthPhase }) {
             title: 'Мои дети',
           }}
         />
+        <Stack.Screen
+          name="profile/index"
+          options={{ title: 'Профиль', headerBackTitle: 'Назад' }}
+        />
+        <Stack.Screen
+          name="profile/edit"
+          options={{ presentation: 'modal', title: 'Личные данные' }}
+        />
+        <Stack.Screen
+          name="profile/password"
+          options={{ title: 'Смена пароля', headerBackTitle: 'Профиль' }}
+        />
         <Stack.Screen name="menu" options={{ headerShown: false }} />
         <Stack.Screen
           name="modal"

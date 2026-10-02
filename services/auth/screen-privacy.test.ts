@@ -33,6 +33,18 @@ describe('native screen privacy', () => {
     expect(mocked.enableAppSwitcherProtectionAsync).toHaveBeenCalledWith(1);
   });
 
+  it('allows screenshots in a test build marked with EXPO_PUBLIC_ALLOW_SCREENSHOTS', async () => {
+    process.env.EXPO_PUBLIC_ALLOW_SCREENSHOTS = '1';
+    try {
+      await expect(enableProtectedScreenPrivacy()).resolves.toBe(true);
+      expect(mocked.preventScreenCaptureAsync).not.toHaveBeenCalled();
+      expect(mocked.allowScreenCaptureAsync).toHaveBeenCalledWith(SCREEN_PRIVACY_KEY);
+      expect(mocked.enableAppSwitcherProtectionAsync).toHaveBeenCalledWith(1);
+    } finally {
+      delete process.env.EXPO_PUBLIC_ALLOW_SCREENSHOTS;
+    }
+  });
+
   it('re-allows capture and disables iOS app-switcher protection', async () => {
     await expect(disableProtectedScreenPrivacy()).resolves.toBe(true);
     expect(mocked.allowScreenCaptureAsync).toHaveBeenCalledWith(SCREEN_PRIVACY_KEY);

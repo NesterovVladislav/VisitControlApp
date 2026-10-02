@@ -1,7 +1,9 @@
 import { useFocusEffect } from '@react-navigation/native';
+import { useRouter } from 'expo-router';
 import React, { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  FlatList,
   RefreshControl,
   SectionList,
   StyleSheet,
@@ -10,11 +12,15 @@ import {
   View,
 } from 'react-native';
 import SegmentedControl from '../../../components/segmented-control';
+import { IconSymbol } from '../../../components/ui/icon-symbol';
+import { LoadState, PresenceSections, useVisitListStyles } from '../../../components/visit-list';
+import { useOpenGroupMembers } from '../../../hooks/use-open-group-members';
 import { useAppDispatch, useAppSelector } from '../../../store';
 import { loadJournalMore, loadJournalStart, loadPresentStart } from '../../../store/reducers/visits';
-import { LoadStatus, Presence, PresentChild, VisitEntry } from '../../../store/types/visits';
 import { plural } from '../../../utils/plural';
-import { dayTitle, localDayKey, timeOfDay } from '../../../utils/visit-dates';
+import { BranchSummary, branchSections, branchSummaries, singleBranchId } from '../../../utils/presence';
+import { intervalsLabel, journalSections, representativesLabel } from '../../../utils/journal';
+import { makeStyles, usePalette } from '../../../hooks/use-palette';
 
 type Mode = 'present' | 'journal';
 
@@ -25,9 +31,11 @@ const MODE_OPTIONS: { value: Mode; label: string }[] = [
 
 /**
  * Вкладка «Посещение»: кто сейчас в саду и журнал отметок (docs/admin-screens.md).
- * «Кто в саду» — по группам из GET /group/presence (на старом бэкенде — общим списком), журнал — без фильтров.
+ * «Кто в саду» — сначала филиалы, внутри филиала дети по группам (branch/[id].tsx). Если филиал один — его группы
+ * сразу здесь. На старом бэкенде без групп — общим списком. Журнал — без фильтров.
  */
 export default function VisitsScreen() {
+  const styles = useStyles();
   const dispatch = useAppDispatch();
   const [mode, setMode] = useState<Mode>('present');
 
@@ -48,119 +56,123 @@ export default function VisitsScreen() {
   );
 }
 
-interface PresentSection {
-  key: string;
-  title: string;
-  /** Группа, где сейчас никого: заголовок без строк */
-  empty: boolean;
-  data: PresentChild[];
-}
-
-/**
- * Группы с детьми по названию (порядок задаёт сервер), затем дети без группы.
- * Группы, в которых вообще нет детей, не показываем.
- */
-function presentSections(presence: Presence): PresentSection[] {
-  if (presence.groups === null) {
-    // Бэкенд без разбивки по группам — один общий список без заголовка
-    return [{ key: 'all', title: '', empty: false, data: presence.withoutGroup }];
-  }
-  const sections: PresentSection[] = presence.groups
-    .filter((group) => group.totalChildren > 0 || group.present.length > 0)
-    .map((group) => ({
-      key: group.id,
-      title: `${group.name} · ${group.present.length} из ${group.totalChildren}`,
-      empty: group.present.length === 0,
-      data: group.present,
-    }));
-  if (presence.withoutGroup.length > 0) {
-    sections.push({
-      key: 'without-group',
-      title: `Без группы · ${presence.withoutGroup.length}`,
-      empty: false,
-      data: presence.withoutGroup,
-    });
-  }
-  return sections;
+function childrenCount(count: number): string {
+  return `${count} ${plural(count, ['ребёнок', 'ребёнка', 'детей'])}`;
 }
 
 function PresentList() {
   const dispatch = useAppDispatch();
   const { data, status, refreshing } = useAppSelector((state) => state.visits.present);
-  const sections = useMemo(() => presentSections(data), [data]);
   const reload = () => dispatch(loadPresentStart({ refresh: true }));
+  const onlyBranch = useMemo(() => singleBranchId(data), [data]);
+  const openGroup = useOpenGroupMembers();
 
   if (status !== 'loaded') {
     return <LoadState status={status} onRetry={() => dispatch(loadPresentStart())} />;
   }
 
-  const nobody = data.total === 0;
+  // Бэкенд без разбивки по группам — один общий список без заголовка
+  if (data.groups === null) {
+    const sections = data.withoutGroup.length > 0
+      ? [{ key: 'all', title: '', group: null, emptyText: null, data: data.withoutGroup }]
+      : [];
+    return (
+      <PresenceSections
+        sections={sections}
+        header={`В саду ${childrenCount(data.total)}`}
+        emptyText="Сейчас в саду никого нет"
+        refreshing={refreshing}
+        onRefresh={reload}
+      />
+    );
+  }
+
+  // Один филиал — выбирать нечего, сразу группы
+  if (onlyBranch) {
+    return (
+      <PresenceSections
+        sections={branchSections(data, onlyBranch)}
+        header={`В саду ${childrenCount(data.total)}`}
+        emptyText="В саду пока нет групп"
+        refreshing={refreshing}
+        onRefresh={reload}
+        onEditGroup={openGroup}
+      />
+    );
+  }
+
+  return <BranchList summaries={branchSummaries(data)} total={data.total} refreshing={refreshing} onRefresh={reload} />;
+}
+
+function BranchList({
+  summaries,
+  total,
+  refreshing,
+  onRefresh,
+}: {
+  summaries: BranchSummary[];
+  total: number;
+  refreshing: boolean;
+  onRefresh: () => void;
+}) {
+  const c = usePalette();
+  const styles = useStyles();
+  const visitListStyles = useVisitListStyles();
+  const router = useRouter();
+  const empty = summaries.length === 0;
 
   return (
-    <SectionList
-      sections={nobody ? [] : sections}
-      keyExtractor={(child, index) => `${child.id}-${index}`}
-      contentContainerStyle={nobody ? styles.emptyContainer : styles.listContainer}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={reload} />}
-      stickySectionHeadersEnabled={false}
-      ListHeaderComponent={
-        nobody ? null : (
-          <Text style={styles.total}>
-            В саду {data.total} {plural(data.total, ['ребёнок', 'ребёнка', 'детей'])}
-          </Text>
-        )
-      }
-      renderSectionHeader={({ section }) =>
-        section.title ? (
-          <View>
-            <Text style={styles.sectionTitle}>{section.title.toUpperCase()}</Text>
-            {section.empty ? <Text style={styles.sectionEmpty}>Сейчас никого нет</Text> : null}
-          </View>
-        ) : null
-      }
-      renderItem={({ item, index, section }) => (
-        <View
+    <FlatList
+      data={summaries}
+      keyExtractor={(item) => item.id}
+      contentContainerStyle={empty ? visitListStyles.emptyContainer : visitListStyles.listContainer}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+      ListHeaderComponent={empty ? null : <Text style={visitListStyles.total}>В саду {childrenCount(total)}</Text>}
+      renderItem={({ item, index }) => (
+        <TouchableOpacity
           style={[
-            styles.row,
-            index === 0 && styles.rowFirst,
-            index === section.data.length - 1 && styles.rowLast,
+            visitListStyles.row,
+            styles.branchRow,
+            index === 0 && visitListStyles.rowFirst,
+            index === summaries.length - 1 && visitListStyles.rowLast,
           ]}
+          onPress={() => router.push({ pathname: '/visits/branch/[id]', params: { id: item.id } })}
+          accessibilityRole="button"
+          accessibilityLabel={`${item.name}: в саду ${item.present}${item.total === null ? '' : ` из ${item.total}`}`}
         >
-          <View style={[styles.dot, styles.dotIn]} />
-          <Text style={styles.rowTitle}>{`${item.firstName} ${item.surname}`.trim()}</Text>
-        </View>
+          <View style={styles.rowText}>
+            <Text style={visitListStyles.rowTitle}>{item.name}</Text>
+            {item.total === null ? null : (
+              <Text style={styles.rowSubtitle}>
+                {item.groupCount === 0
+                  ? 'Групп нет'
+                  : `${item.groupCount} ${plural(item.groupCount, ['группа', 'группы', 'групп'])}`}
+              </Text>
+            )}
+          </View>
+          <Text style={[styles.count, item.present > 0 && styles.countPresent]}>
+            {item.total === null ? item.present : `${item.present} из ${item.total}`}
+          </Text>
+          <IconSymbol name="chevron.right" size={22} color={c.textTertiary} />
+        </TouchableOpacity>
       )}
-      ListEmptyComponent={<Text style={styles.message}>Сейчас в саду никого нет</Text>}
+      ListEmptyComponent={<Text style={visitListStyles.message}>Филиалов пока нет</Text>}
     />
   );
 }
 
-interface JournalSection {
-  key: string;
-  title: string;
-  data: VisitEntry[];
-}
-
 function Journal() {
+  const c = usePalette();
+  const styles = useStyles();
+  const visitListStyles = useVisitListStyles();
   const dispatch = useAppDispatch();
   const { items, status, refreshing, last, loadingMore, loadMoreFailed } = useAppSelector(
     (state) => state.visits.journal
   );
+  const showBranch = useAppSelector((state) => state.visits.present.data.branches.length > 1);
 
-  // Отметки уже отсортированы по убыванию времени: подряд идущие одного дня — одна секция
-  const sections = useMemo(() => {
-    const result: JournalSection[] = [];
-    for (const entry of items) {
-      const key = localDayKey(entry.datetime);
-      const current = result[result.length - 1];
-      if (current?.key === key) {
-        current.data.push(entry);
-      } else {
-        result.push({ key, title: dayTitle(entry.datetime), data: [entry] });
-      }
-    }
-    return result;
-  }, [items]);
+  // День → группа → по строке на ребёнка: когда пришёл и ушёл, кто привёл и забрал
+  const sections = useMemo(() => journalSections(items, showBranch), [items, showBranch]);
 
   if (status !== 'loaded') {
     return <LoadState status={status} onRetry={() => dispatch(loadJournalStart())} />;
@@ -174,7 +186,7 @@ function Journal() {
 
   let footer: React.ReactElement | null = null;
   if (loadingMore) {
-    footer = <ActivityIndicator style={styles.footer} color="#999" />;
+    footer = <ActivityIndicator style={styles.footer} color={c.textTertiary} />;
   } else if (loadMoreFailed) {
     footer = (
       <TouchableOpacity style={styles.footer} onPress={() => dispatch(loadJournalMore())}>
@@ -186,180 +198,110 @@ function Journal() {
   return (
     <SectionList
       sections={sections}
-      keyExtractor={(entry) => entry.key}
-      contentContainerStyle={items.length === 0 ? styles.emptyContainer : styles.listContainer}
+      keyExtractor={(row) => row.key}
+      contentContainerStyle={items.length === 0 ? visitListStyles.emptyContainer : visitListStyles.listContainer}
       refreshControl={
         <RefreshControl refreshing={refreshing} onRefresh={() => dispatch(loadJournalStart({ refresh: true }))} />
       }
       stickySectionHeadersEnabled={false}
       renderSectionHeader={({ section }) => (
-        <Text style={styles.sectionTitle}>{section.title.toUpperCase()}</Text>
-      )}
-      renderItem={({ item, index, section }) => (
-        <View
-          style={[
-            styles.row,
-            index === 0 && styles.rowFirst,
-            index === section.data.length - 1 && styles.rowLast,
-          ]}
-        >
-          <Text style={styles.time}>{timeOfDay(item.datetime)}</Text>
-          <View style={[styles.dot, item.status === 'IN' ? styles.dotIn : styles.dotOut]} />
-          <View style={styles.rowText}>
-            <Text style={styles.rowTitle}>{item.childName}</Text>
-            {/* Пол ни ребёнка, ни представителя сервер не отдаёт, поэтому без «пришла / привела» */}
-            <Text style={styles.rowSubtitle}>
-              {item.status === 'IN' ? 'Приход' : 'Уход'} · {item.representativeName}
-            </Text>
-          </View>
+        <View>
+          {section.dayTitle ? <Text style={styles.dayTitle}>{section.dayTitle}</Text> : null}
+          <Text style={visitListStyles.sectionTitle}>{section.title.toUpperCase()}</Text>
         </View>
       )}
+      renderItem={({ item, index, section }) => {
+        const representatives = representativesLabel(item);
+        return (
+          <View
+            style={[
+              visitListStyles.row,
+              styles.journalRow,
+              index === 0 && visitListStyles.rowFirst,
+              index === section.data.length - 1 && visitListStyles.rowLast,
+            ]}
+          >
+            <View
+              style={[visitListStyles.dot, styles.journalDot, item.inNow ? visitListStyles.dotIn : visitListStyles.dotOut]}
+              accessibilityLabel={item.inNow ? 'В саду' : 'Не в саду'}
+            />
+            <View style={styles.rowText}>
+              <Text style={visitListStyles.rowTitle}>{item.childName}</Text>
+              <Text style={styles.intervals}>{intervalsLabel(item)}</Text>
+              {representatives ? <Text style={styles.rowSubtitle}>{representatives}</Text> : null}
+            </View>
+          </View>
+        );
+      }}
       onEndReached={loadMore}
       onEndReachedThreshold={0.5}
       ListFooterComponent={footer}
-      ListEmptyComponent={<Text style={styles.message}>Отметок пока нет</Text>}
+      ListEmptyComponent={<Text style={visitListStyles.message}>Отметок пока нет</Text>}
     />
   );
 }
 
-function LoadState({ status, onRetry }: { status: LoadStatus; onRetry: () => void }) {
-  if (status === 'failed') {
-    return (
-      <View style={styles.center}>
-        <Text style={styles.message}>Не удалось загрузить данные</Text>
-        <TouchableOpacity style={styles.retry} onPress={onRetry}>
-          <Text style={styles.retryText}>Повторить</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  }
-  return (
-    <View style={styles.center}>
-      <ActivityIndicator size="large" color="#007AFF" />
-    </View>
-  );
-}
-
-const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-    backgroundColor: '#f5f5f5',
-  },
-  switcher: {
-    paddingHorizontal: 20,
-    paddingTop: 16,
-    width: '100%',
-    maxWidth: 440,
-    alignSelf: 'center',
-  },
-  listContainer: {
-    paddingHorizontal: 20,
-    paddingBottom: 24,
-    width: '100%',
-    maxWidth: 440,
-    alignSelf: 'center',
-  },
-  emptyContainer: {
-    flexGrow: 1,
-    justifyContent: 'center',
-    padding: 20,
-  },
-  center: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  total: {
-    fontSize: 17,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 12,
-  },
-  sectionEmpty: {
-    fontSize: 14,
-    color: '#999',
-    marginBottom: 12,
-  },
-  sectionTitle: {
-    fontSize: 12,
-    fontWeight: '700',
-    letterSpacing: 0.5,
-    color: '#888',
-    marginTop: 8,
-    marginBottom: 8,
-  },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#fff',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#e0e0e0',
-  },
-  rowFirst: {
-    borderTopLeftRadius: 10,
-    borderTopRightRadius: 10,
-  },
-  rowLast: {
-    borderBottomLeftRadius: 10,
-    borderBottomRightRadius: 10,
-    borderBottomWidth: 0,
-    marginBottom: 12,
-  },
-  rowText: {
-    flex: 1,
-  },
-  rowTitle: {
-    fontSize: 16,
-    color: '#333',
-  },
-  rowSubtitle: {
-    marginTop: 2,
-    fontSize: 13,
-    color: '#666',
-  },
-  time: {
-    width: 48,
-    fontSize: 15,
-    fontVariant: ['tabular-nums'],
-    color: '#333',
-  },
-  dot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    marginRight: 12,
-  },
-  dotIn: {
-    backgroundColor: '#2E7D32',
-  },
-  dotOut: {
-    backgroundColor: '#888',
-  },
-  message: {
-    fontSize: 16,
-    color: '#666',
-    textAlign: 'center',
-    lineHeight: 22,
-    marginBottom: 8,
-  },
-  retry: {
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-  },
-  retryText: {
-    color: '#007AFF',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  footer: {
-    paddingVertical: 16,
-    alignItems: 'center',
-  },
-  link: {
-    color: '#007AFF',
-    fontSize: 15,
-  },
-});
+const useStyles = makeStyles((c) =>
+  StyleSheet.create({
+    screen: {
+      flex: 1,
+      backgroundColor: c.background,
+    },
+    switcher: {
+      paddingHorizontal: 20,
+      paddingTop: 16,
+      width: '100%',
+      maxWidth: 440,
+      alignSelf: 'center',
+    },
+    branchRow: {
+      paddingVertical: 14,
+    },
+    rowText: {
+      flex: 1,
+    },
+    rowSubtitle: {
+      marginTop: 2,
+      fontSize: 13,
+      color: c.textSecondary,
+    },
+    count: {
+      fontSize: 15,
+      fontVariant: ['tabular-nums'],
+      color: c.textTertiary,
+      marginLeft: 12,
+      marginRight: 4,
+    },
+    countPresent: {
+      color: c.success,
+      fontWeight: '600',
+    },
+    dayTitle: {
+      fontSize: 17,
+      fontWeight: '600',
+      color: c.text,
+      marginTop: 12,
+      marginBottom: 4,
+    },
+    journalRow: {
+      alignItems: 'flex-start',
+    },
+    journalDot: {
+      marginTop: 6,
+    },
+    intervals: {
+      marginTop: 2,
+      fontSize: 15,
+      fontVariant: ['tabular-nums'],
+      color: c.text,
+    },
+    footer: {
+      paddingVertical: 16,
+      alignItems: 'center',
+    },
+    link: {
+      color: c.primary,
+      fontSize: 15,
+    },
+  })
+);

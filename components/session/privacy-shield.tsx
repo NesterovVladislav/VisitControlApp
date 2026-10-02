@@ -1,6 +1,9 @@
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { makeStyles, usePalette } from '../../hooks/use-palette';
 
 export function PrivacyShield() {
+  const c = usePalette();
+  const styles = useStyles();
   return (
     <View
       accessibilityRole="progressbar"
@@ -9,23 +12,25 @@ export function PrivacyShield() {
       testID="privacy-shield"
     >
       <Text style={styles.title}>Visit Control</Text>
-      <ActivityIndicator color="#ffffff" size="large" />
+      <ActivityIndicator color={c.onShield} size="large" />
     </View>
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    ...StyleSheet.absoluteFillObject,
-    alignItems: 'center',
-    backgroundColor: '#1D3557',
-    justifyContent: 'center',
-    zIndex: 10_000,
-  },
-  title: {
-    color: '#ffffff',
-    fontSize: 28,
-    fontWeight: '700',
-    marginBottom: 24,
-  },
-});
+const useStyles = makeStyles((c) =>
+  StyleSheet.create({
+    container: {
+      ...StyleSheet.absoluteFillObject,
+      alignItems: 'center',
+      backgroundColor: c.shield,
+      justifyContent: 'center',
+      zIndex: 10_000,
+    },
+    title: {
+      color: c.onShield,
+      fontSize: 28,
+      fontWeight: '700',
+      marginBottom: 24,
+    },
+  })
+);

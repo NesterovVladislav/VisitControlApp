@@ -29,6 +29,8 @@ const user = {
   firstName: 'Parent',
   surname: 'Example',
   patronymic: null,
+  birthDate: null,
+  phone: null,
   gender: null,
   role: 'PARENT',
 } as const;
@@ -105,6 +107,16 @@ describe('auth reducer state machine', () => {
     const signedOut = reducer(parentMode, logoutCompleted({ reason: 'user' }));
     expect(signedOut.mode).toBe('parent');
     expect(signedOut.user).toBeNull();
+  });
+
+  it('gives an employee the same work mode and parent mode switch as an administrator', () => {
+    const employee = { ...user, role: 'EMPLOYEE' };
+    const authenticated = reducer(initialAuthState, validationSucceeded(employee));
+    expect(authenticated.mode).toBe('admin');
+
+    const parentMode = reducer(authenticated, switchMode('parent'));
+    expect(parentMode.mode).toBe('parent');
+    expect(reducer(parentMode, switchMode('admin')).mode).toBe('admin');
   });
 
   it('restores the selected parent mode after unlocking the same administrator', () => {

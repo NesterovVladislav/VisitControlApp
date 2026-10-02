@@ -2,6 +2,7 @@ import React from 'react';
 import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Child, ChildStatus, isInKindergarten } from '../store/types/children';
 import { User } from '../store/types/auth';
+import { makeStyles, usePalette } from '../hooks/use-palette';
 
 interface ChildCardProps {
   child: Child;
@@ -34,6 +35,8 @@ export default function ChildCard({
   onMark,
   onRetryStatus,
 }: ChildCardProps) {
+  const c = usePalette();
+  const styles = useStyles();
   const value = status?.value ?? null;
   const known = value !== null;
   const inKindergarten = isInKindergarten(value);
@@ -51,7 +54,7 @@ export default function ChildCard({
       </Text>
     );
   } else if (!known) {
-    statusView = <ActivityIndicator size="small" color="#999" style={styles.statusSpinner} />;
+    statusView = <ActivityIndicator size="small" color={c.textTertiary} style={styles.statusSpinner} />;
   } else {
     statusView = (
       <View style={styles.statusRow}>
@@ -77,7 +80,7 @@ export default function ChildCard({
         accessibilityState={{ disabled, busy: marking }}
       >
         {marking ? (
-          <ActivityIndicator color="#fff" />
+          <ActivityIndicator color={c.onPrimary} />
         ) : (
           <Text style={styles.buttonText}>{markActionLabel(inKindergarten, gender)}</Text>
         )}
@@ -86,79 +89,81 @@ export default function ChildCard({
   );
 }
 
-const styles = StyleSheet.create({
-  card: {
-    backgroundColor: '#fff',
-    borderRadius: 10,
-    padding: 20,
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  name: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#333',
-  },
-  status: {
-    marginTop: 8,
-    minHeight: 20,
-    justifyContent: 'center',
-  },
-  statusRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  statusSpinner: {
-    alignSelf: 'flex-start',
-  },
-  dot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    marginRight: 8,
-  },
-  dotIn: {
-    backgroundColor: '#2E7D32',
-  },
-  dotOut: {
-    backgroundColor: '#888',
-  },
-  statusText: {
-    fontSize: 15,
-    color: '#888',
-  },
-  statusTextIn: {
-    color: '#2E7D32',
-    fontWeight: '500',
-  },
-  notice: {
-    marginTop: 8,
-    fontSize: 13,
-    color: '#B26A00',
-  },
-  link: {
-    color: '#007AFF',
-    fontWeight: '500',
-  },
-  button: {
-    backgroundColor: '#007AFF',
-    borderRadius: 8,
-    padding: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 16,
-    minHeight: 48,
-  },
-  buttonDisabled: {
-    backgroundColor: '#ccc',
-  },
-  buttonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-});
+const useStyles = makeStyles((c) =>
+  StyleSheet.create({
+    card: {
+      backgroundColor: c.card,
+      borderRadius: 10,
+      padding: 20,
+      marginBottom: 16,
+      shadowColor: c.shadow,
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.1,
+      shadowRadius: 4,
+      elevation: 3,
+    },
+    name: {
+      fontSize: 18,
+      fontWeight: '600',
+      color: c.text,
+    },
+    status: {
+      marginTop: 8,
+      minHeight: 20,
+      justifyContent: 'center',
+    },
+    statusRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
+    statusSpinner: {
+      alignSelf: 'flex-start',
+    },
+    dot: {
+      width: 10,
+      height: 10,
+      borderRadius: 5,
+      marginRight: 8,
+    },
+    dotIn: {
+      backgroundColor: c.success,
+    },
+    dotOut: {
+      backgroundColor: c.textTertiary,
+    },
+    statusText: {
+      fontSize: 15,
+      color: c.textTertiary,
+    },
+    statusTextIn: {
+      color: c.success,
+      fontWeight: '500',
+    },
+    notice: {
+      marginTop: 8,
+      fontSize: 13,
+      color: c.warning,
+    },
+    link: {
+      color: c.primary,
+      fontWeight: '500',
+    },
+    button: {
+      backgroundColor: c.primary,
+      borderRadius: 8,
+      padding: 14,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginTop: 16,
+      minHeight: 48,
+    },
+    buttonDisabled: {
+      backgroundColor: c.disabled,
+    },
+    buttonText: {
+      color: c.onPrimary,
+      fontSize: 16,
+      fontWeight: '600',
+    },
+  })
+);

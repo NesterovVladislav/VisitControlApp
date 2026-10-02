@@ -16,8 +16,9 @@ jest.mock('expo-router', () => {
   const Native = jest.requireActual('react-native');
   const Tabs = ({ children }: { children: React.ReactNode }) =>
     React.createElement(Native.View, { testID: 'admin-tabs' }, children);
-  Tabs.Screen = function MockTabsScreen({ name }: { name: string }) {
-    return React.createElement(Native.Text, null, name);
+  // Как в expo-router: вкладка с href: null в панели не показывается
+  Tabs.Screen = function MockTabsScreen({ name, options }: { name: string; options?: { href?: null } }) {
+    return options?.href === null ? null : React.createElement(Native.Text, null, name);
   };
   return {
     Redirect: ({ href }: { href: string }) =>
@@ -34,6 +35,8 @@ const admin = {
   firstName: 'Admin',
   surname: 'Example',
   patronymic: null,
+  birthDate: null,
+  phone: null,
   gender: null,
   role: 'ADMIN',
 } as const;
@@ -92,5 +95,34 @@ describe('administrator route authorization', () => {
     });
     expect(screen.queryByTestId('admin-tabs')).toBeNull();
     expect(screen.queryByTestId('redirect')).toBeNull();
+  });
+
+  it('shows the administrator every tab and loads registration requests', async () => {
+    const dispatch = jest.fn();
+    mockUseAppDispatch.mockReturnValue(dispatch);
+    const screen = await renderLayout({ ...initialAuthState, phase: 'authenticated', user: admin, mode: 'admin' });
+
+    for (const tab of ['visits', 'requests', 'garden', 'people/index', 'more/index']) {
+      expect(screen.getByText(tab)).toBeTruthy();
+    }
+    expect(dispatch).toHaveBeenCalledWith(expect.objectContaining({ type: 'requests/loadRequestsStart' }));
+  });
+
+  it('gives an employee only visits and more, without registration requests', async () => {
+    const dispatch = jest.fn();
+    mockUseAppDispatch.mockReturnValue(dispatch);
+    const screen = await renderLayout({
+      ...initialAuthState,
+      phase: 'authenticated',
+      user: { ...admin, role: 'EMPLOYEE' },
+      mode: 'admin',
+    });
+
+    expect(screen.getByText('visits')).toBeTruthy();
+    expect(screen.getByText('more/index')).toBeTruthy();
+    expect(screen.queryByText('requests')).toBeNull();
+    expect(screen.queryByText('garden')).toBeNull();
+    expect(screen.queryByText('people/index')).toBeNull();
+    expect(dispatch).not.toHaveBeenCalled();
   });
 });

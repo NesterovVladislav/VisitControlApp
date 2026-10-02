@@ -2,8 +2,10 @@ import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 import { useAppDispatch } from '../store';
 import { logoutRequested } from '../store/reducers/auth';
+import { makeStyles } from '../hooks/use-palette';
 
 export default function MenuScreen() {
+  const styles = useStyles();
   const dispatch = useAppDispatch();
 
   return (
@@ -21,31 +23,33 @@ export default function MenuScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    alignItems: 'center',
-    backgroundColor: '#f5f5f5',
-    flex: 1,
-    justifyContent: 'center',
-    padding: 20,
-  },
-  title: {
-    color: '#333',
-    fontSize: 28,
-    fontWeight: 'bold',
-    marginBottom: 16,
-  },
-  subtitle: {
-    color: '#666',
-    fontSize: 18,
-  },
-  logoutButton: {
-    marginTop: 32,
-    padding: 16,
-  },
-  logoutText: {
-    color: '#B42318',
-    fontSize: 17,
-    fontWeight: '600',
-  },
-});
+const useStyles = makeStyles((c) =>
+  StyleSheet.create({
+    container: {
+      alignItems: 'center',
+      backgroundColor: c.background,
+      flex: 1,
+      justifyContent: 'center',
+      padding: 20,
+    },
+    title: {
+      color: c.text,
+      fontSize: 28,
+      fontWeight: 'bold',
+      marginBottom: 16,
+    },
+    subtitle: {
+      color: c.textSecondary,
+      fontSize: 18,
+    },
+    logoutButton: {
+      marginTop: 32,
+      padding: 16,
+    },
+    logoutText: {
+      color: c.danger,
+      fontSize: 17,
+      fontWeight: '600',
+    },
+  })
+);

@@ -39,6 +39,7 @@ describe('admin data isolation', () => {
       total: 1,
       groups: null,
       withoutGroup: [{ id: 'child-1', firstName: 'Иван', surname: 'Иванов' }],
+      branches: [],
     }));
     state = visitsReducer(state, loadJournalSuccess({
       items: [{
@@ -47,6 +48,7 @@ describe('admin data isolation', () => {
         childName: 'Иван Иванов',
         representativeName: 'Иванова А.',
         status: 'IN',
+        group: null,
         datetime: '2026-09-25T08:00:00.000Z',
       }],
       page: 0,

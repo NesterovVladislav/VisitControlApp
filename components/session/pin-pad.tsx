@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { makeStyles } from '../../hooks/use-palette';
 
 type PinPadProps = {
   onSubmit(pin: string): void;
@@ -9,6 +10,7 @@ type PinPadProps = {
 const KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', 'empty', '0', 'delete'] as const;
 
 export function PinPad({ onSubmit, disabled = false }: PinPadProps) {
+  const styles = useStyles();
   const [digits, setDigits] = useState('');
 
   const enterDigit = (digit: string) => {
@@ -72,49 +74,51 @@ export function PinPad({ onSubmit, disabled = false }: PinPadProps) {
   );
 }
 
-const styles = StyleSheet.create({
-  indicators: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    marginBottom: 28,
-  },
-  indicator: {
-    borderColor: '#1D3557',
-    borderRadius: 8,
-    borderWidth: 2,
-    height: 16,
-    marginHorizontal: 8,
-    width: 16,
-  },
-  indicatorFilled: {
-    backgroundColor: '#1D3557',
-  },
-  grid: {
-    alignSelf: 'center',
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    width: 264,
-  },
-  key: {
-    height: 72,
-    margin: 8,
-    width: 72,
-  },
-  keyButton: {
-    alignItems: 'center',
-    backgroundColor: '#F1F4F8',
-    borderRadius: 36,
-    justifyContent: 'center',
-  },
-  keyDisabled: {
-    opacity: 0.45,
-  },
-  keyPressed: {
-    backgroundColor: '#DCE6F2',
-  },
-  keyText: {
-    color: '#1D3557',
-    fontSize: 26,
-    fontWeight: '600',
-  },
-});
+const useStyles = makeStyles((c) =>
+  StyleSheet.create({
+    indicators: {
+      flexDirection: 'row',
+      justifyContent: 'center',
+      marginBottom: 28,
+    },
+    indicator: {
+      borderColor: c.ink,
+      borderRadius: 8,
+      borderWidth: 2,
+      height: 16,
+      marginHorizontal: 8,
+      width: 16,
+    },
+    indicatorFilled: {
+      backgroundColor: c.ink,
+    },
+    grid: {
+      alignSelf: 'center',
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      width: 264,
+    },
+    key: {
+      height: 72,
+      margin: 8,
+      width: 72,
+    },
+    keyButton: {
+      alignItems: 'center',
+      backgroundColor: c.key,
+      borderRadius: 36,
+      justifyContent: 'center',
+    },
+    keyDisabled: {
+      opacity: 0.45,
+    },
+    keyPressed: {
+      backgroundColor: c.keyPressed,
+    },
+    keyText: {
+      color: c.ink,
+      fontSize: 26,
+      fontWeight: '600',
+    },
+  })
+);

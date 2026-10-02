@@ -2,6 +2,7 @@ const SECRET_ACTION_TYPES = new Set([
   'auth/loginStart',
   'auth/completePinSetup',
   'auth/unlockWithPin',
+  'profile/changePasswordStart',
 ]);
 
 const SENSITIVE_KEY = /token|password|pin/i;

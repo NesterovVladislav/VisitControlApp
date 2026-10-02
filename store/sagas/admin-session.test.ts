@@ -32,6 +32,7 @@ import {
 } from '../reducers/visits';
 import { watchRequests } from './requests';
 import { watchVisits } from './visits';
+import { Presence } from '../types/visits';
 
 const api = visitControlApi as jest.Mocked<typeof visitControlApi>;
 const request = {
@@ -141,14 +142,19 @@ describe('admin saga session isolation', () => {
   });
 
   it('does not publish presence fetched for a previous session', async () => {
-    const pending = deferred<{ total: number; groups: null; withoutGroup: Array<{ id: string; firstName: string; surname: string }> }>();
+    const pending = deferred<Presence>();
     api.getPresence.mockReturnValue(pending.promise);
     const run = startWatcher(watchVisits);
     run.channel.put(loadPresentStart());
     expect(api.getPresence).toHaveBeenCalledTimes(1);
 
     run.state.auth.sessionEpoch = 2;
-    pending.resolve({ total: 1, groups: null, withoutGroup: [{ id: 'child-1', firstName: 'Иван', surname: 'Иванов' }] });
+    pending.resolve({
+      total: 1,
+      groups: null,
+      withoutGroup: [{ id: 'child-1', firstName: 'Иван', surname: 'Иванов' }],
+      branches: [],
+    });
     await settle();
 
     expect(run.dispatched).not.toContainEqual(expect.objectContaining({ type: loadPresentSuccess.type }));

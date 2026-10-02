@@ -49,13 +49,14 @@
 
 | Роль | Права |
 | --- | --- |
-| ADMIN | все |
-| PARENT | USER_READ, VISIT_READ/WRITE, GROUP_READ, BRANCH_READ, CHILD_REPRESENTATIVE_READ/WRITE |
+| ADMIN | все, включая PRESENCE_READ |
+| EMPLOYEE (сотрудник, с 28.09.2026) | PRESENCE_READ, VISIT_READ, GROUP_READ, BRANCH_READ + права родителя (VISIT_WRITE, CHILD_REPRESENTATIVE_READ/WRITE): сотрудник может водить в сад своих детей. Без USER_READ/USER_WRITE |
+| PARENT | VISIT_READ/WRITE, GROUP_READ, BRANCH_READ, CHILD_REPRESENTATIVE_READ/WRITE (USER_READ отобран 24.09.2026) |
 | VISITOR (ребёнок) | VISIT_READ/WRITE |
 | RELATIVE | VISIT_READ, CHILD_REPRESENTATIVE_READ |
 | ACQUAINTANCE | VISIT_READ |
 
-RELATIVE и ACQUAINTANCE — роли связи «ребёнок — представитель», а не роли пользователя. В токен попадает только роль пользователя, поэтому бабушка с ролью RELATIVE получит права своей роли пользователя (скорее всего PARENT).
+PRESENCE_READ открывает «кто в саду» (`GET /group/presence`, `GET /group/children/present`) — ФИО детей, поэтому его нет у родителей. RELATIVE и ACQUAINTANCE — роли связи «ребёнок — представитель», а не роли пользователя. В токен попадает только роль пользователя, поэтому бабушка с ролью RELATIVE получит права своей роли пользователя (скорее всего PARENT).
 
 ## Аутентификация
 

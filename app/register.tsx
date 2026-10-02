@@ -41,6 +41,7 @@ import {
   validateField,
   validateForm,
 } from '../utils/registration-validation';
+import { makeStyles, usePalette } from '../hooks/use-palette';
 
 const EMPTY_FORM: RegistrationForm = {
   surname: '',
@@ -66,6 +67,8 @@ function isDirty(form: RegistrationForm): boolean {
 }
 
 export default function RegisterScreen() {
+  const c = usePalette();
+  const styles = useStyles();
   const router = useRouter();
   const navigation = useNavigation();
   const headerHeight = useHeaderHeight();
@@ -389,7 +392,7 @@ export default function RegisterScreen() {
               </Text>
             ) : !policy ? (
               <View style={styles.policyLoading}>
-                <ActivityIndicator size="small" color="#999" />
+                <ActivityIndicator size="small" color={c.textTertiary} />
                 <Text style={styles.policyStatus}>  Загружаем политику обработки данных…</Text>
               </View>
             ) : (
@@ -422,7 +425,7 @@ export default function RegisterScreen() {
             accessibilityState={{ disabled: isSubmitting || !policy, busy: isSubmitting }}
           >
             {isSubmitting ? (
-              <ActivityIndicator color="#fff" />
+              <ActivityIndicator color={c.onPrimary} />
             ) : (
               <Text style={styles.buttonText}>Отправить заявку</Text>
             )}
@@ -439,91 +442,93 @@ export default function RegisterScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  flex: {
-    flex: 1,
-    backgroundColor: '#f5f5f5',
-  },
-  container: {
-    padding: 20,
-    alignItems: 'center',
-  },
-  card: {
-    width: '100%',
-    maxWidth: 400,
-    backgroundColor: '#fff',
-    borderRadius: 10,
-    padding: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  subtitle: {
-    fontSize: 15,
-    color: '#666',
-    marginBottom: 24,
-    lineHeight: 21,
-  },
-  section: {
-    fontSize: 12,
-    fontWeight: '700',
-    letterSpacing: 0.5,
-    color: '#888',
-    marginBottom: 12,
-    marginTop: 4,
-  },
-  link: {
-    color: '#007AFF',
-    fontWeight: '500',
-    marginTop: 4,
-  },
-  policyLoading: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  policyStatus: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 16,
-    lineHeight: 20,
-  },
-  banner: {
-    backgroundColor: '#FDECEA',
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 12,
-  },
-  bannerText: {
-    color: '#B71C1C',
-    fontSize: 14,
-    lineHeight: 20,
-  },
-  button: {
-    backgroundColor: '#007AFF',
-    borderRadius: 8,
-    padding: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 8,
-    minHeight: 50,
-  },
-  buttonDisabled: {
-    backgroundColor: '#ccc',
-  },
-  buttonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  footer: {
-    marginTop: 20,
-    alignItems: 'center',
-  },
-  footerText: {
-    fontSize: 14,
-    color: '#666',
-  },
-});
+const useStyles = makeStyles((c) =>
+  StyleSheet.create({
+    flex: {
+      flex: 1,
+      backgroundColor: c.background,
+    },
+    container: {
+      padding: 20,
+      alignItems: 'center',
+    },
+    card: {
+      width: '100%',
+      maxWidth: 400,
+      backgroundColor: c.card,
+      borderRadius: 10,
+      padding: 24,
+      shadowColor: c.shadow,
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.1,
+      shadowRadius: 4,
+      elevation: 3,
+    },
+    subtitle: {
+      fontSize: 15,
+      color: c.textSecondary,
+      marginBottom: 24,
+      lineHeight: 21,
+    },
+    section: {
+      fontSize: 12,
+      fontWeight: '700',
+      letterSpacing: 0.5,
+      color: c.textTertiary,
+      marginBottom: 12,
+      marginTop: 4,
+    },
+    link: {
+      color: c.primary,
+      fontWeight: '500',
+      marginTop: 4,
+    },
+    policyLoading: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: 16,
+    },
+    policyStatus: {
+      fontSize: 14,
+      color: c.textSecondary,
+      marginBottom: 16,
+      lineHeight: 20,
+    },
+    banner: {
+      backgroundColor: c.dangerSoft,
+      borderRadius: 8,
+      padding: 12,
+      marginBottom: 12,
+    },
+    bannerText: {
+      color: c.danger,
+      fontSize: 14,
+      lineHeight: 20,
+    },
+    button: {
+      backgroundColor: c.primary,
+      borderRadius: 8,
+      padding: 16,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginTop: 8,
+      minHeight: 50,
+    },
+    buttonDisabled: {
+      backgroundColor: c.disabled,
+    },
+    buttonText: {
+      color: c.onPrimary,
+      fontSize: 16,
+      fontWeight: '600',
+    },
+    footer: {
+      marginTop: 20,
+      alignItems: 'center',
+    },
+    footerText: {
+      fontSize: 14,
+      color: c.textSecondary,
+    },
+  })
+);

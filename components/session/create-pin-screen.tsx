@@ -5,8 +5,10 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAppDispatch, useAppSelector } from '../../store';
 import { completePinSetup } from '../../store/reducers/auth';
 import { PinPad } from './pin-pad';
+import { makeStyles } from '../../hooks/use-palette';
 
 export function CreatePinScreen() {
+  const styles = useStyles();
   const dispatch = useAppDispatch();
   const isLoading = useAppSelector((state) => state.auth.isLoading);
   const [firstPin, setFirstPin] = useState<string | null>(null);
@@ -43,17 +45,19 @@ export function CreatePinScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  safeArea: { backgroundColor: '#FFFFFF', flex: 1 },
-  content: { flex: 1, justifyContent: 'center', padding: 24 },
-  title: { color: '#1D3557', fontSize: 28, fontWeight: '700', textAlign: 'center' },
-  description: {
-    color: '#5D6B7A',
-    fontSize: 16,
-    marginBottom: 28,
-    marginTop: 12,
-    textAlign: 'center',
-  },
-  error: { color: '#B42318', marginBottom: 16, textAlign: 'center' },
-  status: { color: '#5D6B7A', marginTop: 16, textAlign: 'center' },
-});
+const useStyles = makeStyles((c) =>
+  StyleSheet.create({
+    safeArea: { backgroundColor: c.card, flex: 1 },
+    content: { flex: 1, justifyContent: 'center', padding: 24 },
+    title: { color: c.ink, fontSize: 28, fontWeight: '700', textAlign: 'center' },
+    description: {
+      color: c.inkSecondary,
+      fontSize: 16,
+      marginBottom: 28,
+      marginTop: 12,
+      textAlign: 'center',
+    },
+    error: { color: c.danger, marginBottom: 16, textAlign: 'center' },
+    status: { color: c.inkSecondary, marginTop: 16, textAlign: 'center' },
+  })
+);

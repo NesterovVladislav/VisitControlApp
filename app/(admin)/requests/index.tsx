@@ -15,11 +15,14 @@ import { useAppDispatch, useAppSelector } from '../../../store';
 import { loadRequestsStart } from '../../../store/reducers/requests';
 import { formatPhone } from '../../../utils/input-masks';
 import { fullName, submittedAt } from '../../../utils/registration-request-format';
+import { makeStyles, usePalette } from '../../../hooks/use-palette';
 
 /**
  * Вкладка «Заявки»: заявки на регистрацию, ожидающие подтверждения, старые сверху.
  */
 export default function RequestsScreen() {
+  const c = usePalette();
+  const styles = useStyles();
   const router = useRouter();
   const dispatch = useAppDispatch();
   const { items, total, status, refreshing } = useAppSelector((state) => state.requests);
@@ -34,7 +37,7 @@ export default function RequestsScreen() {
   if (status === 'idle' || status === 'loading') {
     return (
       <View style={styles.center}>
-        <ActivityIndicator size="large" color="#007AFF" />
+        <ActivityIndicator size="large" color={c.primary} />
       </View>
     );
   }
@@ -82,7 +85,7 @@ export default function RequestsScreen() {
             </Text>
             <Text style={styles.date}>{submittedAt(item.created)}</Text>
           </View>
-          <IconSymbol name="chevron.right" size={22} color="#bbb" />
+          <IconSymbol name="chevron.right" size={22} color={c.iconMuted} />
         </TouchableOpacity>
       )}
       ListEmptyComponent={
@@ -94,88 +97,90 @@ export default function RequestsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-    backgroundColor: '#f5f5f5',
-  },
-  listContainer: {
-    padding: 20,
-    width: '100%',
-    maxWidth: 440,
-    alignSelf: 'center',
-  },
-  emptyContainer: {
-    flexGrow: 1,
-    justifyContent: 'center',
-    padding: 20,
-  },
-  center: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#f5f5f5',
-    padding: 20,
-  },
-  empty: {
-    alignItems: 'center',
-  },
-  note: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 12,
-    lineHeight: 20,
-  },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#fff',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#e0e0e0',
-  },
-  rowFirst: {
-    borderTopLeftRadius: 10,
-    borderTopRightRadius: 10,
-  },
-  rowLast: {
-    borderBottomLeftRadius: 10,
-    borderBottomRightRadius: 10,
-    borderBottomWidth: 0,
-  },
-  rowText: {
-    flex: 1,
-    marginRight: 8,
-  },
-  name: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#333',
-  },
-  contacts: {
-    marginTop: 4,
-    fontSize: 14,
-    color: '#666',
-  },
-  date: {
-    marginTop: 4,
-    fontSize: 13,
-    color: '#999',
-  },
-  message: {
-    fontSize: 16,
-    color: '#666',
-    textAlign: 'center',
-    marginBottom: 8,
-  },
-  retry: {
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-  },
-  retryText: {
-    color: '#007AFF',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-});
+const useStyles = makeStyles((c) =>
+  StyleSheet.create({
+    screen: {
+      flex: 1,
+      backgroundColor: c.background,
+    },
+    listContainer: {
+      padding: 20,
+      width: '100%',
+      maxWidth: 440,
+      alignSelf: 'center',
+    },
+    emptyContainer: {
+      flexGrow: 1,
+      justifyContent: 'center',
+      padding: 20,
+    },
+    center: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+      backgroundColor: c.background,
+      padding: 20,
+    },
+    empty: {
+      alignItems: 'center',
+    },
+    note: {
+      fontSize: 14,
+      color: c.textSecondary,
+      marginBottom: 12,
+      lineHeight: 20,
+    },
+    row: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: c.card,
+      paddingHorizontal: 16,
+      paddingVertical: 14,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: c.separator,
+    },
+    rowFirst: {
+      borderTopLeftRadius: 10,
+      borderTopRightRadius: 10,
+    },
+    rowLast: {
+      borderBottomLeftRadius: 10,
+      borderBottomRightRadius: 10,
+      borderBottomWidth: 0,
+    },
+    rowText: {
+      flex: 1,
+      marginRight: 8,
+    },
+    name: {
+      fontSize: 16,
+      fontWeight: '600',
+      color: c.text,
+    },
+    contacts: {
+      marginTop: 4,
+      fontSize: 14,
+      color: c.textSecondary,
+    },
+    date: {
+      marginTop: 4,
+      fontSize: 13,
+      color: c.textTertiary,
+    },
+    message: {
+      fontSize: 16,
+      color: c.textSecondary,
+      textAlign: 'center',
+      marginBottom: 8,
+    },
+    retry: {
+      paddingVertical: 10,
+      paddingHorizontal: 20,
+    },
+    retryText: {
+      color: c.primary,
+      fontSize: 16,
+      fontWeight: '600',
+    },
+  })
+);

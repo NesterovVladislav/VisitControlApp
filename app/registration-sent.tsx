@@ -3,8 +3,10 @@ import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useAppDispatch } from '../store';
 import { resetRegistration } from '../store/reducers/registration';
+import { makeStyles } from '../hooks/use-palette';
 
 export default function RegistrationSentScreen() {
+  const styles = useStyles();
   const router = useRouter();
   const dispatch = useAppDispatch();
   const { email } = useLocalSearchParams<{ email?: string }>();
@@ -43,64 +45,66 @@ export default function RegistrationSentScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#f5f5f5',
-    padding: 20,
-  },
-  card: {
-    width: '100%',
-    maxWidth: 400,
-    backgroundColor: '#fff',
-    borderRadius: 10,
-    padding: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  icon: {
-    fontSize: 40,
-    textAlign: 'center',
-    marginBottom: 12,
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: 16,
-    textAlign: 'center',
-    color: '#333',
-  },
-  text: {
-    fontSize: 16,
-    lineHeight: 23,
-    color: '#333',
-    marginBottom: 12,
-  },
-  email: {
-    fontWeight: '600',
-  },
-  note: {
-    fontSize: 14,
-    lineHeight: 20,
-    color: '#666',
-    marginBottom: 24,
-  },
-  button: {
-    backgroundColor: '#007AFF',
-    borderRadius: 8,
-    padding: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-    minHeight: 50,
-  },
-  buttonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-});
+const useStyles = makeStyles((c) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+      backgroundColor: c.background,
+      padding: 20,
+    },
+    card: {
+      width: '100%',
+      maxWidth: 400,
+      backgroundColor: c.card,
+      borderRadius: 10,
+      padding: 24,
+      shadowColor: c.shadow,
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.1,
+      shadowRadius: 4,
+      elevation: 3,
+    },
+    icon: {
+      fontSize: 40,
+      textAlign: 'center',
+      marginBottom: 12,
+    },
+    title: {
+      fontSize: 24,
+      fontWeight: 'bold',
+      marginBottom: 16,
+      textAlign: 'center',
+      color: c.text,
+    },
+    text: {
+      fontSize: 16,
+      lineHeight: 23,
+      color: c.text,
+      marginBottom: 12,
+    },
+    email: {
+      fontWeight: '600',
+    },
+    note: {
+      fontSize: 14,
+      lineHeight: 20,
+      color: c.textSecondary,
+      marginBottom: 24,
+    },
+    button: {
+      backgroundColor: c.primary,
+      borderRadius: 8,
+      padding: 16,
+      alignItems: 'center',
+      justifyContent: 'center',
+      minHeight: 50,
+    },
+    buttonText: {
+      color: c.onPrimary,
+      fontSize: 16,
+      fontWeight: '600',
+    },
+  })
+);

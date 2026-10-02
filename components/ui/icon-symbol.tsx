@@ -24,6 +24,15 @@ const MAPPING = {
   'person.2.fill': 'people',
   'ellipsis': 'more-horiz',
   'figure.2.and.child.holdinghands': 'family-restroom',
+  'eye': 'visibility',
+  'eye.slash': 'visibility-off',
+  'phone.fill': 'phone',
+  'magnifyingglass': 'search',
+  'xmark.circle.fill': 'cancel',
+  'chevron.down': 'expand-more',
+  'checkmark': 'check',
+  'plus': 'add',
+  'plus.circle.fill': 'add-circle',
 } as IconMapping;
 
 /**

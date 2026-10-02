@@ -46,7 +46,7 @@ import {
   validationStarted,
   validationSucceeded,
 } from '../reducers/auth';
-import { ADMIN_ROLE, LoginCredentials, LogoutReason, User } from '../types/auth';
+import { LoginCredentials, LogoutReason, User, isStaffRole } from '../types/auth';
 
 export const AUTH_ERRORS = {
   wrongCredentials: 'Неверный email или пароль',
@@ -93,9 +93,9 @@ function* validateProtectedRecord(record: ProtectedSessionRecord) {
     );
     if (currentEpoch !== expectedEpoch) return;
     yield put(validationSucceeded(user));
-    // Администратору свои дети нужны сразу: по ним решаем, показывать ли переключатель в режим родителя.
+    // Персоналу свои дети нужны сразу: по ним решаем, показывать ли переключатель в режим родителя.
     // Родителю список загрузит экран «Мои дети».
-    if (user.role === ADMIN_ROLE) {
+    if (isStaffRole(user.role)) {
       yield put(loadChildrenStart());
     }
   } catch (error) {

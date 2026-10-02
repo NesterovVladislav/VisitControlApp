@@ -10,8 +10,9 @@ jest.mock('../../store', () => ({
   useAppSelector: jest.fn(),
 }));
 jest.mock('@/components/ui/icon-symbol', () => ({ IconSymbol: () => null }));
+const mockPush = jest.fn();
 jest.mock('expo-router', () => ({
-  useRouter: () => ({ replace: jest.fn() }),
+  useRouter: () => ({ replace: jest.fn(), push: mockPush }),
 }));
 
 const mockUseAppDispatch = useAppDispatch as jest.MockedFunction<typeof useAppDispatch>;
@@ -23,7 +24,22 @@ describe('administrator account menu', () => {
     jest.clearAllMocks();
     mockUseAppDispatch.mockReturnValue(dispatch);
     mockUseAppSelector.mockImplementation((selector) =>
-      selector({ children: { items: [] } } as never),
+      selector({
+        children: { items: [] },
+        auth: {
+          user: {
+            id: 'admin-1',
+            email: 'admin@example.test',
+            firstName: 'Анна',
+            surname: 'Смирнова',
+            patronymic: null,
+            birthDate: null,
+            phone: null,
+            gender: null,
+            role: 'ADMIN',
+          },
+        },
+      } as never),
     );
   });
 
@@ -41,5 +57,14 @@ describe('administrator account menu', () => {
     } finally {
       alert.mockRestore();
     }
+  });
+
+  it('opens the profile from the card with the administrator name', async () => {
+    const screen = await render(<MoreScreen />);
+    expect(screen.getByText('Смирнова Анна')).toBeTruthy();
+
+    await fireEvent.press(screen.getByLabelText('Профиль'));
+
+    expect(mockPush).toHaveBeenCalledWith('/profile');
   });
 });

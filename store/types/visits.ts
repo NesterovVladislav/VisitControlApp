@@ -21,13 +21,24 @@ export interface PresenceGroup {
 }
 
 /**
+ * Филиал (GET /branch/list)
+ */
+export interface Branch {
+  id: string;
+  name: string;
+}
+
+/**
  * Кто сейчас в саду. groups === null — бэкенд ещё без разбивки по группам,
- * тогда все дети в withoutGroup.
+ * тогда все дети в withoutGroup, а филиалов нет.
+ * withoutGroup — дети в саду, которые не состоят ни в одной группе: к филиалу они не привязаны.
  */
 export interface Presence {
   total: number;
   groups: PresenceGroup[] | null;
   withoutGroup: PresentChild[];
+  /** Активные филиалы по названию */
+  branches: Branch[];
 }
 
 /**
@@ -42,6 +53,8 @@ export interface VisitEntry {
   status: 'IN' | 'OUT';
   /** ISO-время в UTC */
   datetime: string;
+  /** Нынешняя группа ребёнка (не на день отметки); null — без группы или старый бэкенд */
+  group: { id: string; name: string; branchName: string | null } | null;
 }
 
 export interface VisitPage {

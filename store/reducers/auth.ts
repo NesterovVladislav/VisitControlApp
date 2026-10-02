@@ -1,12 +1,12 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 
 import {
-  ADMIN_ROLE,
   AppMode,
   AuthState,
   LoginCredentials,
   LogoutReason,
   User,
+  isStaffRole,
 } from '../types/auth';
 
 export const MAX_PIN_ATTEMPTS = 5;
@@ -149,13 +149,19 @@ const authSlice = createSlice({
       state.error = null;
       state.notice = null;
       state.user = action.payload;
-      const keepSelection = action.payload.role === ADMIN_ROLE &&
-        state.selectedModeOwnerId === action.payload.id;
-      state.mode = action.payload.role === ADMIN_ROLE
+      const staff = isStaffRole(action.payload.role);
+      const keepSelection = staff && state.selectedModeOwnerId === action.payload.id;
+      state.mode = staff
         ? (keepSelection ? state.mode : 'admin')
         : 'parent';
       if (!keepSelection) state.selectedModeOwnerId = null;
       state.remainingPinAttempts = MAX_PIN_ATTEMPTS;
+    },
+    /** Свежие данные из GET /user. Чужой ответ (другой аккаунт, сессия закрыта) не применяется. */
+    userRefreshed: (state, action: PayloadAction<User>) => {
+      if (state.phase === 'authenticated' && state.user?.id === action.payload.id) {
+        state.user = action.payload;
+      }
     },
     sessionValidationUnavailable: (state, action: PayloadAction<string>) => {
       state.phase = 'validationUnavailable';
@@ -196,8 +202,8 @@ const authSlice = createSlice({
       state.sessionEpoch += 1;
     },
     switchMode: (state, action: PayloadAction<AppMode>) => {
-      // Переключаться может только администратор, родитель всегда в режиме родителя
-      if (state.phase === 'authenticated' && state.user?.role === ADMIN_ROLE) {
+      // Переключаться может только персонал (администратор, сотрудник), родитель всегда в режиме родителя
+      if (state.phase === 'authenticated' && state.user && isStaffRole(state.user.role)) {
         state.mode = action.payload;
         state.selectedModeOwnerId = state.user.id;
       }
@@ -247,6 +253,7 @@ export const {
   unlockFailed,
   validationStarted,
   validationSucceeded,
+  userRefreshed,
   sessionValidationUnavailable,
   retrySessionValidation,
   storageUnavailable,

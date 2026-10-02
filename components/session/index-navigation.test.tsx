@@ -24,6 +24,8 @@ const admin = {
   firstName: 'Admin',
   surname: 'Example',
   patronymic: null,
+  birthDate: null,
+  phone: null,
   gender: null,
   role: 'ADMIN',
 } as const;

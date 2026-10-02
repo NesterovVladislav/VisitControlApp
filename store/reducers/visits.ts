@@ -4,7 +4,7 @@ import { logoutCompleted } from './auth';
 
 const initialState: VisitsState = {
   present: {
-    data: { total: 0, groups: null, withoutGroup: [] },
+    data: { total: 0, groups: null, withoutGroup: [], branches: [] },
     status: 'idle',
     refreshing: false,
   },

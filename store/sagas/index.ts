@@ -4,6 +4,11 @@ import { watchRegistration } from './registration';
 import { watchChildren } from './children';
 import { watchVisits } from './visits';
 import { watchRequests } from './requests';
+import { watchProfile } from './profile';
+import { watchPeople } from './people';
+import { watchGroupMembership } from './group-membership';
+import { watchGarden } from './garden';
+import { watchGroupPeople } from './group-people';
 
 // Здесь будут импортироваться и объединяться все sagas
 export function* rootSaga() {
@@ -14,6 +19,11 @@ export function* rootSaga() {
     fork(watchChildren),
     fork(watchVisits),
     fork(watchRequests),
+    fork(watchProfile),
+    fork(watchPeople),
+    fork(watchGroupMembership),
+    fork(watchGarden),
+    fork(watchGroupPeople),
     // Пример: fork(visitsSaga),
   ]);
   console.log('[Root Saga] Root saga started');
