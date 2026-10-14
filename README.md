@@ -1,5 +1,44 @@
 # Welcome to your Expo app 👋
 
+## ДоброВход: адрес API и сборки
+
+Нативные Android/iOS-клиенты используют `https://core.dobrovhod.ru/api`.
+Этот адрес задан для `preview` и `production` в `eas.json`, а также используется
+по умолчанию в Expo Go. Локальные `.env` могут переопределять адрес: если после
+переключения ветки Expo Go продолжает обращаться к старому серверу, проверьте
+`EXPO_PUBLIC_API_URL` и полностью перезагрузите приложение.
+
+PWA собирается отдельно командой `npm run build:web` с относительным `/api`:
+на опубликованном `https://app.dobrovhod.ru` API обслуживает тот же домен.
+Относительный `/api` не следует передавать нативной сборке.
+
+Профиль `preview` выпускает APK для внутреннего распространения; `production`
+сохраняет штатный формат публикации EAS. Обычные сборки больше не включают
+`EXPO_PUBLIC_ALLOW_INSECURE_HTTP`: разрешение HTTP требуется только для явно
+отмеченного локального стенда. Значение переменной в окружении EAS тоже должно
+отсутствовать или отличаться от `1`.
+
+Для локального APK (нужны JDK, Android SDK/NDK и установленные зависимости):
+
+```sh
+EXPO_NO_DOTENV=1 EXPO_PUBLIC_API_URL=https://core.dobrovhod.ru/api npx expo prebuild --platform android --no-install
+cd android
+EXPO_NO_DOTENV=1 EXPO_PUBLIC_API_URL=https://core.dobrovhod.ru/api ./gradlew :app:assembleRelease -PreactNativeArchitectures=arm64-v8a
+```
+
+Результат: `android/app/build/outputs/apk/release/app-release.apk`.
+Этот вариант для современных ARM64-устройств. Для других архитектур изменить
+`reactNativeArchitectures`. Локальный APK использует тестовую подпись шаблона
+Expo; подпись релиза для магазина выбирается отдельно через EAS/keystore.
+Перед установкой поверх прежнего APK нужно сравнить их сертификаты подписи.
+
+Версия локальной сборки — `1.0.1`, Android `versionCode=2`; EAS с
+`appVersionSource=remote` управляет Android-кодом версии на своей стороне.
+
+Смена DNS сама по себе не обновляет установленный APK. Для перехода на новый
+адрес нужно установить новую сборку. Нужна проверка входа, восстановления
+сессии, фотографий и QR на реальном телефоне.
+
 This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
 
 ## Get started

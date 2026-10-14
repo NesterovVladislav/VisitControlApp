@@ -11,9 +11,10 @@ export interface BackendConfig {
 
 export const BACKENDS: Record<string, BackendConfig> = {
   visitControlServer: {
-    // Локальный стенд по умолчанию. Для release задайте EXPO_PUBLIC_API_URL с HTTPS.
-    host: '93.77.168.178',
-    protocol: 'http',
+    // Expo Go и локальная разработка используют публичный HTTPS API.
+    // Для release адрес также явно задаётся в профиле сборки eas.json.
+    host: 'core.dobrovhod.ru',
+    protocol: 'https',
     basePath: '/api',
     timeout: 10000,
   },
