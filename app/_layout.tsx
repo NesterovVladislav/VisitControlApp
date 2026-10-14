@@ -1,6 +1,7 @@
 import { DarkTheme, DefaultTheme, Theme, ThemeProvider } from '@react-navigation/native';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
+import { Platform } from 'react-native';
 import 'react-native-reanimated';
 import { Provider } from 'react-redux';
 
@@ -9,6 +10,7 @@ import { WebAlertHost } from '../components/web-alert-host';
 import { Palette, palettes } from '../constants/palette';
 import { useScheme } from '../hooks/use-palette';
 import { loadThemePreference } from '../services/theme/theme-preference';
+import { syncBrowserTheme } from '../services/theme/browser-theme';
 import { store } from '../store';
 
 /** Шапки, таб-бар и фон под экранами — из той же палитры, что и сами экраны. */
@@ -39,6 +41,10 @@ export default function RootLayout() {
   useEffect(() => {
     void loadThemePreference();
   }, []);
+
+  useEffect(() => {
+    if (Platform.OS === 'web') syncBrowserTheme(scheme);
+  }, [scheme]);
 
   return (
     <Provider store={store}>
