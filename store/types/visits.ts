@@ -18,6 +18,10 @@ export interface PresenceGroup {
   totalChildren: number;
   /** Кто из группы сейчас в саду */
   present: PresentChild[];
+  /** Сколько детей группы ждут приёма: родитель отметил приход, сад ещё не подтвердил. В present не входят */
+  pendingIn?: number;
+  /** Сколько детей группы ждут выдачи: они ещё в саду и входят в present */
+  pendingOut?: number;
 }
 
 /**
@@ -51,10 +55,51 @@ export interface VisitEntry {
   childName: string;
   representativeName: string;
   status: 'IN' | 'OUT';
-  /** ISO-время в UTC */
+  /** ISO-время; на экране — часы сада, см. toWallClockIso */
   datetime: string;
   /** Нынешняя группа ребёнка (не на день отметки); null — без группы или старый бэкенд */
   group: { id: string; name: string; branchName: string | null } | null;
+  /** Решение сада; нет — отметке подтверждение не требовалось */
+  confirmation?: VisitConfirmation | null;
+  /** Сотрудник, который принял или отдал ребёнка: «Петрова О.» */
+  decidedBy?: string | null;
+  /** Комментарий того, кто поставил отметку */
+  comment?: string | null;
+}
+
+/** Решение сада по отметке прихода или ухода. */
+export type VisitConfirmation = 'PENDING' | 'CONFIRMED' | 'REJECTED' | 'CANCELLED';
+
+/** Отметка в очереди сотрудника (GET /visit/pending): ждёт «Принять» или «Отдать». */
+export interface VisitQueueItem {
+  id: string;
+  status: 'IN' | 'OUT';
+  childName: string;
+  /** Пути к фотографиям ребёнка и взрослого относительно API */
+  childPhotoUrl?: string | null;
+  representativePhotoUrl?: string | null;
+  representativeId: string;
+  /** «Иванова А.» */
+  representativeName: string;
+  /** Кем приходится ребёнку: PARENT, RELATIVE, ACQUAINTANCE */
+  linkRole: string | null;
+  /** ISO-время; на экране — часы сада, см. toWallClockIso */
+  datetime: string;
+  comment: string | null;
+  /** Группа ребёнка на момент отметки */
+  group: { id: string; name: string } | null;
+}
+
+/** Какие группы сотрудник выбрал для очереди. Хранится на устройстве. */
+export interface QueueFilter {
+  groupIds: string[];
+  withoutGroup: boolean;
+}
+
+export interface VisitQueue {
+  items: VisitQueueItem[];
+  /** Сколько отметок ждут вне выбранных групп */
+  otherCount: number;
 }
 
 export interface VisitPage {
@@ -64,6 +109,43 @@ export interface VisitPage {
 }
 
 export type LoadStatus = 'idle' | 'loading' | 'loaded' | 'failed';
+
+/** Одноразовый код для QR (POST /visit/handover). */
+export interface HandoverToken {
+  /** Содержимое QR-кода */
+  token: string;
+  /** Через сколько секунд код перестанет действовать */
+  expiresIn: number;
+}
+
+/** Что получилось после скана QR-кода сотрудником (POST /visit/handover/redeem). */
+export interface HandoverResult {
+  status: 'IN' | 'OUT';
+  childName: string;
+  /** «Иванова А.» */
+  representativeName: string;
+  linkRole: string | null;
+  groupName: string | null;
+}
+
+export interface VisitQueueState {
+  /** Включено ли в саду подтверждение посещений; null — ещё не знаем */
+  enabled: boolean | null;
+  items: VisitQueueItem[];
+  otherCount: number;
+  status: LoadStatus;
+  refreshing: boolean;
+  /** Выбранные группы; null — вся очередь */
+  filter: QueueFilter | null;
+  /** Выбор групп прочитан с устройства */
+  filterLoaded: boolean;
+  /** Показать всю очередь поверх выбранных групп; до перезапуска приложения */
+  showAll: boolean;
+  /** Отметки, по которым сейчас отправляется решение */
+  decidingIds: string[];
+  /** Ошибка решения, которую экран показывает диалогом */
+  error: string | null;
+}
 
 export interface VisitsState {
   present: {

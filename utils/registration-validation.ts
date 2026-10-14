@@ -1,4 +1,7 @@
 import {
+  ChildErrors,
+  ChildField,
+  ChildForm,
   RegistrationField,
   RegistrationFieldErrors,
   RegistrationForm,
@@ -7,6 +10,10 @@ import {
 import { ageOn, parseDate, phoneToE164 } from './input-masks';
 
 export const MIN_AGE = 16;
+/** Ребёнку из заявки должно быть меньше стольких лет — так же проверяет сервер */
+export const MAX_CHILD_AGE = 18;
+/** Сколько детей можно указать в одной заявке — так же ограничивает сервер */
+export const MAX_CHILDREN = 10;
 export const MAX_AGE = 100;
 const MAX_NAME_LENGTH = 255;
 
@@ -26,6 +33,9 @@ export const MESSAGES = {
   email: 'Введите корректный email',
   phone: 'Введите номер полностью: +7 и 10 цифр',
   consent: 'Без согласия заявку отправить нельзя',
+  childAge: `Ребёнку должно быть меньше ${MAX_CHILD_AGE} лет`,
+  childFuture: 'Дата рождения ещё не наступила',
+  childTwice: 'Этот ребёнок уже указан выше',
 } as const;
 
 /**
@@ -91,6 +101,69 @@ export function validateField(
   }
 }
 
+export const CHILD_FIELD_ORDER: ChildField[] = ['surname', 'firstName', 'patronymic', 'birthDate', 'gender'];
+
+/**
+ * Проверяет одно поле ребёнка. Отчество необязательно.
+ */
+export function validateChildField(
+  field: ChildField,
+  child: ChildForm,
+  now: Date = new Date()
+): string | undefined {
+  switch (field) {
+    case 'surname':
+      return validateName(child.surname, true);
+    case 'firstName':
+      return validateName(child.firstName, true);
+    case 'patronymic':
+      return validateName(child.patronymic, false);
+    case 'birthDate': {
+      if (!child.birthDate) return MESSAGES.required;
+      if (child.birthDate.length < 10) return MESSAGES.date;
+      const parsed = parseDate(child.birthDate);
+      if (!parsed) return MESSAGES.dateInvalid;
+      if (parsed.date.getTime() > now.getTime()) return MESSAGES.childFuture;
+      return ageOn(parsed.date, now) >= MAX_CHILD_AGE ? MESSAGES.childAge : undefined;
+    }
+    case 'gender':
+      return child.gender ? undefined : MESSAGES.gender;
+  }
+}
+
+/**
+ * Проверяет всех детей. Возвращает ошибки по ключу ребёнка; у сотрудника дети не проверяются — не отправляются.
+ */
+export function validateChildren(
+  form: RegistrationForm,
+  now: Date = new Date()
+): Record<string, ChildErrors> {
+  const result: Record<string, ChildErrors> = {};
+  if (form.role !== 'PARENT') {
+    return result;
+  }
+  const seen = new Set<string>();
+  for (const child of form.children) {
+    const errors: ChildErrors = {};
+    for (const field of CHILD_FIELD_ORDER) {
+      const error = validateChildField(field, child, now);
+      if (error) {
+        errors[field] = error;
+      }
+    }
+    // Сервер отклонит заявку, где один ребёнок указан дважды
+    const same = [child.surname, child.firstName, child.birthDate].map((value) => value.trim().toLowerCase()).join('|');
+    if (!errors.firstName && seen.has(same)) {
+      errors.firstName = MESSAGES.childTwice;
+    }
+    seen.add(same);
+    if (Object.keys(errors).length > 0) {
+      result[child.key] = errors;
+    }
+  }
+  return result;
+}
+
 /**
  * Проверяет всю форму.
  */
@@ -108,7 +181,11 @@ export function validateForm(form: RegistrationForm, now: Date = new Date()): Re
 /**
  * Собирает тело запроса из проверенной формы.
  */
-export function toRegistrationRequest(form: RegistrationForm, policyVersion: string): RegistrationRequest {
+export function toRegistrationRequest(
+  form: RegistrationForm,
+  organizationId: string,
+  policyVersion: string
+): RegistrationRequest {
   const birthDate = parseDate(form.birthDate);
   const phone = phoneToE164(form.phone);
   if (!birthDate || !phone || !form.gender) {
@@ -116,6 +193,7 @@ export function toRegistrationRequest(form: RegistrationForm, policyVersion: str
   }
   const patronymic = form.noPatronymic ? '' : form.patronymic.trim();
   return {
+    organization_external_key: organizationId,
     surname: form.surname.trim(),
     first_name: form.firstName.trim(),
     ...(patronymic ? { patronymic } : {}),
@@ -124,6 +202,26 @@ export function toRegistrationRequest(form: RegistrationForm, policyVersion: str
     email: form.email.trim().toLowerCase(),
     phone,
     personal_data_consent: { accepted: true, policy_version: policyVersion },
+    role: form.role,
+    ...(form.role === 'PARENT' && form.children.length > 0
+      ? { children: form.children.map(toChildRequest) }
+      : {}),
+  };
+}
+
+/** Ребёнок из формы → тело запроса. Форма должна быть проверена. */
+export function toChildRequest(child: ChildForm) {
+  const birthDate = parseDate(child.birthDate);
+  if (!birthDate || !child.gender) {
+    throw new Error('Children must be validated before building a request');
+  }
+  const patronymic = child.patronymic.trim();
+  return {
+    surname: child.surname.trim(),
+    first_name: child.firstName.trim(),
+    ...(patronymic ? { patronymic } : {}),
+    birth_date: birthDate.iso,
+    gender: child.gender,
   };
 }
 

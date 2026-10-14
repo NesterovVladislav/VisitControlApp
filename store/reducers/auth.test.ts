@@ -32,6 +32,7 @@ const user = {
   birthDate: null,
   phone: null,
   gender: null,
+  organization: null,
   role: 'PARENT',
 } as const;
 
@@ -109,8 +110,8 @@ describe('auth reducer state machine', () => {
     expect(signedOut.user).toBeNull();
   });
 
-  it('gives an employee the same work mode and parent mode switch as an administrator', () => {
-    const employee = { ...user, role: 'EMPLOYEE' };
+  it.each(['EMPLOYEE', 'DIRECTOR'])('gives %s the same work mode and parent mode switch as an administrator', (role) => {
+    const employee = { ...user, role };
     const authenticated = reducer(initialAuthState, validationSucceeded(employee));
     expect(authenticated.mode).toBe('admin');
 

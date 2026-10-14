@@ -1,7 +1,8 @@
-import { ADMIN_ROLE, User } from '@/store/types/auth';
+import { ADMIN_ROLE, DIRECTOR_ROLE, User } from '@/store/types/auth';
 import { formatPhone } from './input-masks';
 
 const ROLE_LABELS: Record<string, string> = {
+  [DIRECTOR_ROLE]: 'Директор',
   [ADMIN_ROLE]: 'Администратор',
   PARENT: 'Родитель',
   EMPLOYEE: 'Сотрудник',

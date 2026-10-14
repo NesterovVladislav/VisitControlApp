@@ -6,6 +6,7 @@ import { useSessionLifecycle } from '../../hooks/use-session-lifecycle';
 import { useAppDispatch, useAppSelector } from '../../store';
 import { bootstrapSession } from '../../store/reducers/auth';
 import { AuthPhase } from '../../store/types/auth';
+import { brandHeaderTitle } from '../header-brand-title';
 import { BiometricSetupScreen } from './biometric-setup-screen';
 import { CreatePinScreen } from './create-pin-screen';
 import { PrivacyShield } from './privacy-shield';
@@ -17,17 +18,14 @@ function SessionNavigator({ phase }: { phase: AuthPhase }) {
   const protectedRoutes = phase === 'authenticated';
 
   return (
-    <Stack>
+    // Логотип сада в шапке; до входа сада нет — заголовок обычный
+    <Stack screenOptions={{ headerTitle: brandHeaderTitle }}>
       <Stack.Screen name="index" options={{ headerShown: false }} />
       <Stack.Protected guard={publicRoutes}>
         <Stack.Screen name="auth" options={{ headerShown: false }} />
         <Stack.Screen
           name="register"
           options={{ title: 'Регистрация', headerBackTitle: 'Назад' }}
-        />
-        <Stack.Screen
-          name="registration-sent"
-          options={{ gestureEnabled: false, headerShown: false }}
         />
       </Stack.Protected>
       <Stack.Protected guard={protectedRoutes}>
@@ -51,6 +49,14 @@ function SessionNavigator({ phase }: { phase: AuthPhase }) {
         <Stack.Screen
           name="profile/password"
           options={{ title: 'Смена пароля', headerBackTitle: 'Профиль' }}
+        />
+        <Stack.Screen
+          name="profile/child/[id]"
+          options={{ title: 'Данные ребёнка', headerBackTitle: 'Профиль' }}
+        />
+        <Stack.Screen
+          name="profile/add-child"
+          options={{ title: 'Добавить ребёнка', headerBackTitle: 'Профиль' }}
         />
         <Stack.Screen name="menu" options={{ headerShown: false }} />
         <Stack.Screen

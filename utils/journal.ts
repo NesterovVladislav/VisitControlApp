@@ -4,10 +4,19 @@ import { dayTitle, localDayKey, timeOfDay } from './visit-dates';
 
 const WITHOUT_GROUP_KEY = 'without-group';
 
-/** Пребывание в саду: приход и уход. null — отметки нет (или она на ещё не загруженной странице). */
+/**
+ * Пребывание в саду: приход и уход. null — отметки нет (или она на ещё не загруженной странице).
+ * Кто привёл, забрал, принял и отдал — у каждого пребывания свои: за день их может быть несколько.
+ */
 export interface JournalInterval {
   in: string | null;
   out: string | null;
+  broughtBy: string | null;
+  pickedUpBy: string | null;
+  acceptedBy: string | null;
+  releasedBy: string | null;
+  /** Приход или уход, который сад так и не подтвердил */
+  unconfirmed: boolean;
 }
 
 /** Ребёнок в журнале за день: когда пришёл и ушёл, кто привёл и забрал. */
@@ -19,6 +28,14 @@ export interface JournalChildRow {
   broughtBy: string | null;
   /** Кто отметил последний уход за день */
   pickedUpBy: string | null;
+  /** Сотрудник, который принял ребёнка (первый приход за день) */
+  acceptedBy: string | null;
+  /** Сотрудник, который отдал ребёнка (последний уход за день) */
+  releasedBy: string | null;
+  /** Есть отметка, которую сад так и не подтвердил */
+  unconfirmed: boolean;
+  /** Комментарии к отметкам дня, по времени */
+  comments: string[];
   /** Сейчас в саду: сегодня и последний приход без ухода */
   inNow: boolean;
   /** День не сегодняшний, а ухода после прихода нет */
@@ -41,18 +58,51 @@ function childRow(dayKey: string, entries: VisitEntry[], today: boolean): Journa
   const intervals: JournalInterval[] = [];
   let broughtBy: string | null = null;
   let pickedUpBy: string | null = null;
+  let acceptedBy: string | null = null;
+  let releasedBy: string | null = null;
+  let unconfirmed = false;
+  const comments: string[] = [];
   for (const entry of sorted) {
     const last = intervals[intervals.length - 1];
+    unconfirmed ||= entry.confirmation === 'PENDING';
+    if (entry.comment) {
+      comments.push(entry.comment);
+    }
+    const decidedBy = entry.confirmation === 'CONFIRMED' ? entry.decidedBy ?? null : null;
+    const pending = entry.confirmation === 'PENDING';
     if (entry.status === 'IN') {
-      intervals.push({ in: entry.datetime, out: null });
-      broughtBy ??= entry.representativeName;
+      intervals.push({
+        in: entry.datetime,
+        out: null,
+        broughtBy: entry.representativeName,
+        pickedUpBy: null,
+        acceptedBy: decidedBy,
+        releasedBy: null,
+        unconfirmed: pending,
+      });
+      if (broughtBy === null) {
+        broughtBy = entry.representativeName;
+        acceptedBy = entry.confirmation === 'CONFIRMED' ? entry.decidedBy ?? null : null;
+      }
     } else {
       if (last && last.in && !last.out) {
         last.out = entry.datetime;
+        last.pickedUpBy = entry.representativeName;
+        last.releasedBy = decidedBy;
+        last.unconfirmed ||= pending;
       } else {
-        intervals.push({ in: null, out: entry.datetime });
+        intervals.push({
+          in: null,
+          out: entry.datetime,
+          broughtBy: null,
+          pickedUpBy: entry.representativeName,
+          acceptedBy: null,
+          releasedBy: decidedBy,
+          unconfirmed: pending,
+        });
       }
       pickedUpBy = entry.representativeName;
+      releasedBy = entry.confirmation === 'CONFIRMED' ? entry.decidedBy ?? null : null;
     }
   }
   const last = intervals[intervals.length - 1];
@@ -63,6 +113,10 @@ function childRow(dayKey: string, entries: VisitEntry[], today: boolean): Journa
     intervals,
     broughtBy,
     pickedUpBy,
+    acceptedBy,
+    releasedBy,
+    unconfirmed,
+    comments,
     inNow: today && open,
     exitMissing: !today && open,
   };
@@ -77,6 +131,10 @@ export function journalSections(items: VisitEntry[], showBranch: boolean, now: D
   // Дни в порядке ленты (новые сверху); внутри дня — отметки по детям
   const days = new Map<string, { title: string; byChild: Map<string, VisitEntry[]> }>();
   for (const entry of items) {
+    // Отклонённые садом и отменённые родителем отметки — не посещения
+    if (entry.confirmation === 'REJECTED' || entry.confirmation === 'CANCELLED') {
+      continue;
+    }
     const dayKey = localDayKey(entry.datetime);
     let day = days.get(dayKey);
     if (!day) {
@@ -117,33 +175,53 @@ export function journalSections(items: VisitEntry[], showBranch: boolean, now: D
   return result;
 }
 
-/** «08:40 → 17:30», «08:55 → ещё в саду», «? → 17:30», несколько пребываний — через запятую. */
-export function intervalsLabel(row: Pick<JournalChildRow, 'intervals' | 'inNow' | 'exitMissing'>): string {
-  return row.intervals
-    .map((interval, index) => {
-      const last = index === row.intervals.length - 1;
-      const start = interval.in ? timeOfDay(interval.in) : '?';
-      let end = interval.out ? timeOfDay(interval.out) : '?';
-      if (!interval.out && last && row.inNow) {
-        end = 'ещё в саду';
-      } else if (!interval.out && last && row.exitMissing) {
-        end = 'уход не отмечен';
-      }
-      return `${start} → ${end}`;
-    })
-    .join(', ');
+/**
+ * «08:40 → 17:30», «08:55 → ещё в саду», «? → 17:30» — по строке на каждое пребывание за день, от утра к вечеру.
+ */
+export function intervalLabels(row: Pick<JournalChildRow, 'intervals' | 'inNow' | 'exitMissing'>): string[] {
+  return row.intervals.map((interval, index) => {
+    const last = index === row.intervals.length - 1;
+    const start = interval.in ? timeOfDay(interval.in) : '?';
+    let end = interval.out ? timeOfDay(interval.out) : '?';
+    if (!interval.out && last && row.inNow) {
+      end = 'ещё в саду';
+    } else if (!interval.out && last && row.exitMissing) {
+      end = 'уход не отмечен';
+    }
+    return `${start} → ${end}`;
+  });
 }
 
 /**
  * «Приход — Иванова А. · Уход — Иванов С.». Без глаголов «привела / забрал»: пол представителя сервер не отдаёт.
  */
-export function representativesLabel(row: Pick<JournalChildRow, 'broughtBy' | 'pickedUpBy'>): string | null {
+export function representativesLabel(row: Pick<JournalInterval, 'broughtBy' | 'pickedUpBy'>): string | null {
   const parts: string[] = [];
   if (row.broughtBy) {
     parts.push(`Приход — ${row.broughtBy}`);
   }
   if (row.pickedUpBy) {
     parts.push(`Уход — ${row.pickedUpBy}`);
+  }
+  return parts.length > 0 ? parts.join(' · ') : null;
+}
+
+/**
+ * «Принял(а) — Петрова О. · Отдал(а) — Петрова О. · не подтверждён» — что сделал сад.
+ * null — подтверждения по отметкам дня нет.
+ */
+export function confirmationLabel(
+  row: Pick<JournalInterval, 'acceptedBy' | 'releasedBy' | 'unconfirmed'>
+): string | null {
+  const parts: string[] = [];
+  if (row.acceptedBy) {
+    parts.push(`Принял(а) — ${row.acceptedBy}`);
+  }
+  if (row.releasedBy) {
+    parts.push(`Отдал(а) — ${row.releasedBy}`);
+  }
+  if (row.unconfirmed) {
+    parts.push('не подтверждён');
   }
   return parts.length > 0 ? parts.join(' · ') : null;
 }

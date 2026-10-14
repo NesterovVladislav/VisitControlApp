@@ -13,6 +13,15 @@ export interface User {
   /** Телефон в формате бэкенда `+7XXXXXXXXXX` */
   phone: string | null;
   role: string;
+  /** Сад пользователя. Нет только у технического администратора. */
+  organization: UserOrganization | null;
+  /** Путь к фотографии относительно API; нет фотографии — null */
+  photoUrl?: string | null;
+}
+
+export interface UserOrganization {
+  id: string;
+  name: string;
 }
 
 /**
@@ -43,6 +52,8 @@ export type LogoutReason = 'user' | 'switchAccount' | 'expired';
 export type AppMode = 'admin' | 'parent';
 
 export const ADMIN_ROLE = 'ADMIN';
+/** Директор сада: всё, что может администратор, плюс назначение администраторов. */
+export const DIRECTOR_ROLE = 'DIRECTOR';
 /** Сотрудник сада: видит весь сад, но не создаёт людей и не разбирает заявки. */
 export const EMPLOYEE_ROLE = 'EMPLOYEE';
 
@@ -50,7 +61,14 @@ export const EMPLOYEE_ROLE = 'EMPLOYEE';
  * Персонал сада — у него есть рабочий режим. Сотрудник и администратор могут быть ещё и родителями.
  */
 export function isStaffRole(role: string | null | undefined): boolean {
-  return role === ADMIN_ROLE || role === EMPLOYEE_ROLE;
+  return isAdminRole(role) || role === EMPLOYEE_ROLE;
+}
+
+/**
+ * Администратор сада или директор: создаёт людей, разбирает заявки, ведёт сад.
+ */
+export function isAdminRole(role: string | null | undefined): boolean {
+  return role === ADMIN_ROLE || role === DIRECTOR_ROLE;
 }
 
 /**

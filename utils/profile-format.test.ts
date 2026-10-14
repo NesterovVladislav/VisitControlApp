@@ -13,6 +13,7 @@ describe('profile format', () => {
   });
 
   it('names roles and genders in Russian', () => {
+    expect(roleLabel('DIRECTOR')).toBe('Директор');
     expect(roleLabel('ADMIN')).toBe('Администратор');
     expect(roleLabel('PARENT')).toBe('Родитель');
     expect(roleLabel('EMPLOYEE')).toBe('Сотрудник');

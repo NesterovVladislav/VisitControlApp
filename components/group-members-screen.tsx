@@ -20,7 +20,7 @@ import {
   putChildInGroup,
   removeChildFromGroup,
 } from '../store/reducers/group-membership';
-import { ADMIN_ROLE } from '../store/types/auth';
+import { isAdminRole } from '../store/types/auth';
 import { CandidateFilter } from '../store/types/group-membership';
 import { Person, PersonGroup } from '../store/types/people';
 import { childSubtitle, personName } from '../utils/people-format';
@@ -50,7 +50,7 @@ export default function GroupMembersScreen() {
   const router = useRouter();
   const dispatch = useAppDispatch();
   const presence = useAppSelector((state) => state.visits.present.data);
-  const isAdmin = useAppSelector((state) => state.auth.user?.role === ADMIN_ROLE);
+  const isAdmin = useAppSelector((state) => isAdminRole(state.auth.user?.role));
   const { filter, q, items, status, last, loadingMore, loadMoreFailed, saving, failed } = useAppSelector(
     (state) => state.groupMembership
   );

@@ -5,6 +5,9 @@ import { ApiError } from '../../services/errors/api-error';
 import {
   approveRequest,
   approveSuccess,
+  loadRolesFailure,
+  loadRolesStart,
+  loadRolesSuccess,
   loadRequestsFailure,
   loadRequestsStart,
   loadRequestsSuccess,
@@ -16,7 +19,12 @@ import {
   resendPasswordSuccess,
 } from '../reducers/requests';
 import { RootState } from '../reducers';
-import { RegistrationRequestsPage, RegistrationRequestView } from '../types/requests';
+import {
+  ApproveRequestPayload,
+  AssignableRole,
+  RegistrationRequestsPage,
+  RegistrationRequestView,
+} from '../types/requests';
 
 export const REQUEST_MESSAGES = {
   network: 'Нет соединения с сервером. Проверьте интернет и обновите список: возможно, действие уже выполнено',
@@ -76,16 +84,19 @@ function* handleActionError(request: RegistrationRequestView, error: unknown) {
   yield put(requestActionFailure(toActionError(error)));
 }
 
-function* approveSaga(action: PayloadAction<RegistrationRequestView>) {
-  const request = action.payload;
+export function* approveSaga(action: PayloadAction<ApproveRequestPayload>) {
+  const { request, roleId, decisions } = action.payload;
   const sessionEpoch: number = yield select(selectSessionEpoch);
   try {
     const passwordSent: boolean = yield call(
       [visitControlApi, visitControlApi.approveRegistration],
-      request.id
+      request.id,
+      roleId,
+      decisions
     );
     if (!(yield* isCurrentSession(sessionEpoch))) return;
-    yield put(approveSuccess({ request, passwordSent }));
+    const childrenAdded = Object.values(decisions).filter((decision) => decision.kind !== 'SKIP').length;
+    yield put(approveSuccess({ request, passwordSent, childrenAdded }));
   } catch (error) {
     if (!(yield* isCurrentSession(sessionEpoch))) return;
     yield call(handleActionError, request, error);
@@ -118,8 +129,22 @@ function* resendPasswordSaga(action: PayloadAction<string>) {
   }
 }
 
+function* loadRolesSaga() {
+  const sessionEpoch: number = yield select(selectSessionEpoch);
+  try {
+    const roles: AssignableRole[] = yield call([visitControlApi, visitControlApi.getAssignableRoles]);
+    if (!(yield* isCurrentSession(sessionEpoch))) return;
+    yield put(loadRolesSuccess(roles));
+  } catch (error) {
+    if (!(yield* isCurrentSession(sessionEpoch))) return;
+    console.warn('[Requests Saga] Failed to load roles', error instanceof ApiError ? error.status : error);
+    yield put(loadRolesFailure());
+  }
+}
+
 export function* watchRequests() {
   yield takeLatest(loadRequestsStart.type, loadRequestsSaga);
+  yield takeLatest(loadRolesStart.type, loadRolesSaga);
   // takeLeading: второе нажатие, пока идёт первый запрос, не отправляет второй
   yield takeLeading([approveRequest.type, rejectRequest.type, resendPassword.type], function* (
     action: PayloadAction<unknown>

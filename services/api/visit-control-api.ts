@@ -4,13 +4,43 @@ import { RequestConfig, ApiResponse } from './types';
 import { ApiError } from '../errors/api-error';
 import { retryRequest, createRetryConfig } from './retry';
 import { LoginCredentials, User } from '../../store/types/auth';
-import { Child, VisitStatus } from '../../store/types/children';
-import { Branch, Presence, PresenceGroup, PresentChild, VisitEntry, VisitPage } from '../../store/types/visits';
-import { RegistrationRequestsPage, RegistrationRequestView } from '../../store/types/requests';
+import { Child, ChildGroup, ChildVisit } from '../../store/types/children';
+import { OrganizationBrand } from '../../store/types/organization';
+import { PhotoRequest, PhotoRequestStatus } from '../../store/types/photos';
+import {
+  ChildChange,
+  ChildChangeBody,
+  ChildChangeStatus,
+  ChildRequest,
+  ChildRequestBody,
+  ChildRequestDecision,
+  ChildRequestStatus,
+  OwnChild,
+} from '../../store/types/child-requests';
+import {
+  Branch,
+  HandoverResult,
+  HandoverToken,
+  Presence,
+  PresenceGroup,
+  PresentChild,
+  QueueFilter,
+  VisitConfirmation,
+  VisitEntry,
+  VisitPage,
+  VisitQueue,
+  VisitQueueItem,
+} from '../../store/types/visits';
+import {
+  AssignableRole,
+  ChildDecision,
+  RegistrationRequestsPage,
+  RegistrationRequestView,
+} from '../../store/types/requests';
 import { GardenGroup, PeoplePage, PeopleQuery, Person } from '../../store/types/people';
 import { ProfileUpdate } from '../../utils/profile-edit';
 import { getAuthToken, notifyUnauthorized } from '../auth/auth-token';
-import { PrivacyPolicy, RegistrationRequest } from '../../store/types/registration';
+import { PrivacyPolicy, PublicOrganization, RegistrationRequest } from '../../store/types/registration';
 
 // DTO бэкенда в snake_case живут только здесь, наружу отдаются модели в camelCase.
 
@@ -28,10 +58,45 @@ interface UserShortInfoDto {
   first_name: string;
   surname: string;
   patronymic?: string | null;
+  /** Путь относительно API, например `/user/{key}/photo?v=…` */
+  photo_url?: string | null;
 }
+
+interface PhotoRequestDto {
+  external_key: string;
+  status: PhotoRequestStatus;
+  user: UserShortInfoDto;
+  applicant?: UserShortInfoDto | null;
+  image_url?: string | null;
+  decision_comment?: string | null;
+}
+
+function mapPhotoRequest(dto: PhotoRequestDto): PhotoRequest {
+  return {
+    id: dto.external_key,
+    status: dto.status,
+    userId: dto.user.external_key,
+    userName: `${dto.user.first_name} ${dto.user.surname}`.trim(),
+    currentPhotoUrl: dto.user.photo_url ?? null,
+    imageUrl: dto.image_url ?? null,
+    reason: dto.decision_comment ?? null,
+    applicantName: dto.applicant ? shortName(dto.applicant) : null,
+  };
+}
+
+/** Файл для multipart в React Native: FormData принимает объект с адресом файла на устройстве. */
+function photoForm(uri: string): FormData {
+  const form = new FormData();
+  form.append('file', { uri, name: 'photo.jpg', type: 'image/jpeg' } as unknown as Blob);
+  return form;
+}
+
+const MULTIPART: RequestConfig = { headers: { 'Content-Type': 'multipart/form-data' }, skipLogging: true };
 
 interface UserDto extends UserShortInfoDto {
   email?: string | null;
+  /** Нет у технического администратора */
+  organization?: { external_key: string; name: string } | null;
   gender?: 'MALE' | 'FEMALE' | null;
   birth_date?: string | number[] | null;
   phone?: string | null;
@@ -49,6 +114,7 @@ interface VisitDto {
   visitor_external_key: string;
   representative_external_key: string;
   status: 'IN' | 'OUT';
+  comment?: string;
 }
 
 interface VisitFullInfoDto {
@@ -57,6 +123,28 @@ interface VisitFullInfoDto {
   status: 'IN' | 'OUT';
   datetime: string | number[];
   group?: { external_key: string; name: string; branch_name?: string | null } | null;
+  /** Поля подтверждения — с бэкенда от 12.10.2026 (docs/visit-confirmation.md в visit-control-service) */
+  external_key?: string;
+  comment?: string | null;
+  confirmation_status?: VisitConfirmation | null;
+  confirmation_method?: 'BUTTON' | 'QR' | 'MANUAL' | null;
+  decided_by?: UserShortInfoDto | null;
+  decided_at?: string | number[] | null;
+  decision_comment?: string | null;
+  link_role?: string | null;
+}
+
+interface ChildVisitStatusDto {
+  status?: 'IN' | 'OUT';
+  decided_by?: UserShortInfoDto | null;
+  decided_at?: string | number[] | null;
+  pending?: VisitFullInfoDto | null;
+  last_rejected?: VisitFullInfoDto | null;
+}
+
+interface VisitQueueDto {
+  items: VisitFullInfoDto[];
+  other_count: number;
 }
 
 interface GroupPresenceDto {
@@ -65,6 +153,8 @@ interface GroupPresenceDto {
   branch_external_key?: string | null;
   total_children: number;
   present: UserShortInfoDto[];
+  pending_in?: UserShortInfoDto[];
+  pending_out?: UserShortInfoDto[];
 }
 
 interface KindergartenPresenceDto {
@@ -93,6 +183,8 @@ function mapPresenceGroup(dto: GroupPresenceDto): PresenceGroup {
     branchId: dto.branch_external_key ?? null,
     totalChildren: dto.total_children,
     present: dto.present.map(mapPresentChild),
+    pendingIn: (dto.pending_in ?? []).length,
+    pendingOut: (dto.pending_out ?? []).length,
   };
 }
 
@@ -105,7 +197,9 @@ interface PageDto<T> {
 /**
  * Время с бэкенда → ISO-строка в UTC с миллисекундами, которую понимает любой движок JS.
  *
- * Бэкенд отдаёт LocalDateTime без зоны (пишет его в UTC) и с точностью PostgreSQL до микросекунд:
+ * Так бэкенд отдаёт время создания заявки на регистрацию: LocalDateTime без зоны по часам сервера (UTC).
+ * Время отметок прихода и ухода — по часам сада, для него есть toWallClockIso.
+ * Точность — как в PostgreSQL, до микросекунд:
  * `2026-09-25T08:40:12.482915`. Hermes не разбирает больше трёх цифр дробной части — `new Date()` даёт
  * Invalid Date, поэтому разбираем строку сами. Массив `[год, месяц, день, час, мин, сек, нс]` — формат
  * Jackson с WRITE_DATES_AS_TIMESTAMPS, на случай если настройку сервера поменяют.
@@ -137,6 +231,31 @@ export function toUtcIso(value: string | number[]): string {
   return new Date(utc).toISOString();
 }
 
+/**
+ * Время отметки с бэкенда → ISO-строка, которая на этом телефоне покажет те же часы и минуты.
+ *
+ * Отметки прихода и ухода бэкенд отдаёт уже по часам сада (`OrganizationTime.toOrganization`), без зоны:
+ * `[2026, 10, 12, 15, 35, …]` — это 15:35 в саду. Считать такое время как UTC нельзя: телефон прибавит
+ * свой сдвиг и покажет 22:35. Поэтому читаем его как «время на стене»: 15:35 остаётся 15:35 на любом телефоне.
+ * Строку с явной зоной (`Z`, `+07:00`) переводим как обычно.
+ */
+export function toWallClockIso(value: string | number[]): string {
+  let parts: number[];
+  if (Array.isArray(value)) {
+    const [year, month, day, hour = 0, minute = 0, second = 0, nanos = 0] = value;
+    parts = [year, month, day, hour, minute, second, Math.floor(nanos / 1_000_000)];
+  } else {
+    const match = /^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})(?::(\d{2})(?:\.(\d+))?)?$/.exec(value.trim());
+    if (!match) {
+      return toUtcIso(value);
+    }
+    const [, year, month, day, hour, minute, second = '0', fraction = ''] = match;
+    parts = [year, month, day, hour, minute, second, fraction.padEnd(3, '0').slice(0, 3)].map(Number);
+  }
+  const [year, month, day, hour, minute, second, millis] = parts;
+  return new Date(year, month - 1, day, hour, minute, second, millis).toISOString();
+}
+
 /** «Иванова А.» */
 function shortName(dto: UserShortInfoDto): string {
   const initial = dto.first_name ? ` ${dto.first_name.charAt(0)}.` : '';
@@ -144,7 +263,7 @@ function shortName(dto: UserShortInfoDto): string {
 }
 
 function mapVisit(dto: VisitFullInfoDto): VisitEntry {
-  const datetime = toUtcIso(dto.datetime);
+  const datetime = toWallClockIso(dto.datetime);
   return {
     key: `${dto.visitor.external_key}|${datetime}|${dto.status}`,
     childId: dto.visitor.external_key,
@@ -155,6 +274,43 @@ function mapVisit(dto: VisitFullInfoDto): VisitEntry {
     group: dto.group
       ? { id: dto.group.external_key, name: dto.group.name, branchName: dto.group.branch_name ?? null }
       : null,
+    confirmation: dto.confirmation_status ?? null,
+    decidedBy: dto.decided_by ? shortName(dto.decided_by) : null,
+    comment: dto.comment ?? null,
+  };
+}
+
+function mapQueueItem(dto: VisitFullInfoDto): VisitQueueItem {
+  return {
+    id: dto.external_key ?? '',
+    status: dto.status,
+    childName: `${dto.visitor.first_name} ${dto.visitor.surname}`.trim(),
+    childPhotoUrl: dto.visitor.photo_url ?? null,
+    representativePhotoUrl: dto.representative.photo_url ?? null,
+    representativeId: dto.representative.external_key,
+    representativeName: shortName(dto.representative),
+    linkRole: dto.link_role ?? null,
+    datetime: toWallClockIso(dto.datetime),
+    comment: dto.comment ?? null,
+    group: dto.group ? { id: dto.group.external_key, name: dto.group.name } : null,
+  };
+}
+
+function mapChildVisit(dto: ChildVisitStatusDto | ''): ChildVisit {
+  if (!dto || !dto.status) {
+    // Старый бэкенд отвечал пустым телом, если отметок не было
+    return { status: 'NONE', decidedBy: null, decidedAt: null, pending: null, rejected: null };
+  }
+  const pending = dto.pending;
+  const rejected = dto.last_rejected;
+  return {
+    status: dto.status,
+    decidedBy: dto.decided_by ? shortName(dto.decided_by) : null,
+    decidedAt: dto.decided_at ? toWallClockIso(dto.decided_at) : null,
+    pending: pending?.external_key
+      ? { id: pending.external_key, status: pending.status, datetime: toWallClockIso(pending.datetime) }
+      : null,
+    rejected: rejected ? { status: rejected.status, reason: rejected.decision_comment ?? null } : null,
   };
 }
 
@@ -169,6 +325,21 @@ export interface RegistrationRequestViewDto {
   email: string;
   phone?: string | null;
   created: string | number[];
+  role?: string | null;
+  children?: RegistrationChildViewDto[] | null;
+}
+
+interface RegistrationChildMatchDto {
+  external_key: string;
+  surname: string;
+  first_name: string;
+  patronymic?: string | null;
+  birth_date?: string | number[] | null;
+}
+
+interface RegistrationChildViewDto extends RegistrationChildMatchDto {
+  gender?: 'MALE' | 'FEMALE' | null;
+  matches?: RegistrationChildMatchDto[] | null;
 }
 
 interface PageWithTotalDto<T> extends PageDto<T> {
@@ -191,6 +362,144 @@ export function mapRegistrationRequest(dto: RegistrationRequestViewDto): Registr
     email: dto.email,
     phone: dto.phone ?? null,
     created: toUtcIso(dto.created),
+    role: dto.role ?? null,
+    children: (dto.children ?? []).map((child) => ({
+      id: child.external_key,
+      surname: child.surname,
+      firstName: child.first_name,
+      patronymic: child.patronymic ?? null,
+      birthDate: toIsoDate(child.birth_date),
+      gender: child.gender ?? null,
+      matches: (child.matches ?? []).map((match) => ({
+        id: match.external_key,
+        surname: match.surname,
+        firstName: match.first_name,
+        patronymic: match.patronymic ?? null,
+        birthDate: toIsoDate(match.birth_date),
+      })),
+    })),
+  };
+}
+
+interface ChildRequestDto {
+  external_key: string;
+  status: ChildRequestStatus;
+  surname: string;
+  first_name: string;
+  patronymic?: string | null;
+  birth_date?: string | number[] | null;
+  gender?: 'MALE' | 'FEMALE' | null;
+  applicant?: UserShortInfoDto | null;
+  applicant_role?: string | null;
+  matches?: {
+    external_key: string;
+    surname: string;
+    first_name: string;
+    patronymic?: string | null;
+    birth_date?: string | number[] | null;
+  }[];
+}
+
+interface ChildChangeDto {
+  external_key: string;
+  status: ChildChangeStatus;
+  child_external_key: string;
+  surname: string;
+  first_name: string;
+  patronymic?: string | null;
+  birth_date?: string | number[] | null;
+  old_surname?: string | null;
+  old_first_name?: string | null;
+  old_patronymic?: string | null;
+  old_birth_date?: string | number[] | null;
+  decision_comment?: string | null;
+  applicant?: UserShortInfoDto | null;
+}
+
+interface OwnChildDto {
+  external_key: string;
+  surname: string;
+  first_name: string;
+  patronymic?: string | null;
+  birth_date?: string | number[] | null;
+  gender?: 'MALE' | 'FEMALE' | null;
+  link_role?: string | null;
+  can_edit?: boolean;
+  can_edit_photo?: boolean;
+  photo_url?: string | null;
+  change?: ChildChangeDto | null;
+}
+
+function mapChildChange(dto: ChildChangeDto): ChildChange {
+  return {
+    id: dto.external_key,
+    status: dto.status,
+    childId: dto.child_external_key,
+    next: {
+      surname: dto.surname,
+      firstName: dto.first_name,
+      patronymic: dto.patronymic ?? null,
+      birthDate: dto.birth_date ? toIsoDate(dto.birth_date) : null,
+    },
+    previous: {
+      surname: dto.old_surname ?? '',
+      firstName: dto.old_first_name ?? '',
+      patronymic: dto.old_patronymic ?? null,
+      birthDate: dto.old_birth_date ? toIsoDate(dto.old_birth_date) : null,
+    },
+    reason: dto.decision_comment ?? null,
+    applicantName: dto.applicant ? shortName(dto.applicant) : null,
+  };
+}
+
+function mapOwnChild(dto: OwnChildDto): OwnChild {
+  return {
+    id: dto.external_key,
+    surname: dto.surname,
+    firstName: dto.first_name,
+    patronymic: dto.patronymic ?? null,
+    birthDate: dto.birth_date ? toIsoDate(dto.birth_date) : null,
+    gender: dto.gender ?? null,
+    linkRole: dto.link_role ?? null,
+    canEdit: dto.can_edit === true,
+    canEditPhoto: dto.can_edit_photo === true,
+    photoUrl: dto.photo_url ?? null,
+    change: dto.change ? mapChildChange(dto.change) : null,
+  };
+}
+
+function mapChildRequest(dto: ChildRequestDto): ChildRequest {
+  return {
+    id: dto.external_key,
+    status: dto.status,
+    surname: dto.surname,
+    firstName: dto.first_name,
+    patronymic: dto.patronymic ?? null,
+    birthDate: dto.birth_date ? toIsoDate(dto.birth_date) : null,
+    gender: dto.gender ?? null,
+    applicantName: dto.applicant ? shortName(dto.applicant) : null,
+    applicantRole: dto.applicant_role ?? null,
+    matches: (dto.matches ?? []).map((match) => ({
+      id: match.external_key,
+      surname: match.surname,
+      firstName: match.first_name,
+      patronymic: match.patronymic ?? null,
+      birthDate: match.birth_date ? toIsoDate(match.birth_date) : null,
+    })),
+  };
+}
+
+/**
+ * Тело подтверждения заявки: роль, если её сменили, и решение по каждому ребёнку.
+ */
+export function toApproveBody(roleId: string | null, decisions: Record<string, ChildDecision>) {
+  return {
+    ...(roleId ? { role_external_key: roleId } : {}),
+    children: Object.entries(decisions).map(([id, decision]) => ({
+      external_key: id,
+      decision: decision.kind,
+      ...(decision.kind === 'LINK' ? { child_external_key: decision.childId } : {}),
+    })),
   };
 }
 
@@ -224,7 +533,20 @@ function mapUser(dto: UserDto): User {
     birthDate: toIsoDate(dto.birth_date),
     phone: dto.phone ?? null,
     role: dto.role.role,
+    organization: dto.organization
+      ? { id: dto.organization.external_key, name: dto.organization.name }
+      : null,
+    photoUrl: dto.photo_url ?? null,
   };
+}
+
+interface OrganizationPublicDto {
+  external_key: string;
+  name: string;
+  address?: string | null;
+  /** Путь относительно API, например `/organization/public/{key}/logo?v=…` */
+  logo_url?: string | null;
+  registration_available: boolean;
 }
 
 function mapChild(dto: ChildRepresentativeDto): Child {
@@ -233,11 +555,13 @@ function mapChild(dto: ChildRepresentativeDto): Child {
     firstName: dto.child?.first_name ?? '',
     surname: dto.child?.surname ?? '',
     linkRole: dto.role.role,
+    photoUrl: dto.child?.photo_url ?? null,
   };
 }
 
 interface PersonDto {
   external_key: string;
+  photo_url?: string | null;
   surname: string;
   first_name: string;
   patronymic?: string | null;
@@ -273,6 +597,7 @@ function mapPerson(dto: PersonDto): Person {
     surname: dto.surname,
     firstName: dto.first_name,
     patronymic: dto.patronymic ?? null,
+    photoUrl: dto.photo_url ?? null,
     role: dto.role ?? null,
     gender: dto.gender ?? null,
     birthDate: toIsoDate(dto.birth_date),
@@ -524,14 +849,264 @@ class VisitControlApiClient {
   }
 
   /**
-   * Статус по последней отметке ребёнка. Если отметок не было, сервер отвечает 200 с пустым телом.
+   * Группа своего ребёнка: дети группы и кто из них сейчас в саду. О других детях — только фамилия и имя.
    */
-  async getActualStatus(childKey: string): Promise<VisitStatus> {
+  async getChildGroup(childId: string): Promise<ChildGroup> {
     const dto = await retryRequest(
-      () => this.get<VisitDto | ''>(`/visit/actual_status/${childKey}`),
+      () =>
+        this.get<{
+          group_name?: string | null;
+          children?: { surname: string; first_name: string; present?: boolean; own?: boolean }[];
+        }>(`/user/me/children/${childId}/group`, { skipLogging: true }),
       createRetryConfig(2, 500)
     );
-    return dto && dto.status ? dto.status : 'NONE';
+    return {
+      name: dto.group_name ?? null,
+      children: (dto.children ?? []).map((member) => ({
+        surname: member.surname,
+        firstName: member.first_name,
+        present: member.present === true,
+        own: member.own === true,
+      })),
+    };
+  }
+
+  /**
+   * Где ребёнок сегодня: в саду или нет, отметка, которая ждёт решения сада, и последнее отклонение.
+   */
+  async getActualStatus(childKey: string): Promise<ChildVisit> {
+    const dto = await retryRequest(
+      () => this.get<ChildVisitStatusDto | ''>(`/visit/actual_status/${childKey}`, { skipLogging: true }),
+      createRetryConfig(2, 500)
+    );
+    return mapChildVisit(dto);
+  }
+
+  /**
+   * Включено ли в саду подтверждение посещений сотрудником (GET /organization/current).
+   * На бэкенде без этой настройки — выключено.
+   */
+  async getVisitConfirmationEnabled(): Promise<boolean> {
+    const dto = await retryRequest(
+      () => this.get<{ visit_confirmation?: boolean }>('/organization/current'),
+      createRetryConfig(2, 500)
+    );
+    return dto.visit_confirmation === true;
+  }
+
+  /**
+   * Название и логотип своего сада для шапки (GET /organization/current). Картинка открыта без токена.
+   */
+  async getOrganizationBrand(): Promise<OrganizationBrand> {
+    const dto = await retryRequest(
+      () => this.get<{ external_key: string; name: string; logo_url?: string | null }>('/organization/current'),
+      createRetryConfig(2, 500)
+    );
+    return {
+      id: dto.external_key,
+      name: dto.name,
+      logoUrl: dto.logo_url ? `${this.getBaseURL()}${dto.logo_url}` : null,
+    };
+  }
+
+  /**
+   * Сегодняшние отметки, которые ждут решения сотрудника. filter === null — вся очередь.
+   */
+  async getVisitQueue(filter: QueueFilter | null): Promise<VisitQueue> {
+    const params: Record<string, string> = {};
+    if (filter) {
+      if (filter.groupIds.length > 0) {
+        params.group_external_keys = filter.groupIds.join(',');
+      }
+      if (filter.withoutGroup) {
+        params.without_group = 'true';
+      }
+    }
+    const dto = await retryRequest(
+      () => this.get<VisitQueueDto>('/visit/pending', { params, skipLogging: true }),
+      createRetryConfig(2, 500)
+    );
+    return { items: dto.items.map(mapQueueItem), otherCount: dto.other_count };
+  }
+
+  /** Сотрудник принял ребёнка или отдал его. Без ретраев: решение по отметке принимается один раз. */
+  async confirmVisit(markId: string): Promise<void> {
+    await this.post(`/visit/${markId}/confirm`);
+  }
+
+  /** Сотрудник отклонил отметку с причиной. */
+  async rejectVisit(markId: string, comment: string): Promise<void> {
+    await this.post(`/visit/${markId}/reject`, { comment });
+  }
+
+  /**
+   * Добавить себе ребёнка. Администратор и директор добавляют сразу (ADDED), остальные подают заявку (PENDING).
+   * Без ретраев: повтор после таймаута создал бы вторую заявку.
+   */
+  async addMyChild(child: ChildRequestBody): Promise<ChildRequestStatus> {
+    const dto = await this.post<ChildRequestDto, ChildRequestBody>('/user/me/children', child, {
+      skipLogging: true,
+    });
+    return dto.status;
+  }
+
+  /** Свои дети с данными для карточки в профиле и изменением, которое ждёт решения сада. */
+  async getOwnChildren(): Promise<OwnChild[]> {
+    const list = await retryRequest(
+      () => this.get<OwnChildDto[]>('/user/me/children', { skipLogging: true }),
+      createRetryConfig(2, 500)
+    );
+    return list.map(mapOwnChild);
+  }
+
+  /**
+   * Изменить ФИО и дату рождения ребёнка. Администратор и директор меняют сразу (APPROVED), родитель подаёт
+   * изменение на подтверждение (PENDING). Без ретраев: это запись.
+   */
+  async changeMyChild(childId: string, data: ChildChangeBody): Promise<ChildChangeStatus> {
+    const dto = await this.put<ChildChangeDto, ChildChangeBody>(`/user/me/children/${childId}`, data, {
+      skipLogging: true,
+    });
+    return dto.status;
+  }
+
+  /** Отозвать своё изменение данных ребёнка, пока его не рассмотрели. */
+  async cancelMyChildChange(id: string): Promise<void> {
+    await this.delete(`/user/me/children/changes/${id}`);
+  }
+
+  /** Изменения данных детей сада, которые ждут администратора. */
+  async getChildChanges(): Promise<ChildChange[]> {
+    const list = await retryRequest(
+      () => this.get<ChildChangeDto[]>('/registration/child-changes', { skipLogging: true }),
+      createRetryConfig(2, 500)
+    );
+    return list.map(mapChildChange);
+  }
+
+  /** Администратор подтверждает изменение: данные ребёнка меняются. */
+  async approveChildChange(id: string): Promise<void> {
+    await this.post(`/registration/child-changes/${id}/approve`, undefined, { skipLogging: true });
+  }
+
+  /** Администратор отклоняет изменение с причиной. */
+  async rejectChildChange(id: string, comment: string): Promise<void> {
+    await this.post(`/registration/child-changes/${id}/reject`, { comment }, { skipLogging: true });
+  }
+
+  /**
+   * Отправить фотографию: свою или своего ребёнка (childId). Администратор и директор меняют её сразу (APPROVED),
+   * остальные подают на подтверждение сада (PENDING). uri — файл на устройстве, уже квадратный JPEG.
+   * Без ретраев: это запись.
+   */
+  async submitPhoto(uri: string, childId?: string): Promise<PhotoRequest> {
+    const endpoint = childId ? `/user/me/children/${childId}/photo` : '/user/me/photo';
+    const dto = await this.put<PhotoRequestDto, FormData>(endpoint, photoForm(uri), MULTIPART);
+    return mapPhotoRequest(dto);
+  }
+
+  /** Убрать действующую фотографию: свою или своего ребёнка. Сразу, без заявки. */
+  async deleteMyPhoto(childId?: string): Promise<void> {
+    await this.delete(childId ? `/user/me/children/${childId}/photo` : '/user/me/photo', { skipLogging: true });
+  }
+
+  /** Свои заявки на фотографию (на себя и на детей): ждут решения или недавно отклонены садом. */
+  async getMyPhotoRequests(): Promise<PhotoRequest[]> {
+    const list = await retryRequest(
+      () => this.get<PhotoRequestDto[]>('/user/me/photo-requests', { skipLogging: true }),
+      createRetryConfig(2, 500)
+    );
+    return list.map(mapPhotoRequest);
+  }
+
+  /** Отозвать свою заявку на фотографию, пока её не рассмотрели. */
+  async cancelMyPhotoRequest(id: string): Promise<void> {
+    await this.delete(`/user/me/photo-requests/${id}`, { skipLogging: true });
+  }
+
+  /** Заявки на фотографию, которые ждут администратора. */
+  async getPhotoRequests(): Promise<PhotoRequest[]> {
+    const list = await retryRequest(
+      () => this.get<PhotoRequestDto[]>('/registration/photo-requests', { skipLogging: true }),
+      createRetryConfig(2, 500)
+    );
+    return list.map(mapPhotoRequest);
+  }
+
+  /** Администратор подтверждает фотографию: она становится действующей. */
+  async approvePhotoRequest(id: string): Promise<void> {
+    await this.post(`/registration/photo-requests/${id}/approve`, undefined, { skipLogging: true });
+  }
+
+  /** Администратор отклоняет фотографию с причиной. */
+  async rejectPhotoRequest(id: string, comment: string): Promise<void> {
+    await this.post(`/registration/photo-requests/${id}/reject`, { comment }, { skipLogging: true });
+  }
+
+  /** Свои заявки на добавление ребёнка: ждут решения или недавно отклонены садом. */
+  async getMyChildRequests(): Promise<ChildRequest[]> {
+    const list = await retryRequest(
+      () => this.get<ChildRequestDto[]>('/user/me/children/requests', { skipLogging: true }),
+      createRetryConfig(2, 500)
+    );
+    return list.map(mapChildRequest);
+  }
+
+  /** Отозвать свою заявку, пока её не рассмотрели. */
+  async cancelMyChildRequest(id: string): Promise<void> {
+    await this.delete(`/user/me/children/requests/${id}`);
+  }
+
+  /** Заявки сада на добавление ребёнка, которые ждут администратора. */
+  async getChildRequests(): Promise<ChildRequest[]> {
+    const list = await retryRequest(
+      () => this.get<ChildRequestDto[]>('/registration/child-requests', { skipLogging: true }),
+      createRetryConfig(2, 500)
+    );
+    return list.map(mapChildRequest);
+  }
+
+  /** Решение администратора: завести ребёнка, привязать ребёнка сада или не добавлять. */
+  async decideChildRequest(id: string, decision: ChildRequestDecision): Promise<void> {
+    await this.post(
+      `/registration/child-requests/${id}/decide`,
+      {
+        decision: decision.kind,
+        ...(decision.kind === 'LINK' ? { child_external_key: decision.childId } : {}),
+      },
+      { skipLogging: true }
+    );
+  }
+
+  /**
+   * Одноразовый код для QR: представитель привёл ребёнка или забирает его. Без ретраев: новый код
+   * отменяет прежний.
+   */
+  async issueHandover(childKey: string, status: 'IN' | 'OUT', comment?: string): Promise<HandoverToken> {
+    const trimmed = comment?.trim();
+    const dto = await this.post<{ token: string; expires_in: number }>(
+      '/visit/handover',
+      { visitor_external_key: childKey, status, ...(trimmed ? { comment: trimmed } : {}) },
+      { skipLogging: true }
+    );
+    return { token: dto.token, expiresIn: dto.expires_in };
+  }
+
+  /** Сотрудник отсканировал QR-код: ребёнок принят или отдан. Без ретраев: код срабатывает один раз. */
+  async redeemHandover(token: string): Promise<HandoverResult> {
+    const dto = await this.post<VisitFullInfoDto>('/visit/handover/redeem', { token }, { skipLogging: true });
+    return {
+      status: dto.status,
+      childName: `${dto.visitor.first_name} ${dto.visitor.surname}`.trim(),
+      representativeName: shortName(dto.representative),
+      linkRole: dto.link_role ?? null,
+      groupName: dto.group?.name ?? null,
+    };
+  }
+
+  /** Родитель отменил свою отметку, пока сад не принял решение. */
+  async cancelVisit(markId: string): Promise<void> {
+    await this.post(`/visit/${markId}/cancel`);
   }
 
   /**
@@ -721,9 +1296,27 @@ class VisitControlApiClient {
    * Без ретраев: повтор после таймаута получит 409 ALREADY_PROCESSED.
    * @returns ушло ли письмо с паролем
    */
-  async approveRegistration(id: string): Promise<boolean> {
-    const result = await this.post<ApprovalResultDto>(`/registration/requests/${id}/approve`);
+  async approveRegistration(
+    id: string,
+    roleId: string | null = null,
+    decisions: Record<string, ChildDecision> = {}
+  ): Promise<boolean> {
+    const result = await this.post<ApprovalResultDto>(
+      `/registration/requests/${id}/approve`,
+      toApproveBody(roleId, decisions)
+    );
     return result.password_sent;
+  }
+
+  /**
+   * Роли, которые текущий пользователь может выдать: только ниже своей.
+   */
+  async getAssignableRoles(): Promise<AssignableRole[]> {
+    const result = await retryRequest(
+      () => this.get<{ external_key: string; role: string }[]>('/user/roles'),
+      createRetryConfig(2, 500)
+    );
+    return result.map((dto) => ({ id: dto.external_key, name: dto.role }));
   }
 
   /**
@@ -747,21 +1340,48 @@ class VisitControlApiClient {
   /**
    * Отметка «привёл / забрал». Без ретраев: повтор после таймаута может записать вторую отметку.
    */
-  async createVisit(childKey: string, representativeKey: string, status: 'IN' | 'OUT'): Promise<void> {
+  async createVisit(
+    childKey: string,
+    representativeKey: string,
+    status: 'IN' | 'OUT',
+    comment?: string
+  ): Promise<void> {
+    const trimmed = comment?.trim();
     await this.post<VisitDto, VisitDto>('/visit', {
       visitor_external_key: childKey,
       representative_external_key: representativeKey,
       status,
+      ...(trimmed ? { comment: trimmed } : {}),
     });
   }
 
   /**
-   * Текущая политика обработки персональных данных. Доступно без токена.
+   * Сады для экрана регистрации, по названию. Доступно без токена.
+   */
+  async getPublicOrganizations(): Promise<PublicOrganization[]> {
+    const result = await retryRequest(
+      () => this.get<OrganizationPublicDto[]>('/organization/public/list'),
+      createRetryConfig(2, 500)
+    );
+    return result.map((dto) => ({
+      id: dto.external_key,
+      name: dto.name,
+      address: dto.address ?? null,
+      logoUrl: dto.logo_url ? `${this.getBaseURL()}${dto.logo_url}` : null,
+      registrationAvailable: dto.registration_available,
+    }));
+  }
+
+  /**
+   * Текущая политика обработки персональных данных сада. Доступно без токена.
    * GET безопасно повторять, поэтому при сетевых ошибках и 5xx делаем 2 ретрая.
    */
-  async getPrivacyPolicy(): Promise<PrivacyPolicy> {
+  async getPrivacyPolicy(organizationId: string): Promise<PrivacyPolicy> {
     return retryRequest(
-      () => this.get<PrivacyPolicy>('/registration/policy'),
+      () =>
+        this.get<PrivacyPolicy>('/registration/policy', {
+          params: { organization_external_key: organizationId },
+        }),
       createRetryConfig(2, 500)
     );
   }

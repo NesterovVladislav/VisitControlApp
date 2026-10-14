@@ -78,6 +78,9 @@ export default function GardenNameScreen() {
       <Stack.Screen
         options={{
           title,
+          // В диалоге слева «Отмена», справа «Сохранить»: логотипу сада рядом с заголовком места нет,
+          // на Android он наезжал на «Отмена». Здесь заголовок обычный
+          headerTitle: undefined,
           headerLeft: () => (
             <TouchableOpacity onPress={() => router.back()} accessibilityRole="button" hitSlop={8}>
               <Text style={gardenStyles.headerButton}>Отмена</Text>

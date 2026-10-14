@@ -4,9 +4,33 @@
 export type Gender = 'FEMALE' | 'MALE';
 
 /**
+ * Кем регистрируется пользователь. Администратор сада при подтверждении может выбрать другую роль.
+ */
+export type RegistrationRole = 'PARENT' | 'EMPLOYEE';
+
+/**
+ * Ребёнок в форме родителя, как его вводит пользователь (дата с маской).
+ */
+export interface ChildForm {
+  /** Ключ строки на экране, на сервер не уходит */
+  key: string;
+  surname: string;
+  firstName: string;
+  /** Необязательно: пусто — без отчества */
+  patronymic: string;
+  birthDate: string; // ДД.ММ.ГГГГ
+  gender: Gender | null;
+}
+
+export type ChildField = 'surname' | 'firstName' | 'patronymic' | 'birthDate' | 'gender';
+
+export type ChildErrors = Partial<Record<ChildField, string>>;
+
+/**
  * Значения формы регистрации в том виде, в каком их вводит пользователь (с масками).
  */
 export interface RegistrationForm {
+  role: RegistrationRole;
   surname: string;
   firstName: string;
   patronymic: string;
@@ -16,6 +40,8 @@ export interface RegistrationForm {
   email: string;
   phone: string; // +7 (XXX) XXX-XX-XX
   consent: boolean;
+  /** Дети родителя; у сотрудника не отправляются */
+  children: ChildForm[];
 }
 
 /**
@@ -37,6 +63,7 @@ export type RegistrationFieldErrors = Partial<Record<RegistrationField, string>>
  * Тело запроса POST /registration (snake_case, как в API).
  */
 export interface RegistrationRequest {
+  organization_external_key: string;
   surname: string;
   first_name: string;
   patronymic?: string;
@@ -48,6 +75,17 @@ export interface RegistrationRequest {
     accepted: true;
     policy_version: string;
   };
+  role: RegistrationRole;
+  /** Только у родителя */
+  children?: RegistrationChildRequest[];
+}
+
+export interface RegistrationChildRequest {
+  surname: string;
+  first_name: string;
+  patronymic?: string;
+  birth_date: string; // YYYY-MM-DD
+  gender: Gender;
 }
 
 /**
@@ -59,9 +97,26 @@ export interface PrivacyPolicy {
 }
 
 /**
+ * Сад в списке на экране регистрации (GET /organization/public/list).
+ */
+export interface PublicOrganization {
+  id: string;
+  name: string;
+  address: string | null;
+  /** Полный адрес картинки или null, если логотипа нет. */
+  logoUrl: string | null;
+  /** false — у сада нет политики ПДн, подать заявку в него нельзя. */
+  registrationAvailable: boolean;
+}
+
+/**
  * Состояние регистрации в Redux. Значения полей хранятся в экране, здесь — только результат запросов.
  */
 export interface RegistrationState {
+  organizations: PublicOrganization[];
+  organizationsStatus: 'idle' | 'loading' | 'loaded' | 'failed';
+  /** Сад, в который подаётся заявка. Политика ПДн у каждого сада своя. */
+  organization: PublicOrganization | null;
   policy: PrivacyPolicy | null;
   policyStatus: 'idle' | 'loading' | 'loaded' | 'failed';
   status: 'idle' | 'submitting' | 'sent';

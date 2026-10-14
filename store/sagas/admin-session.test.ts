@@ -45,6 +45,8 @@ const request = {
   email: 'anna@example.invalid',
   phone: '+70000000000',
   created: '2026-09-25T08:00:00.000Z',
+  role: 'PARENT',
+  children: [] as never[],
 } as const;
 
 function deferred<T>() {
@@ -111,7 +113,7 @@ describe('admin saga session isolation', () => {
   });
 
   it.each([
-    ['approval', approveRequest(request), 'approveRegistration', approveSuccess.type, true],
+    ['approval', approveRequest({ request, roleId: null, decisions: {} }), 'approveRegistration', approveSuccess.type, true],
     ['rejection', rejectRequest({ request, reason: null }), 'rejectRegistration', rejectSuccess.type, undefined],
     ['password resend', resendPassword(request.id), 'resetPassword', resendPasswordSuccess.type, true],
   ] as const)('does not publish stale %s result', async (_name, action, method, successType, result) => {

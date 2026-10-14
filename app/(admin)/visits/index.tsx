@@ -1,6 +1,6 @@
 import { useFocusEffect } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -14,15 +14,17 @@ import {
 import SegmentedControl from '../../../components/segmented-control';
 import { IconSymbol } from '../../../components/ui/icon-symbol';
 import { LoadState, PresenceSections, useVisitListStyles } from '../../../components/visit-list';
+import VisitQueue from '../../../components/visit-queue';
 import { useOpenGroupMembers } from '../../../hooks/use-open-group-members';
 import { useAppDispatch, useAppSelector } from '../../../store';
+import { loadQueueStart, openQueue } from '../../../store/reducers/visit-queue';
 import { loadJournalMore, loadJournalStart, loadPresentStart } from '../../../store/reducers/visits';
 import { plural } from '../../../utils/plural';
 import { BranchSummary, branchSections, branchSummaries, singleBranchId } from '../../../utils/presence';
-import { intervalsLabel, journalSections, representativesLabel } from '../../../utils/journal';
+import { confirmationLabel, intervalLabels, journalSections, representativesLabel } from '../../../utils/journal';
 import { makeStyles, usePalette } from '../../../hooks/use-palette';
 
-type Mode = 'present' | 'journal';
+type Mode = 'queue' | 'present' | 'journal';
 
 const MODE_OPTIONS: { value: Mode; label: string }[] = [
   { value: 'present', label: 'Кто в саду' },
@@ -33,25 +35,56 @@ const MODE_OPTIONS: { value: Mode; label: string }[] = [
  * Вкладка «Посещение»: кто сейчас в саду и журнал отметок (docs/admin-screens.md).
  * «Кто в саду» — сначала филиалы, внутри филиала дети по группам (branch/[id].tsx). Если филиал один — его группы
  * сразу здесь. На старом бэкенде без групп — общим списком. Журнал — без фильтров.
+ * Если в саду включено подтверждение посещений — ещё и «Очередь»: отметки, которые ждут сотрудника
+ * (components/visit-queue.tsx).
  */
 export default function VisitsScreen() {
   const styles = useStyles();
   const dispatch = useAppDispatch();
   const [mode, setMode] = useState<Mode>('present');
+  const queueEnabled = useAppSelector((state) => state.visitQueue.enabled === true);
+  const waiting = useAppSelector((state) => state.visitQueue.items.length + state.visitQueue.otherCount);
+
+  // Очередь открывается первой, пока в ней кто-то ждёт, — один раз, дальше режим выбирает сотрудник
+  const openedQueue = useRef(false);
+  useEffect(() => {
+    if (queueEnabled && waiting > 0 && !openedQueue.current) {
+      openedQueue.current = true;
+      setMode('queue');
+    }
+  }, [queueEnabled, waiting]);
 
   // При каждом возврате на вкладку и смене режима — свежие данные: родители отмечают детей в течение дня
   useFocusEffect(
     useCallback(() => {
-      dispatch(mode === 'present' ? loadPresentStart() : loadJournalStart());
+      // Включено ли подтверждение и сколько ждут — нужно в любом режиме: это число на переключателе
+      dispatch(openQueue());
+      if (mode === 'queue') {
+        dispatch(loadQueueStart());
+        // Группы для выбора «моих групп» берутся из «Кто в саду»
+        dispatch(loadPresentStart());
+      } else {
+        dispatch(mode === 'present' ? loadPresentStart() : loadJournalStart());
+      }
     }, [dispatch, mode])
   );
+
+  const options = useMemo(
+    () =>
+      queueEnabled
+        ? [{ value: 'queue' as Mode, label: waiting > 0 ? `Очередь ${waiting}` : 'Очередь' }, ...MODE_OPTIONS]
+        : MODE_OPTIONS,
+    [queueEnabled, waiting]
+  );
+  // Подтверждение выключили, пока очередь была на экране
+  const shown: Mode = mode === 'queue' && !queueEnabled ? 'present' : mode;
 
   return (
     <View style={styles.screen}>
       <View style={styles.switcher}>
-        <SegmentedControl options={MODE_OPTIONS} value={mode} onChange={setMode} />
+        <SegmentedControl options={options} value={shown} onChange={setMode} />
       </View>
-      {mode === 'present' ? <PresentList /> : <Journal />}
+      {shown === 'queue' ? <VisitQueue /> : shown === 'present' ? <PresentList /> : <Journal />}
     </View>
   );
 }
@@ -211,7 +244,7 @@ function Journal() {
         </View>
       )}
       renderItem={({ item, index, section }) => {
-        const representatives = representativesLabel(item);
+        const labels = intervalLabels(item);
         return (
           <View
             style={[
@@ -227,8 +260,23 @@ function Journal() {
             />
             <View style={styles.rowText}>
               <Text style={visitListStyles.rowTitle}>{item.childName}</Text>
-              <Text style={styles.intervals}>{intervalsLabel(item)}</Text>
-              {representatives ? <Text style={styles.rowSubtitle}>{representatives}</Text> : null}
+              {/* Каждое пребывание за день — отдельным блоком: своё время и свои взрослые */}
+              {item.intervals.map((interval, intervalIndex) => {
+                const representatives = representativesLabel(interval);
+                const confirmation = confirmationLabel(interval);
+                return (
+                  <View key={intervalIndex} style={intervalIndex > 0 && styles.nextInterval}>
+                    <Text style={styles.intervals}>{labels[intervalIndex]}</Text>
+                    {representatives ? <Text style={styles.rowSubtitle}>{representatives}</Text> : null}
+                    {confirmation ? <Text style={styles.rowSubtitle}>{confirmation}</Text> : null}
+                  </View>
+                );
+              })}
+              {item.comments.map((comment, commentIndex) => (
+                <Text key={commentIndex} style={styles.rowSubtitle}>
+                  «{comment}»
+                </Text>
+              ))}
             </View>
           </View>
         );
@@ -288,6 +336,9 @@ const useStyles = makeStyles((c) =>
     },
     journalDot: {
       marginTop: 6,
+    },
+    nextInterval: {
+      marginTop: 8,
     },
     intervals: {
       marginTop: 2,

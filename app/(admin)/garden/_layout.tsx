@@ -1,5 +1,6 @@
 import { Stack } from 'expo-router';
 import React from 'react';
+import { brandHeaderTitle } from '@/components/header-brand-title';
 
 /**
  * Стек вкладки «Сад» (docs/garden-screen.md): филиалы → филиал → группа; «Дети без группы»;
@@ -7,7 +8,7 @@ import React from 'react';
  */
 export default function GardenLayout() {
   return (
-    <Stack screenOptions={{ headerBackTitle: 'Назад' }}>
+    <Stack screenOptions={{ headerBackTitle: 'Назад', headerTitle: brandHeaderTitle }}>
       <Stack.Screen name="index" options={{ title: 'Сад' }} />
       <Stack.Screen name="branch/[id]" options={{ title: 'Филиал' }} />
       <Stack.Screen name="group/[id]" options={{ title: 'Группа' }} />

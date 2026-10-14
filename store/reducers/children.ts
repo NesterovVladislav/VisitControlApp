@@ -3,8 +3,8 @@ import {
   Child,
   ChildrenState,
   ChildStatus,
+  ChildVisit,
   MarkVisitRequest,
-  VisitStatus,
 } from '../types/children';
 import { logoutCompleted } from './auth';
 
@@ -15,9 +15,10 @@ const initialState: ChildrenState = {
   statusById: {},
   markingIds: [],
   markError: null,
+  qrAvailable: false,
 };
 
-const EMPTY_STATUS: ChildStatus = { value: null, loading: false, error: false, notice: null };
+const EMPTY_STATUS: ChildStatus = { value: null, visit: null, loading: false, error: false, notice: null };
 
 function statusOf(state: ChildrenState, childId: string): ChildStatus {
   if (!state.statusById[childId]) {
@@ -56,17 +57,21 @@ const childrenSlice = createSlice({
         state.listStatus = 'failed';
       }
     },
+    setQrAvailable: (state, action: PayloadAction<boolean>) => {
+      state.qrAvailable = action.payload;
+    },
     /** Перечитать статусы всех детей: экран снова в фокусе или приложение вернулось из фона */
     refreshStatuses: () => {},
     loadStatusStart: (state, action: PayloadAction<string>) => {
       const status = statusOf(state, action.payload);
       status.loading = true;
     },
-    loadStatusSuccess: (state, action: PayloadAction<{ childId: string; status: VisitStatus }>) => {
+    loadStatusSuccess: (state, action: PayloadAction<{ childId: string; visit: ChildVisit }>) => {
       const status = statusOf(state, action.payload.childId);
       // Подсказка «статус изменился» живёт до следующего обновления статуса
       status.notice = null;
-      status.value = action.payload.status;
+      status.value = action.payload.visit.status;
+      status.visit = action.payload.visit;
       status.loading = false;
       status.error = false;
     },
@@ -99,6 +104,19 @@ const childrenSlice = createSlice({
     clearMarkError: (state) => {
       state.markError = null;
     },
+    /** Родитель отменяет отметку, которая ждёт решения сада */
+    cancelMarkStart: (state, action: PayloadAction<string>) => {
+      if (!state.markingIds.includes(action.payload)) {
+        state.markingIds.push(action.payload);
+      }
+    },
+    cancelMarkFinished: (state, action: PayloadAction<{ childId: string; message: string | null }>) => {
+      const { childId, message } = action.payload;
+      state.markingIds = state.markingIds.filter((id) => id !== childId);
+      if (message) {
+        state.markError = { childId, message };
+      }
+    },
   },
   extraReducers: (builder) => {
     builder.addCase(logoutCompleted, () => initialState);
@@ -109,6 +127,7 @@ export const {
   loadChildrenStart,
   loadChildrenSuccess,
   loadChildrenFailure,
+  setQrAvailable,
   refreshStatuses,
   loadStatusStart,
   loadStatusSuccess,
@@ -118,5 +137,7 @@ export const {
   markVisitStale,
   markVisitFailure,
   clearMarkError,
+  cancelMarkStart,
+  cancelMarkFinished,
 } = childrenSlice.actions;
 export default childrenSlice.reducer;

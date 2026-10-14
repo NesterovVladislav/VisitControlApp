@@ -12,20 +12,51 @@ import {
   View,
 } from 'react-native';
 import { useHeaderHeight } from '@react-navigation/elements';
+import OptionSheet from '../../../components/option-sheet';
 import { useAppDispatch, useAppSelector } from '../../../store';
 import {
   approveRequest,
   clearActionError,
+  loadRolesStart,
   rejectRequest,
   resendPassword,
 } from '../../../store/reducers/requests';
-import { RegistrationRequestView, RequestOutcome } from '../../../store/types/requests';
+import {
+  AssignableRole,
+  ChildDecision,
+  RegistrationRequestView,
+  RequestChild,
+  RequestOutcome,
+} from '../../../store/types/requests';
 import { ageOn, formatPhone } from '../../../utils/input-masks';
 import { plural } from '../../../utils/plural';
+import { formatBirthDate, roleLabel } from '../../../utils/profile-format';
 import { fullName, submittedAt } from '../../../utils/registration-request-format';
 import { makeStyles, usePalette } from '../../../hooks/use-palette';
 
 const REASON_MAX_LENGTH = 500;
+
+/** Роли, которые имеет смысл выдать заявителю. Ребёнок и роли связей сюда не попадают */
+const APPLICANT_ROLES = ['PARENT', 'EMPLOYEE', 'ADMIN'];
+
+/** Без похожих детей в саду ребёнок по умолчанию создаётся; с похожими — администратор выбирает сам */
+function defaultDecision(child: RequestChild): ChildDecision | undefined {
+  return child.matches.length === 0 ? { kind: 'CREATE' } : undefined;
+}
+
+function sameDecision(a: ChildDecision | undefined, b: ChildDecision): boolean {
+  return a?.kind === b.kind && (a.kind !== 'LINK' || (b.kind === 'LINK' && a.childId === b.childId));
+}
+
+function childrenSummary(decisions: ChildDecision[]): string {
+  const created = decisions.filter((decision) => decision.kind === 'CREATE').length;
+  const linked = decisions.filter((decision) => decision.kind === 'LINK').length;
+  const parts = [
+    created > 0 ? `добавить новых — ${created}` : null,
+    linked > 0 ? `связать с записанными в сад — ${linked}` : null,
+  ].filter(Boolean);
+  return parts.length > 0 ? ` Дети: ${parts.join(', ')}.` : '';
+}
 
 function birthDateText(iso: string | null): string {
   if (!iso) {
@@ -58,14 +89,21 @@ export default function RequestScreen() {
   const router = useRouter();
   const dispatch = useAppDispatch();
   const headerHeight = useHeaderHeight();
-  const { items, outcomes, processing, actionError } = useAppSelector((state) => state.requests);
+  const { items, outcomes, processing, actionError, roles } = useAppSelector((state) => state.requests);
   const request = items.find((item) => item.id === id);
   const outcome = id ? outcomes[id] : undefined;
   const busy = processing?.id === id;
 
   const [rejecting, setRejecting] = useState(false);
   const [reason, setReason] = useState('');
+  const [decisions, setDecisions] = useState<Record<string, ChildDecision>>({});
+  const [role, setRole] = useState<AssignableRole | null>(null);
+  const [rolePicker, setRolePicker] = useState(false);
   const scrollRef = useRef<ScrollView>(null);
+
+  useEffect(() => {
+    dispatch(loadRolesStart());
+  }, [dispatch]);
 
   useEffect(() => {
     if (actionError) {
@@ -90,13 +128,30 @@ export default function RequestScreen() {
     );
   }
 
+  const children = request.children ?? [];
+  const decisionOf = (child: RequestChild) => decisions[child.id] ?? defaultDecision(child);
+  const undecided = children.filter((child) => !decisionOf(child));
+  const roleName = role?.name ?? request.role ?? 'PARENT';
+  const roleOptions = roles.filter((item) => APPLICANT_ROLES.includes(item.name));
+
   function confirmApprove(target: RegistrationRequestView) {
+    const chosen: Record<string, ChildDecision> = {};
+    for (const child of children) {
+      const decision = decisionOf(child);
+      if (decision) {
+        chosen[child.id] = decision;
+      }
+    }
     Alert.alert(
       'Подтвердить заявку?',
-      `${target.firstName} сможет войти в приложение: на ${target.email} придёт письмо с паролем.`,
+      `${target.firstName} получит роль «${roleLabel(roleName)}» и сможет войти в приложение: на ${target.email} ` +
+        `придёт письмо с паролем.${childrenSummary(Object.values(chosen))}`,
       [
         { text: 'Отмена', style: 'cancel' },
-        { text: 'Подтвердить', onPress: () => dispatch(approveRequest(target)) },
+        {
+          text: 'Подтвердить',
+          onPress: () => dispatch(approveRequest({ request: target, roleId: role?.id ?? null, decisions: chosen })),
+        },
       ]
     );
   }
@@ -122,6 +177,26 @@ export default function RequestScreen() {
       >
         <View style={styles.card}>
           <Text style={styles.name}>{fullName(request)}</Text>
+          <View style={styles.field}>
+            <Text style={styles.fieldLabel}>Роль</Text>
+            <View style={styles.roleRow}>
+              <Text style={styles.fieldValue}>
+                {roleLabel(roleName)}
+                {role && request.role && role.name !== request.role ? `  (в заявке — ${roleLabel(request.role)})` : ''}
+              </Text>
+              {roleOptions.length > 1 ? (
+                <TouchableOpacity
+                  onPress={() => setRolePicker(true)}
+                  disabled={busy}
+                  hitSlop={8}
+                  accessibilityRole="button"
+                  accessibilityLabel="Сменить роль"
+                >
+                  <Text style={styles.smallLink}>Сменить</Text>
+                </TouchableOpacity>
+              ) : null}
+            </View>
+          </View>
           {rows.map(([label, value]) => (
             <View key={label} style={styles.field}>
               <Text style={styles.fieldLabel}>{label}</Text>
@@ -131,6 +206,23 @@ export default function RequestScreen() {
             </View>
           ))}
         </View>
+
+        {children.length > 0 ? (
+          <View style={styles.card}>
+            <Text style={styles.sectionTitle}>
+              {children.length} {plural(children.length, ['ребёнок', 'ребёнка', 'детей'])} в заявке
+            </Text>
+            {children.map((child) => (
+              <ChildDecisionView
+                key={child.id}
+                child={child}
+                decision={decisionOf(child)}
+                disabled={busy}
+                onChange={(decision) => setDecisions((prev) => ({ ...prev, [child.id]: decision }))}
+              />
+            ))}
+          </View>
+        ) : null}
 
         {rejecting ? (
           <View style={styles.card}>
@@ -170,12 +262,18 @@ export default function RequestScreen() {
           </View>
         ) : (
           <View>
+            {undecided.length > 0 ? (
+              <Text style={styles.hint}>
+                Похожий ребёнок уже есть в саду. Выберите для{' '}
+                {undecided.map((child) => child.firstName).join(', ')}: это он или новый ребёнок
+              </Text>
+            ) : null}
             <TouchableOpacity
-              style={[styles.button, busy && styles.buttonDisabled]}
+              style={[styles.button, (busy || undecided.length > 0) && styles.buttonDisabled]}
               onPress={() => confirmApprove(request)}
-              disabled={busy}
+              disabled={busy || undecided.length > 0}
               accessibilityRole="button"
-              accessibilityState={{ disabled: busy, busy }}
+              accessibilityState={{ disabled: busy || undecided.length > 0, busy }}
             >
               {busy ? <ActivityIndicator color={c.onPrimary} /> : <Text style={styles.buttonText}>Подтвердить</Text>}
             </TouchableOpacity>
@@ -190,7 +288,77 @@ export default function RequestScreen() {
           </View>
         )}
       </ScrollView>
+      <OptionSheet
+        visible={rolePicker}
+        title="Роль после подтверждения"
+        sections={[
+          {
+            key: 'roles',
+            title: '',
+            data: roleOptions.map((item) => ({
+              key: item.id,
+              label: roleLabel(item.name),
+              selected: item.name === roleName,
+              onPress: () => setRole(item.name === request.role ? null : item),
+            })),
+          },
+        ]}
+        onClose={() => setRolePicker(false)}
+      />
     </KeyboardAvoidingView>
+  );
+}
+
+/**
+ * Ребёнок из заявки и выбор: связать с похожим ребёнком сада, создать нового или не добавлять.
+ */
+function ChildDecisionView({
+  child,
+  decision,
+  disabled,
+  onChange,
+}: {
+  child: RequestChild;
+  decision: ChildDecision | undefined;
+  disabled: boolean;
+  onChange: (decision: ChildDecision) => void;
+}) {
+  const styles = useStyles();
+  const options: { key: string; label: string; value: ChildDecision }[] = [
+    ...child.matches.map((match) => ({
+      key: match.id,
+      label: `Это ${fullName(match)}${match.birthDate ? `, ${formatBirthDate(match.birthDate)}` : ''} — уже в саду`,
+      value: { kind: 'LINK', childId: match.id } as ChildDecision,
+    })),
+    { key: 'create', label: 'Новый ребёнок — добавить в сад', value: { kind: 'CREATE' } },
+    { key: 'skip', label: 'Не добавлять', value: { kind: 'SKIP' } },
+  ];
+  return (
+    <View style={styles.child}>
+      <Text style={styles.childName}>{fullName(child)}</Text>
+      <Text style={styles.childMeta}>
+        {[birthDateText(child.birthDate), genderText(child.gender)].join(' · ')}
+      </Text>
+      {options.map((option) => {
+        const selected = sameDecision(decision, option.value);
+        return (
+          <TouchableOpacity
+            key={option.key}
+            style={styles.option}
+            onPress={() => onChange(option.value)}
+            disabled={disabled}
+            accessibilityRole="radio"
+            accessibilityState={{ checked: selected, disabled }}
+            accessibilityLabel={`${child.firstName}: ${option.label}`}
+          >
+            <View style={[styles.radio, selected && styles.radioSelected]}>
+              {selected ? <View style={styles.radioDot} /> : null}
+            </View>
+            <Text style={styles.optionText}>{option.label}</Text>
+          </TouchableOpacity>
+        );
+      })}
+    </View>
   );
 }
 
@@ -229,10 +397,15 @@ function OutcomeView({
     <View style={styles.center}>
       <Text style={styles.outcomeTitle}>{title}</Text>
       <Text style={styles.message}>{text}</Text>
-      {outcome.result === 'approved' ? (
+      {outcome.result === 'approved' && outcome.childrenAdded ? (
         <Text style={styles.hint}>
-          Следующий шаг — связать заявителя с детьми, иначе экран «Мои дети» будет пустым. Это появится
-          во вкладке «Люди»
+          {outcome.childrenAdded} {plural(outcome.childrenAdded, ['ребёнок', 'ребёнка', 'детей'])} в «Моих детях»
+          у {request.firstName}. Распределить детей по группам можно во вкладке «Сад»
+        </Text>
+      ) : outcome.result === 'approved' && request.role === 'PARENT' ? (
+        <Text style={styles.hint}>
+          Детей в заявке не было: свяжите родителя с детьми во вкладке «Люди», иначе экран «Мои дети» будет
+          пустым
         </Text>
       ) : null}
       {showResend ? (
@@ -302,6 +475,70 @@ const useStyles = makeStyles((c) =>
       marginTop: 2,
       fontSize: 16,
       color: c.text,
+      flexShrink: 1,
+    },
+    roleRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+    },
+    smallLink: {
+      color: c.primary,
+      fontSize: 15,
+      fontWeight: '500',
+      marginLeft: 12,
+    },
+    sectionTitle: {
+      fontSize: 17,
+      fontWeight: '600',
+      color: c.text,
+    },
+    child: {
+      marginTop: 16,
+      paddingTop: 16,
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: c.separator,
+    },
+    childName: {
+      fontSize: 16,
+      fontWeight: '600',
+      color: c.text,
+    },
+    childMeta: {
+      marginTop: 2,
+      marginBottom: 8,
+      fontSize: 14,
+      color: c.textSecondary,
+    },
+    option: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: 8,
+    },
+    radio: {
+      width: 22,
+      height: 22,
+      borderRadius: 11,
+      borderWidth: 2,
+      borderColor: c.border,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginRight: 12,
+    },
+    radioSelected: {
+      borderColor: c.primary,
+    },
+    radioDot: {
+      width: 10,
+      height: 10,
+      borderRadius: 5,
+      backgroundColor: c.primary,
+    },
+    optionText: {
+      flex: 1,
+      fontSize: 15,
+      color: c.text,
+      lineHeight: 20,
     },
     reasonInput: {
       marginTop: 8,

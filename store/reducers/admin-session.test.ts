@@ -19,14 +19,16 @@ const request = {
   email: 'anna@example.invalid',
   phone: '+70000000000',
   created: '2026-09-25T08:00:00.000Z',
+  role: 'PARENT',
+  children: [] as never[],
 } as const;
 
 describe('admin data isolation', () => {
   it('removes pending requests and outcomes after protected session logout', () => {
     const stillPending = { ...request, id: 'request-2', email: 'second@example.invalid' };
     let state = requestsReducer(undefined, loadRequestsSuccess({ items: [request, stillPending], total: 2 }));
-    state = requestsReducer(state, approveRequest(request));
-    state = requestsReducer(state, approveSuccess({ request, passwordSent: true }));
+    state = requestsReducer(state, approveRequest({ request, roleId: null, decisions: {} }));
+    state = requestsReducer(state, approveSuccess({ request, passwordSent: true, childrenAdded: 0 }));
 
     const signedOut = requestsReducer(state, logoutCompleted({ reason: 'user' }));
 

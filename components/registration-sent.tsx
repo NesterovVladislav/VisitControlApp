@@ -1,43 +1,45 @@
-import { useLocalSearchParams, useRouter } from 'expo-router';
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { useAppDispatch } from '../store';
-import { resetRegistration } from '../store/reducers/registration';
 import { makeStyles } from '../hooks/use-palette';
 
-export default function RegistrationSentScreen() {
-  const styles = useStyles();
-  const router = useRouter();
-  const dispatch = useAppDispatch();
-  const { email } = useLocalSearchParams<{ email?: string }>();
+interface Props {
+  email: string | null;
+  onDone: () => void;
+}
 
-  const handleDone = () => {
-    dispatch(resetRegistration());
-    router.dismissTo('/auth');
-  };
+/**
+ * Итог отправки заявки. Показывается на месте формы: переход на отдельный экран
+ * в момент отправки (с открытой клавиатурой и защитой от ухода с формы) ронял приложение.
+ */
+export default function RegistrationSent({ email, onDone }: Props) {
+  const styles = useStyles();
 
   return (
     <View style={styles.container}>
       <View style={styles.card}>
-        <Text style={styles.icon} accessibilityElementsHidden>
+        <Text style={styles.icon} accessibilityElementsHidden importantForAccessibility="no">
           ✉️
         </Text>
         <Text style={styles.title} accessibilityRole="header">
           Заявка отправлена
         </Text>
         <Text style={styles.text}>
-          Администратор сада проверит данные. После подтверждения
+          Ваша заявка направлена администратору и будет рассмотрена в ближайшее время.
+        </Text>
+        <Text style={styles.text}>
+          После подтверждения пароль для входа придёт на почту
           {email ? (
             <>
-              {' '}на <Text style={styles.email}>{email}</Text>
+              {' '}
+              <Text style={styles.email}>{email}</Text>
             </>
-          ) : null}{' '}
-          придёт письмо с паролем для входа.
+          ) : null}
+          .
         </Text>
         <Text style={styles.note}>
           Если письмо долго не приходит, проверьте папку «Спам» или обратитесь к администратору сада.
         </Text>
-        <TouchableOpacity style={styles.button} onPress={handleDone} accessibilityRole="button">
+        <TouchableOpacity style={styles.button} onPress={onDone} accessibilityRole="button">
           <Text style={styles.buttonText}>Понятно</Text>
         </TouchableOpacity>
       </View>

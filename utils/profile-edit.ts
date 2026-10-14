@@ -49,7 +49,7 @@ export function validateProfileField(field: ProfileEditField, form: ProfileEditF
   if (field === 'phone' && !form.phone) {
     return undefined;
   }
-  return validateField(field, { ...form, gender: null, email: '', consent: false }, now);
+  return validateField(field, { ...form, gender: null, email: '', consent: false, role: 'PARENT', children: [] }, now);
 }
 
 export function validateProfileForm(form: ProfileEditForm, now = new Date()): ProfileEditErrors {

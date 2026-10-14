@@ -1,7 +1,7 @@
 import { useRouter } from 'expo-router';
 import { useMemo } from 'react';
 import { useAppSelector } from '../store';
-import { ADMIN_ROLE } from '../store/types/auth';
+import { isAdminRole } from '../store/types/auth';
 
 /**
  * Открывает «Состав группы», где добавляют и убирают детей, в стеке своей вкладки: переход в чужой стек
@@ -9,7 +9,7 @@ import { ADMIN_ROLE } from '../store/types/auth';
  */
 export function useOpenGroupMembers(stack: 'visits' | 'garden' = 'visits'): ((groupId: string) => void) | undefined {
   const router = useRouter();
-  const isAdmin = useAppSelector((state) => state.auth.user?.role === ADMIN_ROLE);
+  const isAdmin = useAppSelector((state) => isAdminRole(state.auth.user?.role));
   return useMemo(
     () =>
       isAdmin

@@ -1,5 +1,7 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import {
+  ApproveRequestPayload,
+  AssignableRole,
   RegistrationRequestsPage,
   RegistrationRequestView,
   RequestOutcome,
@@ -15,6 +17,8 @@ const initialState: RequestsState = {
   processing: null,
   outcomes: {},
   actionError: null,
+  roles: [],
+  rolesStatus: 'idle',
 };
 
 /** Заявка обработана: убираем из списка и запоминаем результат для экрана заявки */
@@ -55,9 +59,23 @@ const requestsSlice = createSlice({
       }
     },
 
-    approveRequest: (state, action: PayloadAction<RegistrationRequestView>) => {
-      state.processing = { id: action.payload.id, kind: 'approve' };
+    approveRequest: (state, action: PayloadAction<ApproveRequestPayload>) => {
+      state.processing = { id: action.payload.request.id, kind: 'approve' };
       state.actionError = null;
+    },
+    loadRolesStart: (state) => {
+      if (state.rolesStatus !== 'loaded') {
+        state.rolesStatus = 'loading';
+      }
+    },
+    loadRolesSuccess: (state, action: PayloadAction<AssignableRole[]>) => {
+      state.roles = action.payload;
+      state.rolesStatus = 'loaded';
+    },
+    loadRolesFailure: (state) => {
+      if (state.rolesStatus !== 'loaded') {
+        state.rolesStatus = 'failed';
+      }
     },
     rejectRequest: (
       state,
@@ -72,7 +90,7 @@ const requestsSlice = createSlice({
     },
     approveSuccess: (
       state,
-      action: PayloadAction<{ request: RegistrationRequestView; passwordSent: boolean }>
+      action: PayloadAction<{ request: RegistrationRequestView; passwordSent: boolean; childrenAdded: number }>
     ) => {
       finish(state, { ...action.payload, result: 'approved' });
     },
@@ -109,6 +127,9 @@ export const {
   loadRequestsSuccess,
   loadRequestsFailure,
   approveRequest,
+  loadRolesStart,
+  loadRolesSuccess,
+  loadRolesFailure,
   rejectRequest,
   resendPassword,
   approveSuccess,

@@ -26,7 +26,9 @@ export interface Person {
   surname: string;
   firstName: string;
   patronymic: string | null;
-  /** Роль пользователя: ADMIN, EMPLOYEE, PARENT, VISITOR */
+  /** Путь к фотографии относительно API; нет фотографии — null */
+  photoUrl?: string | null;
+  /** Роль пользователя: DIRECTOR, ADMIN, EMPLOYEE, PARENT, VISITOR */
   role: string | null;
   gender: 'MALE' | 'FEMALE' | null;
   /** ISO `YYYY-MM-DD` */

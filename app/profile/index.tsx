@@ -2,13 +2,16 @@ import { useFocusEffect } from '@react-navigation/native';
 import { Stack, useRouter } from 'expo-router';
 import React, { useCallback } from 'react';
 import { Alert, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import PhotoEditor from '@/components/photo-editor';
+import ProfileChildren from '@/components/profile-children';
 import ProfileSummary from '@/components/profile-summary';
 import SegmentedControl from '@/components/segmented-control';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useAppDispatch, useAppSelector } from '../../store';
 import { logoutRequested } from '../../store/reducers/auth';
 import { refreshProfile } from '../../store/reducers/profile';
-import { ADMIN_ROLE } from '../../store/types/auth';
+import { isAdminRole } from '../../store/types/auth';
+import { canAddChild } from '../../utils/child-requests';
 import { formatBirthDate, formatPhoneForDisplay, genderLabel } from '../../utils/profile-format';
 import { makeStyles, usePalette } from '../../hooks/use-palette';
 import { useThemePreference } from '../../hooks/use-theme-preference';
@@ -50,7 +53,8 @@ function InfoCard({ title, rows }: { title: string; rows: Row[] }) {
 }
 
 /**
- * Профиль: личные данные, смена пароля, тема оформления и выход. См. docs/profile-screen.md.
+ * Профиль: личные данные, свои дети и «Добавить ребёнка», смена пароля, тема оформления и выход.
+ * См. docs/profile-screen.md.
  * Свои данные меняет сам только администратор (кнопка «Изменить»), остальные — через администратора.
  */
 export default function ProfileScreen() {
@@ -80,7 +84,7 @@ export default function ProfileScreen() {
     return null;
   }
 
-  const canEdit = user.role === ADMIN_ROLE;
+  const canEdit = isAdminRole(user.role);
 
   return (
     <ScrollView
@@ -105,8 +109,16 @@ export default function ProfileScreen() {
             : undefined,
         }}
       />
+      {/* Свою фотографию меняет сам пользователь; у технического администратора сада и фотографии нет */}
+      <PhotoEditor
+        userId={user.id}
+        firstName={user.firstName}
+        surname={user.surname}
+        photoUrl={user.photoUrl}
+        canEdit={user.organization !== null}
+      />
       <View style={[styles.card, styles.summary]}>
-        <ProfileSummary user={user} />
+        <ProfileSummary user={user} hideAvatar />
       </View>
 
       <InfoCard
@@ -123,6 +135,8 @@ export default function ProfileScreen() {
           { label: 'Телефон', value: formatPhoneForDisplay(user.phone) },
         ]}
       />
+
+      {canAddChild(user.role) ? <ProfileChildren /> : null}
 
       {canEdit ? null : (
         <Text style={styles.note}>

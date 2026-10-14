@@ -14,6 +14,7 @@ const admin: User = {
   surname: 'Иванова',
   patronymic: 'Петровна',
   gender: 'FEMALE',
+  organization: null,
   birthDate: '1990-03-14',
   phone: '+79123456789',
   role: 'ADMIN',

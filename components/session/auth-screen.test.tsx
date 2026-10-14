@@ -23,9 +23,21 @@ describe('AuthScreen session notice', () => {
         error: null,
         notice: 'Сессия истекла. Войдите снова',
       },
+      organization: { brand: null },
     } as never));
 
     const screen = await render(<AuthScreen />);
     expect(screen.getByText('Сессия истекла. Войдите снова')).toBeTruthy();
+  });
+
+  it('shows the garden of the last sign-in on this device', async () => {
+    mockUseAppDispatch.mockReturnValue(jest.fn());
+    mockUseAppSelector.mockImplementation((selector) => selector({
+      auth: { isLoading: false, error: null, notice: null },
+      organization: { brand: { id: 'org-1', name: 'Сад «Ромашка»', logoUrl: null } },
+    } as never));
+
+    const screen = await render(<AuthScreen />);
+    expect(screen.getByText('Сад «Ромашка»')).toBeTruthy();
   });
 });

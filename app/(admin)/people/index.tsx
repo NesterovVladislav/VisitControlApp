@@ -14,6 +14,7 @@ import {
   View,
 } from 'react-native';
 import SegmentedControl from '../../../components/segmented-control';
+import Avatar from '@/components/avatar';
 import { IconSymbol } from '../../../components/ui/icon-symbol';
 import { LoadState, useVisitListStyles } from '../../../components/visit-list';
 import { useAppDispatch, useAppSelector } from '../../../store';
@@ -236,6 +237,9 @@ function PersonRow({
           accessibilityLabel={person.present ? 'В саду' : 'Не в саду'}
         />
       ) : null}
+      <View style={styles.rowPhoto}>
+        <Avatar firstName={person.firstName} surname={person.surname} photoUrl={person.photoUrl} size={36} />
+      </View>
       <View style={styles.rowText}>
         <Text style={visitListStyles.rowTitle}>{personName(person)}</Text>
         {subtitle ? (
@@ -426,6 +430,9 @@ const useStyles = makeStyles((c) =>
       fontSize: 15,
       color: c.textSecondary,
       marginBottom: 8,
+    },
+    rowPhoto: {
+      marginRight: 10,
     },
     rowText: {
       flex: 1,

@@ -27,6 +27,7 @@ const admin = {
   birthDate: null,
   phone: null,
   gender: null,
+  organization: null,
   role: 'ADMIN',
 } as const;
 

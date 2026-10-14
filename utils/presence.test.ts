@@ -7,6 +7,7 @@ import {
   branchSummaries,
   findGroup,
   singleBranchId,
+  pendingSuffix,
 } from './presence';
 
 const child = (id: string) => ({ id, firstName: id, surname: 'Иванов' });
@@ -96,5 +97,12 @@ describe('presence by branch', () => {
   it('names a branch by id and reports a vanished one', () => {
     expect(branchName(presence, 'b-north')).toBe('Северный');
     expect(branchName(presence, 'b-gone')).toBeNull();
+  });
+
+  it('adds marks waiting for the kindergarten to the group title', () => {
+    expect(pendingSuffix({ pendingIn: 2, pendingOut: 1 })).toBe(' · ждут приёма: 2 · ждут выдачи: 1');
+    expect(pendingSuffix({ pendingIn: 0, pendingOut: 3 })).toBe(' · ждут выдачи: 3');
+    // Бэкенд без подтверждения посещений этих полей не отдаёт
+    expect(pendingSuffix({})).toBe('');
   });
 });

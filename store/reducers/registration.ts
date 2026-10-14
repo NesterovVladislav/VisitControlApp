@@ -1,6 +1,7 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import {
   PrivacyPolicy,
+  PublicOrganization,
   RegistrationField,
   RegistrationFieldErrors,
   RegistrationRequest,
@@ -8,6 +9,9 @@ import {
 } from '../types/registration';
 
 const initialState: RegistrationState = {
+  organizations: [],
+  organizationsStatus: 'idle',
+  organization: null,
   policy: null,
   policyStatus: 'idle',
   status: 'idle',
@@ -21,12 +25,39 @@ export interface RegisterFailurePayload {
   fieldErrors?: RegistrationFieldErrors;
   formError?: string | null;
   resetConsent?: boolean;
+  /** Сад не найден (удалён): вернуться к выбору сада. */
+  resetOrganization?: boolean;
 }
 
 const registrationSlice = createSlice({
   name: 'registration',
   initialState,
   reducers: {
+    loadOrganizationsStart: (state) => {
+      state.organizationsStatus = 'loading';
+    },
+    loadOrganizationsSuccess: (state, action: PayloadAction<PublicOrganization[]>) => {
+      state.organizations = action.payload;
+      state.organizationsStatus = 'loaded';
+    },
+    loadOrganizationsFailure: (state) => {
+      state.organizationsStatus = 'failed';
+    },
+    /**
+     * Выбор сада. У другого сада другая политика ПДн: её загружаем заново, а согласие нужно дать ещё раз.
+     * null — вернуться к списку садов.
+     */
+    selectOrganization: (state, action: PayloadAction<PublicOrganization | null>) => {
+      if (state.organization?.id === action.payload?.id) {
+        return;
+      }
+      state.organization = action.payload;
+      state.policy = null;
+      state.policyStatus = action.payload ? 'loading' : 'idle';
+      state.formError = null;
+      delete state.fieldErrors.consent;
+      state.consentResetCount += 1;
+    },
     loadPolicyStart: (state) => {
       state.policyStatus = 'loading';
     },
@@ -67,6 +98,10 @@ const registrationSlice = createSlice({
 });
 
 export const {
+  loadOrganizationsStart,
+  loadOrganizationsSuccess,
+  loadOrganizationsFailure,
+  selectOrganization,
   loadPolicyStart,
   loadPolicySuccess,
   loadPolicyFailure,

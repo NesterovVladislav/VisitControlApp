@@ -44,6 +44,7 @@ const user = {
   birthDate: '1990-03-14',
   phone: '+79123456789',
   gender: 'FEMALE',
+  organization: null,
   role: 'PARENT',
 } as const;
 

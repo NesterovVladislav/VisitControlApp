@@ -1,6 +1,6 @@
 import { useFocusEffect } from '@react-navigation/native';
 import { Stack, useRouter } from 'expo-router';
-import React, { useCallback, useEffect, useRef } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -12,19 +12,26 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import ChildCard, { markActionLabel } from '../components/child-card';
+import ChildCard, { commentLabel, markActionLabel } from '../components/child-card';
+import CommentSheet from '../components/comment-sheet';
+import ChildGroupSheet from '../components/child-group-sheet';
+import VisitQrSheet from '../components/visit-qr-sheet';
 import { useAppDispatch, useAppSelector } from '../store';
 import { logoutRequested, switchMode } from '../store/reducers/auth';
 import {
+  cancelMarkStart,
   clearMarkError,
   loadChildrenStart,
   loadStatusStart,
   markVisitStart,
   refreshStatuses,
 } from '../store/reducers/children';
-import { ADMIN_ROLE, isStaffRole } from '../store/types/auth';
-import { Child, isInKindergarten } from '../store/types/children';
+import { isAdminRole, isStaffRole } from '../store/types/auth';
+import { Child, isInKindergarten, VISIT_COMMENT_MAX_LENGTH, VisitStatus } from '../store/types/children';
 import { makeStyles, usePalette } from '../hooks/use-palette';
+
+/** Как часто перечитывать статусы, пока отметка ждёт подтверждения сада */
+const PENDING_POLL_MS = 12_000;
 
 export default function ChildrenScreen() {
   const c = usePalette();
@@ -32,7 +39,7 @@ export default function ChildrenScreen() {
   const router = useRouter();
   const dispatch = useAppDispatch();
   const { user } = useAppSelector((state) => state.auth);
-  const { items, listStatus, refreshing, statusById, markingIds, markError } = useAppSelector(
+  const { items, listStatus, refreshing, statusById, markingIds, markError, qrAvailable } = useAppSelector(
     (state) => state.children
   );
 
@@ -49,6 +56,25 @@ export default function ChildrenScreen() {
   }, [dispatch]);
 
   useFocusEffect(reload);
+
+  // Пока отметка ждёт сотрудника сада, статус перечитываем сами: родитель смотрит на экран и ждёт ответа
+  const waiting = Object.values(statusById).some((status) => status.visit?.pending);
+  useFocusEffect(
+    useCallback(() => {
+      if (!waiting) {
+        return undefined;
+      }
+      const timer = setInterval(() => {
+        if (AppState.currentState === 'active') {
+          dispatch(refreshStatuses());
+        }
+      }, PENDING_POLL_MS);
+      return () => clearInterval(timer);
+    }, [waiting, dispatch])
+  );
+
+  // Ребёнок, по которому открыто окно подтверждения отметки, и статус, который видел пользователь
+  const [marking, setMarking] = useState<{ child: Child; seenStatus: VisitStatus } | null>(null);
 
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (state) => {
@@ -72,17 +98,69 @@ export default function ChildrenScreen() {
     if (!seenStatus) {
       return;
     }
-    const inKindergarten = isInKindergarten(seenStatus);
-    // Пол ребёнка сервер не отдаёт, поэтому вопрос без согласования по роду
-    const question = inKindergarten ? 'Отметить уход из сада?' : 'Отметить приход в сад?';
-    Alert.alert(`${child.firstName} ${child.surname}`.trim(), question, [
-      { text: 'Отмена', style: 'cancel' },
-      {
-        text: markActionLabel(inKindergarten, user?.gender ?? null),
-        onPress: () => dispatch(markVisitStart({ childId: child.id, seenStatus })),
-      },
+    // Вместо Alert — шторка: в ней есть поле для комментария
+    setMarking({ child, seenStatus });
+  }
+
+  function confirmCancel(child: Child) {
+    Alert.alert(`${child.firstName} ${child.surname}`.trim(), 'Отменить отметку? Сад её ещё не подтвердил', [
+      { text: 'Нет', style: 'cancel' },
+      { text: 'Отменить отметку', style: 'destructive', onPress: () => dispatch(cancelMarkStart(child.id)) },
     ]);
   }
+
+  // Ребёнок, чья группа сейчас открыта
+  const [groupChildId, setGroupChildId] = useState<string | null>(null);
+  const groupSheet = (
+    <ChildGroupSheet
+      child={items.find((child) => child.id === groupChildId) ?? null}
+      onClose={() => setGroupChildId(null)}
+    />
+  );
+
+  // Ребёнок, чей QR-код сейчас на экране. Следующий — тот, кому код тоже можно показать: у каждого ребёнка свой
+  const [qrChildId, setQrChildId] = useState<string | null>(null);
+  const qrChild = items.find((child) => child.id === qrChildId) ?? null;
+  const qrCandidates = items.filter(
+    (child) => statusById[child.id]?.value != null && !statusById[child.id]?.visit?.pending
+  );
+  const qrIndex = qrCandidates.findIndex((child) => child.id === qrChildId);
+  const qrNext =
+    qrCandidates.length > 1 && qrChildId
+      ? qrCandidates[(qrIndex + 1) % qrCandidates.length] ?? null
+      : null;
+  const pollQrStatus = useCallback((childId: string) => dispatch(loadStatusStart(childId)), [dispatch]);
+  const qrSheet = (
+    <VisitQrSheet
+      child={qrChild}
+      status={qrChild ? statusById[qrChild.id]?.value ?? null : null}
+      next={qrNext && qrNext.id !== qrChildId ? qrNext : null}
+      onPoll={pollQrStatus}
+      onNext={(child) => setQrChildId(child.id)}
+      onClose={() => setQrChildId(null)}
+    />
+  );
+
+  const markingInKindergarten = marking ? isInKindergarten(marking.seenStatus) : false;
+  const markSheet = (
+    <CommentSheet
+      visible={marking !== null}
+      title={marking ? `${marking.child.firstName} ${marking.child.surname}`.trim() : ''}
+      // Пол ребёнка сервер не отдаёт, поэтому вопрос без согласования по роду
+      message={markingInKindergarten ? 'Отметить уход из сада?' : 'Отметить приход в сад?'}
+      label={commentLabel(markingInKindergarten)}
+      placeholder="Необязательно"
+      maxLength={VISIT_COMMENT_MAX_LENGTH}
+      confirmLabel={markActionLabel(markingInKindergarten, user?.gender ?? null)}
+      onClose={() => setMarking(null)}
+      onConfirm={(comment) => {
+        if (marking) {
+          dispatch(markVisitStart({ childId: marking.child.id, seenStatus: marking.seenStatus, comment }));
+        }
+        setMarking(null);
+      }}
+    />
+  );
 
   function confirmLogout() {
     Alert.alert('Выйти из аккаунта?', undefined, [
@@ -104,7 +182,7 @@ export default function ChildrenScreen() {
       { text: 'Профиль', onPress: () => router.push('/profile') },
       isStaff
         ? {
-            text: user?.role === ADMIN_ROLE ? 'Режим администратора' : 'Режим сотрудника',
+            text: isAdminRole(user?.role) ? 'Режим администратора' : 'Режим сотрудника',
             onPress: () => {
               dispatch(switchMode('admin'));
               router.replace('/visits');
@@ -156,6 +234,9 @@ export default function ChildrenScreen() {
   return (
     <>
       {header}
+      {markSheet}
+      {qrSheet}
+      {groupSheet}
       <FlatList
         style={styles.list}
         contentContainerStyle={items.length === 0 ? styles.emptyContainer : styles.container}
@@ -168,6 +249,9 @@ export default function ChildrenScreen() {
             gender={user?.gender ?? null}
             marking={markingIds.includes(item.id)}
             onMark={() => confirmMark(item)}
+            onCancel={() => confirmCancel(item)}
+            onShowQr={qrAvailable ? () => setQrChildId(item.id) : undefined}
+            onShowGroup={() => setGroupChildId(item.id)}
             onRetryStatus={() => dispatch(loadStatusStart(item.id))}
           />
         )}

@@ -40,10 +40,29 @@ const presence: Presence = {
   withoutGroup: [child('c3', 'Ольга')],
 };
 
-function givenPresence(data: Presence, role = 'ADMIN', journalItems: unknown[] = []) {
+const noQueue = {
+  enabled: false,
+  items: [],
+  otherCount: 0,
+  status: 'idle',
+  refreshing: false,
+  filter: null,
+  filterLoaded: false,
+  showAll: false,
+  decidingIds: [],
+  error: null,
+};
+
+function givenPresence(
+  data: Presence,
+  role = 'ADMIN',
+  journalItems: unknown[] = [],
+  visitQueue: object = noQueue,
+) {
   mockUseAppSelector.mockImplementation((selector) =>
     selector({
-      auth: { user: { role } },
+      auth: { user: { id: 'me', role } },
+      visitQueue,
       visits: {
         present: { data, status: 'loaded', refreshing: false },
         journal: { items: journalItems, status: 'loaded', refreshing: false, page: 0, last: false, loadingMore: false, loadMoreFailed: false },
@@ -147,5 +166,59 @@ describe('presence by branch', () => {
     expect(screen.getByText('РОМАШКА · ЦЕНТРАЛЬНЫЙ · 1 РЕБЁНОК')).toBeTruthy();
     expect(screen.getByText('08:40 → 17:30')).toBeTruthy();
     expect(screen.getByText('Приход — Иванова А. · Уход — Иванов С.')).toBeTruthy();
+  });
+
+  it('opens the queue first while marks are waiting and lets the employee accept a child', async () => {
+    const dispatch = jest.fn();
+    mockUseAppDispatch.mockReturnValue(dispatch);
+    const mark = {
+      id: 'm1',
+      status: 'IN',
+      childName: 'Мария Иванова',
+      representativeId: 'mother',
+      representativeName: 'Иванова А.',
+      linkRole: 'PARENT',
+      datetime: new Date(2026, 9, 12, 8, 40).toISOString(),
+      comment: 'Привела бабушка',
+      group: { id: 'g-rom', name: 'Ромашка' },
+    };
+    givenPresence(presence, 'EMPLOYEE', [], { ...noQueue, enabled: true, status: 'loaded', items: [mark], otherCount: 2 });
+    const screen = await render(<VisitsScreen />);
+
+    // Число на переключателе — все, кто ждёт, в том числе в других группах
+    expect(screen.getByText('Очередь 3')).toBeTruthy();
+    expect(screen.getByText('→ Мария Иванова')).toBeTruthy();
+    expect(screen.getByText('Привёл(а) — Иванова А. (родитель)')).toBeTruthy();
+    expect(screen.getByText('«Привела бабушка»')).toBeTruthy();
+
+    await fireEvent.press(screen.getByText('Принять'));
+
+    expect(dispatch).toHaveBeenCalledWith({ type: 'visitQueue/confirmMarkStart', payload: 'm1' });
+  });
+
+  it('does not let an employee confirm their own mark', async () => {
+    const mark = {
+      id: 'm1',
+      status: 'OUT',
+      childName: 'Мария Иванова',
+      representativeId: 'me',
+      representativeName: 'Иванова А.',
+      linkRole: 'PARENT',
+      datetime: new Date(2026, 9, 12, 17, 30).toISOString(),
+      comment: null,
+      group: null,
+    };
+    givenPresence(presence, 'EMPLOYEE', [], { ...noQueue, enabled: true, status: 'loaded', items: [mark] });
+    const screen = await render(<VisitsScreen />);
+
+    expect(screen.getByText('Это ваша отметка: её подтвердит другой сотрудник')).toBeTruthy();
+    expect(screen.queryByText('Отдать')).toBeNull();
+  });
+
+  it('has no queue when confirmation is off in the kindergarten', async () => {
+    givenPresence(presence);
+    const screen = await render(<VisitsScreen />);
+
+    expect(screen.queryByText(/Очередь/)).toBeNull();
   });
 });

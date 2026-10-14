@@ -2,7 +2,7 @@ import { RegistrationRequestView } from '../store/types/requests';
 import { dayTitle, timeOfDay } from './visit-dates';
 
 /** «Иванова Мария Петровна» */
-export function fullName(request: RegistrationRequestView): string {
+export function fullName(request: Pick<RegistrationRequestView, 'surname' | 'firstName' | 'patronymic'>): string {
   return [request.surname, request.firstName, request.patronymic].filter(Boolean).join(' ');
 }
 

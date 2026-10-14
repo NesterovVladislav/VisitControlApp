@@ -1,22 +1,30 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { User } from '@/store/types/auth';
-import { fullName, initials, roleLabel } from '@/utils/profile-format';
+import { fullName, roleLabel } from '@/utils/profile-format';
+import Avatar from './avatar';
 import { makeStyles } from '../hooks/use-palette';
 
 /**
- * Инициалы, ФИО и роль пользователя — в шапке профиля и в карточке во вкладке «Ещё».
+ * Фотография (или инициалы), ФИО, роль и сад пользователя — в шапке профиля и в карточке во вкладке «Ещё».
+ * Сад сервер определяет по аккаунту, поэтому при входе его не выбирают, а показывают здесь.
+ * hideAvatar — в профиле фотография стоит отдельно, крупно и с кнопкой замены.
  */
-export default function ProfileSummary({ user }: { user: User }) {
+export default function ProfileSummary({ user, hideAvatar = false }: { user: User; hideAvatar?: boolean }) {
   const styles = useStyles();
   return (
     <View style={styles.container}>
-      <View style={styles.avatar} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
-        <Text style={styles.avatarText}>{initials(user)}</Text>
-      </View>
-      <View style={styles.text}>
+      {hideAvatar ? null : (
+        <Avatar firstName={user.firstName} surname={user.surname} photoUrl={user.photoUrl} size={52} />
+      )}
+      <View style={[styles.text, hideAvatar && styles.textAlone]}>
         <Text style={styles.name}>{fullName(user)}</Text>
         <Text style={styles.role}>{roleLabel(user.role)}</Text>
+        {user.organization ? (
+          <Text style={styles.organization} numberOfLines={2}>
+            {user.organization.name}
+          </Text>
+        ) : null}
       </View>
     </View>
   );
@@ -29,22 +37,12 @@ const useStyles = makeStyles((c) =>
       flexDirection: 'row',
       alignItems: 'center',
     },
-    avatar: {
-      width: 52,
-      height: 52,
-      borderRadius: 26,
-      backgroundColor: c.primarySoft,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    avatarText: {
-      fontSize: 19,
-      fontWeight: '600',
-      color: c.primary,
-    },
     text: {
       flex: 1,
       marginLeft: 14,
+    },
+    textAlone: {
+      marginLeft: 0,
     },
     name: {
       fontSize: 17,
@@ -55,6 +53,11 @@ const useStyles = makeStyles((c) =>
       marginTop: 2,
       fontSize: 14,
       color: c.textSecondary,
+    },
+    organization: {
+      marginTop: 2,
+      fontSize: 14,
+      color: c.textTertiary,
     },
   })
 );

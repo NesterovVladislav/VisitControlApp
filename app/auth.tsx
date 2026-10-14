@@ -3,6 +3,8 @@ import React, { useEffect, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
+    KeyboardAvoidingView,
+    ScrollView,
     StyleSheet,
     Text,
     TextInput,
@@ -12,6 +14,7 @@ import {
 import { useAppDispatch, useAppSelector } from '../store';
 import { clearError, loginStart } from '../store/reducers/auth';
 import { LoginCredentials } from '../store/types/auth';
+import OrganizationLogo from '../components/organization-logo';
 import { makeStyles, usePalette } from '../hooks/use-palette';
 
 export default function AuthScreen() {
@@ -20,6 +23,8 @@ export default function AuthScreen() {
   const router = useRouter();
   const dispatch = useAppDispatch();
   const { isLoading, error, notice } = useAppSelector((state) => state.auth);
+  // Сад последнего входа на этом устройстве; при первом запуске его нет
+  const brand = useAppSelector((state) => state.organization.brand);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -69,91 +74,105 @@ export default function AuthScreen() {
   const isFormDisabled = isLoading;
 
   return (
-    <View style={styles.container}>
-      <View style={styles.form}>
-        <Text style={styles.title}>Авторизация</Text>
+    // На Android с edgeToEdgeEnabled система не сжимает окно под клавиатуру, поэтому padding нужен и там.
+    <KeyboardAvoidingView style={styles.screen} behavior="padding">
+      <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
+        <View style={styles.form}>
+          {brand ? (
+            <View style={styles.brand}>
+              <OrganizationLogo key={brand.logoUrl} name={brand.name} logoUrl={brand.logoUrl} size={72} />
+              <Text style={styles.brandName} numberOfLines={2}>
+                {brand.name}
+              </Text>
+            </View>
+          ) : null}
+          <Text style={styles.title}>Авторизация</Text>
 
-        {notice ? <Text style={styles.notice}>{notice}</Text> : null}
+          {notice ? <Text style={styles.notice}>{notice}</Text> : null}
 
-        <View style={styles.inputContainer}>
-          <Text style={styles.label}>Email</Text>
-          <TextInput
-            style={[styles.input, isFormDisabled && styles.inputDisabled]}
-            placeholder="Введите email"
-            placeholderTextColor={c.placeholder}
-            value={email}
-            onChangeText={setEmail}
-            keyboardType="email-address"
-            autoCapitalize="none"
-            autoCorrect={false}
-            editable={!isFormDisabled}
-          />
-        </View>
-
-        <View style={styles.inputContainer}>
-          <Text style={styles.label}>Пароль</Text>
-          <View style={styles.passwordContainer}>
+          <View style={styles.inputContainer}>
+            <Text style={styles.label}>Email</Text>
             <TextInput
-              style={[
-                styles.input,
-                styles.passwordInput,
-                isFormDisabled && styles.inputDisabled,
-              ]}
-              placeholder="Введите пароль"
+              style={[styles.input, isFormDisabled && styles.inputDisabled]}
+              placeholder="Введите email"
               placeholderTextColor={c.placeholder}
-              value={password}
-              onChangeText={setPassword}
-              secureTextEntry={!showPassword}
+              value={email}
+              onChangeText={setEmail}
+              keyboardType="email-address"
               autoCapitalize="none"
               autoCorrect={false}
               editable={!isFormDisabled}
             />
-            <TouchableOpacity
-              style={styles.eyeButton}
-              onPress={() => setShowPassword(!showPassword)}
-              disabled={isFormDisabled}
-            >
-              <Text style={styles.eyeButtonText}>
-                {showPassword ? 'Скрыть' : 'Показать'}
-              </Text>
-            </TouchableOpacity>
           </View>
+
+          <View style={styles.inputContainer}>
+            <Text style={styles.label}>Пароль</Text>
+            <View style={styles.passwordContainer}>
+              <TextInput
+                style={[
+                  styles.input,
+                  styles.passwordInput,
+                  isFormDisabled && styles.inputDisabled,
+                ]}
+                placeholder="Введите пароль"
+                placeholderTextColor={c.placeholder}
+                value={password}
+                onChangeText={setPassword}
+                secureTextEntry={!showPassword}
+                autoCapitalize="none"
+                autoCorrect={false}
+                editable={!isFormDisabled}
+              />
+              <TouchableOpacity
+                style={styles.eyeButton}
+                onPress={() => setShowPassword(!showPassword)}
+                disabled={isFormDisabled}
+              >
+                <Text style={styles.eyeButtonText}>
+                  {showPassword ? 'Скрыть' : 'Показать'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          <TouchableOpacity
+            style={[styles.button, isFormDisabled && styles.buttonDisabled]}
+            onPress={handleLogin}
+            disabled={isFormDisabled}
+          >
+            {isLoading ? (
+              <ActivityIndicator color={c.onPrimary} />
+            ) : (
+              <Text style={styles.buttonText}>Войти</Text>
+            )}
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.registerLink}
+            onPress={() => router.push('/register')}
+            disabled={isFormDisabled}
+            accessibilityRole="link"
+          >
+            <Text style={styles.registerText}>
+              Нет аккаунта? <Text style={styles.registerTextAccent}>Зарегистрироваться</Text>
+            </Text>
+          </TouchableOpacity>
         </View>
-
-        <TouchableOpacity
-          style={[styles.button, isFormDisabled && styles.buttonDisabled]}
-          onPress={handleLogin}
-          disabled={isFormDisabled}
-        >
-          {isLoading ? (
-            <ActivityIndicator color={c.onPrimary} />
-          ) : (
-            <Text style={styles.buttonText}>Войти</Text>
-          )}
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.registerLink}
-          onPress={() => router.push('/register')}
-          disabled={isFormDisabled}
-          accessibilityRole="link"
-        >
-          <Text style={styles.registerText}>
-            Нет аккаунта? <Text style={styles.registerTextAccent}>Зарегистрироваться</Text>
-          </Text>
-        </TouchableOpacity>
-      </View>
-    </View>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
 const useStyles = makeStyles((c) =>
   StyleSheet.create({
-    container: {
+    screen: {
       flex: 1,
+      backgroundColor: c.background,
+    },
+    container: {
+      flexGrow: 1,
       justifyContent: 'center',
       alignItems: 'center',
-      backgroundColor: c.background,
       padding: 20,
     },
     form: {
@@ -170,6 +189,17 @@ const useStyles = makeStyles((c) =>
       shadowOpacity: 0.1,
       shadowRadius: 4,
       elevation: 3,
+    },
+    brand: {
+      alignItems: 'center',
+      marginBottom: 20,
+    },
+    brandName: {
+      marginTop: 10,
+      fontSize: 16,
+      fontWeight: '600',
+      textAlign: 'center',
+      color: c.text,
     },
     title: {
       fontSize: 24,

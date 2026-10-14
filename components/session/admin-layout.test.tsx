@@ -38,12 +38,19 @@ const admin = {
   birthDate: null,
   phone: null,
   gender: null,
+  organization: null,
   role: 'ADMIN',
 } as const;
 
-async function renderLayout(auth: AuthState) {
+async function renderLayout(auth: AuthState, visitQueue: object = { enabled: false, items: [], otherCount: 0 }) {
   mockUseAppSelector.mockImplementation((selector) =>
-    selector({ auth, requests: { total: 0 } } as never),
+    selector({
+      auth,
+      requests: { total: 0 },
+      visitQueue,
+      childRequests: { pending: [], changes: [] },
+      photos: { pending: [] },
+    } as never),
   );
   return render(<AdminLayout />);
 }
@@ -97,10 +104,15 @@ describe('administrator route authorization', () => {
     expect(screen.queryByTestId('redirect')).toBeNull();
   });
 
-  it('shows the administrator every tab and loads registration requests', async () => {
+  it.each(['ADMIN', 'DIRECTOR'])('shows %s every tab and loads registration requests', async (role) => {
     const dispatch = jest.fn();
     mockUseAppDispatch.mockReturnValue(dispatch);
-    const screen = await renderLayout({ ...initialAuthState, phase: 'authenticated', user: admin, mode: 'admin' });
+    const screen = await renderLayout({
+      ...initialAuthState,
+      phase: 'authenticated',
+      user: { ...admin, role },
+      mode: 'admin',
+    });
 
     for (const tab of ['visits', 'requests', 'garden', 'people/index', 'more/index']) {
       expect(screen.getByText(tab)).toBeTruthy();
@@ -123,6 +135,8 @@ describe('administrator route authorization', () => {
     expect(screen.queryByText('requests')).toBeNull();
     expect(screen.queryByText('garden')).toBeNull();
     expect(screen.queryByText('people/index')).toBeNull();
-    expect(dispatch).not.toHaveBeenCalled();
+    expect(dispatch).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'requests/loadRequestsStart' }));
+    // Очередь отметок нужна и сотруднику: по ней число на вкладке «Посещение»
+    expect(dispatch).toHaveBeenCalledWith(expect.objectContaining({ type: 'visitQueue/openQueue' }));
   });
 });

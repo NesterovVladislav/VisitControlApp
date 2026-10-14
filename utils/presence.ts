@@ -80,6 +80,18 @@ export function branchName(presence: Presence, branchId: string): string | null 
  * Секции экрана филиала: все группы по названию (порядок задаёт сервер), в том числе пустые —
  * чтобы администратор видел новую группу и мог добавить в неё детей. Для «Без группы» — один список без заголовка.
  */
+/** « · ждут приёма: 2 · ждут выдачи: 1» — отметки, которые сад ещё не подтвердил. */
+export function pendingSuffix(group: Pick<PresenceGroup, 'pendingIn' | 'pendingOut'>): string {
+  const parts: string[] = [];
+  if (group.pendingIn) {
+    parts.push(`ждут приёма: ${group.pendingIn}`);
+  }
+  if (group.pendingOut) {
+    parts.push(`ждут выдачи: ${group.pendingOut}`);
+  }
+  return parts.map((part) => ` · ${part}`).join('');
+}
+
 export function branchSections(presence: Presence, branchId: string): PresentSection[] {
   if (branchId === WITHOUT_GROUP_ID) {
     return presence.withoutGroup.length > 0
@@ -90,7 +102,9 @@ export function branchSections(presence: Presence, branchId: string): PresentSec
     const noChildren = group.totalChildren === 0 && group.present.length === 0;
     return {
       key: group.id,
-      title: noChildren ? group.name : `${group.name} · ${group.present.length} из ${group.totalChildren}`,
+      title: noChildren
+        ? group.name
+        : `${group.name} · ${group.present.length} из ${group.totalChildren}${pendingSuffix(group)}`,
       group: { id: group.id, name: group.name },
       emptyText: noChildren ? 'Детей пока нет' : group.present.length === 0 ? 'Сейчас никого нет' : null,
       data: group.present,

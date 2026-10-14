@@ -100,6 +100,7 @@ const user = {
   birthDate: null,
   phone: null,
   gender: null,
+  organization: null,
   role: 'PARENT',
 };
 

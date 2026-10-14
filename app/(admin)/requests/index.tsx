@@ -10,10 +10,17 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import ChildChangesList from '@/components/child-changes-list';
+import ChildRequestsList from '@/components/child-requests-list';
+import PhotoRequestsList from '@/components/photo-requests-list';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useAppDispatch, useAppSelector } from '../../../store';
+import { loadChildChanges, loadPendingChildRequests } from '../../../store/reducers/child-requests';
+import { loadPendingPhotoRequests } from '../../../store/reducers/photos';
 import { loadRequestsStart } from '../../../store/reducers/requests';
 import { formatPhone } from '../../../utils/input-masks';
+import { plural } from '../../../utils/plural';
+import { roleLabel } from '../../../utils/profile-format';
 import { fullName, submittedAt } from '../../../utils/registration-request-format';
 import { makeStyles, usePalette } from '../../../hooks/use-palette';
 
@@ -26,11 +33,20 @@ export default function RequestsScreen() {
   const router = useRouter();
   const dispatch = useAppDispatch();
   const { items, total, status, refreshing } = useAppSelector((state) => state.requests);
+  // Заявки действующих пользователей «добавить мне ребёнка», изменения данных детей и фотографии — блоками
+  // над заявками на регистрацию
+  const hasChildRequests = useAppSelector(
+    (state) =>
+      state.childRequests.pending.length + state.childRequests.changes.length + state.photos.pending.length > 0
+  );
 
   // Заявки мог обработать другой администратор, пока вкладка была закрыта
   useFocusEffect(
     useCallback(() => {
       dispatch(loadRequestsStart());
+      dispatch(loadPendingChildRequests({ silent: true }));
+      dispatch(loadChildChanges());
+      dispatch(loadPendingPhotoRequests({ silent: true }));
     }, [dispatch])
   );
 
@@ -58,19 +74,30 @@ export default function RequestsScreen() {
       style={styles.screen}
       data={items}
       keyExtractor={(request) => request.id}
-      contentContainerStyle={items.length === 0 ? styles.emptyContainer : styles.listContainer}
+      contentContainerStyle={items.length === 0 && !hasChildRequests ? styles.emptyContainer : styles.listContainer}
       refreshControl={
         <RefreshControl
           refreshing={refreshing}
-          onRefresh={() => dispatch(loadRequestsStart({ refresh: true }))}
+          onRefresh={() => {
+            dispatch(loadRequestsStart({ refresh: true }));
+            dispatch(loadPendingChildRequests({ silent: true }));
+            dispatch(loadChildChanges());
+            dispatch(loadPendingPhotoRequests({ silent: true }));
+          }}
         />
       }
       ListHeaderComponent={
-        total > items.length ? (
-          <Text style={styles.note}>
-            Показаны первые {items.length} из {total}. Обработайте их, чтобы увидеть остальные
-          </Text>
-        ) : null
+        <>
+          <ChildRequestsList />
+          <ChildChangesList />
+          <PhotoRequestsList />
+          {hasChildRequests && items.length > 0 ? <Text style={styles.sectionTitle}>РЕГИСТРАЦИЯ</Text> : null}
+          {total > items.length ? (
+            <Text style={styles.note}>
+              Показаны первые {items.length} из {total}. Обработайте их, чтобы увидеть остальные
+            </Text>
+          ) : null}
+        </>
       }
       renderItem={({ item, index }) => (
         <TouchableOpacity
@@ -80,6 +107,16 @@ export default function RequestsScreen() {
         >
           <View style={styles.rowText}>
             <Text style={styles.name}>{fullName(item)}</Text>
+            <Text style={styles.role}>
+              {[
+                item.role ? roleLabel(item.role) : null,
+                item.children?.length
+                  ? `${item.children.length} ${plural(item.children.length, ['ребёнок', 'ребёнка', 'детей'])}`
+                  : null,
+              ]
+                .filter(Boolean)
+                .join(' · ')}
+            </Text>
             <Text style={styles.contacts} numberOfLines={1}>
               {[item.email, item.phone ? formatPhone(item.phone) : null].filter(Boolean).join(' · ')}
             </Text>
@@ -89,9 +126,11 @@ export default function RequestsScreen() {
         </TouchableOpacity>
       )}
       ListEmptyComponent={
-        <View style={styles.empty}>
-          <Text style={styles.message}>Новых заявок нет</Text>
-        </View>
+        hasChildRequests ? null : (
+          <View style={styles.empty}>
+            <Text style={styles.message}>Новых заявок нет</Text>
+          </View>
+        )
       }
     />
   );
@@ -123,6 +162,14 @@ const useStyles = makeStyles((c) =>
     },
     empty: {
       alignItems: 'center',
+    },
+    sectionTitle: {
+      fontSize: 12,
+      fontWeight: '700',
+      letterSpacing: 0.5,
+      color: c.textTertiary,
+      marginBottom: 8,
+      marginLeft: 4,
     },
     note: {
       fontSize: 14,
@@ -156,6 +203,11 @@ const useStyles = makeStyles((c) =>
       fontSize: 16,
       fontWeight: '600',
       color: c.text,
+    },
+    role: {
+      marginTop: 2,
+      fontSize: 14,
+      color: c.primary,
     },
     contacts: {
       marginTop: 4,
