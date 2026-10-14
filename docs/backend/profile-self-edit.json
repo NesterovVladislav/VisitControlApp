@@ -1,0 +1,58 @@
+{
+  "baseline_manifest_sha256": "e50405f9976c0e7326efc81bf75f13f6e4ed1867e139bc345ed84560029734e4",
+  "patch_sha256": "a92deb92c535a0243f5e0e10436a82ce5567b234776b3bf9d6ec5ccc990d49ad",
+  "changed_files": [
+    {
+      "path": "docs/own-profile.md",
+      "baseline_sha256": null,
+      "release_sha256": "ff1c15b1fb0fd5f4b34389dd989162144dbfc650cd4dad7c85e465b603cb8921"
+    },
+    {
+      "path": "src/main/java/ru/dobrocode/visit/control/controller/ProfileController.java",
+      "baseline_sha256": "16514666d09e56be6cf2c865453b01b4591d5cf766decf960f41d286398d1556",
+      "release_sha256": "4ec353ec62a6efda0a5adca3bb9a2dc4e6bab4006630a9dca5afd8c04305c877"
+    },
+    {
+      "path": "src/main/java/ru/dobrocode/visit/control/dto/UpdateOwnProfileDto.java",
+      "baseline_sha256": "44730a902ad90b0a753c3bd6aa9d9656fcb3909a320893cccf43b3fbc1bd490e",
+      "release_sha256": "e383a19f86480c446845021be03153731cd3c49fb23c0c3b4360a01a162fafff"
+    },
+    {
+      "path": "src/main/java/ru/dobrocode/visit/control/entity/UserEntity.java",
+      "baseline_sha256": "5d2009f690a1e9586c7774eb18e356fc1a955e405ac6cfef1cd95738bce972c3",
+      "release_sha256": "da4f4c4f6799123c960b2348ed2f3bb292d003f3a0183955b4d14f89cad25add"
+    },
+    {
+      "path": "src/main/java/ru/dobrocode/visit/control/service/ProfileService.java",
+      "baseline_sha256": "6032dd5e4e8d6c5dd07cd81533531858b350baa37266dc7b72a72d052341d86e",
+      "release_sha256": "d72182b7feebaf4021d8359b5885f56a80c1f9e7c167e2892e70caca48dfa5d0"
+    },
+    {
+      "path": "src/main/java/ru/dobrocode/visit/control/service/impl/ProfileServiceImpl.java",
+      "baseline_sha256": "6d19433e034d9980f187e7a45dc988872961ff3a4d70aaab9d011610e481f69f",
+      "release_sha256": "9f850ef0782f316370b3b9bb1a2dcac4f98699329d65f0c311a8015bc55b4f8f"
+    },
+    {
+      "path": "src/test/java/ru/dobrocode/visit/control/ProfilePreviewLauncher.java",
+      "baseline_sha256": null,
+      "release_sha256": "fca29c1b2d03271ee92a64b1e27a8f276a48c71289f9b9976f724430c086f3ff"
+    },
+    {
+      "path": "src/test/java/ru/dobrocode/visit/control/controller/AdminOnlyAccessTest.java",
+      "baseline_sha256": "b4b2b05ac725ea8a7ac8c83ac827d9e466e80d1c2b6c44330c31011d214d1519",
+      "release_sha256": "3e0be5f21f6a238b1b037a91064f07d6002c22ef160fb8a38f53d45792952d62"
+    },
+    {
+      "path": "src/test/java/ru/dobrocode/visit/control/controller/ProfileSelfEditIntegrationTest.java",
+      "baseline_sha256": null,
+      "release_sha256": "9f3055fec762bd8a0dcfe2089c97cf37cb5881b1ea4a903741f43bba1599d3ce"
+    }
+  ],
+  "verification": {
+    "baseline": "366 tests / 0 failures / 1 existing skipped",
+    "profile_red": "8 behavioral failures, 0 errors",
+    "profile_green": "14 tests, 0 failures",
+    "verify": "BUILD SUCCESS; checkstyle and full suite passed"
+  },
+  "maven_test_jvm_args": "-Duser.language=en -Duser.country=US"
+}

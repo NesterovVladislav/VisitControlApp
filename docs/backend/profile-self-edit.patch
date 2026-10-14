@@ -1,0 +1,516 @@
+--- /dev/null
++++ b/docs/own-profile.md
+@@ -0,0 +1,21 @@
++# Свой профиль
++
++`PUT /user/me` сохраняет личные данные авторизованного пользователя сразу, без заявки или подтверждения.
++Адресат определяется по действующему токену; тело запроса не выбирает аккаунт.
++
++Разрешённые поля: `surname`, `first_name`, `patronymic`, `birth_date`, `phone`, `gender`.
++Email, роль, организация, статус, пароль, фотография и связи с детьми этим запросом не меняются.
++Отсутствующий или null `gender` сохраняет прежний пол для совместимости с клиентами до 1.0.3.
++Новый клиент передаёт `MALE` либо `FEMALE`.
++
++ФИО проверяется как при регистрации. Дата рождения обязательна, возраст от 16 до 100 лет.
++Телефон необязателен; заполненный — `+7` и десять цифр. Собственный прежний номер разрешён.
++Все поля сохраняются в одной транзакции; при ошибке записи изменения не применяются частично.
++
++Ответ: `200 UserDto`; ошибки: `400 VALIDATION`, `401` без действующей сессии,
++`409 PHONE_TAKEN` для номера другого действующего пользователя.
++
++Тест `ProfileSelfEditIntegrationTest` проверяет реальную авторизацию через `/token`, HTTP-запись,
++повторное чтение из отдельной H2-базы, поддерживаемые роли и неизменность прав аккаунта.
++`ProfilePreviewLauncher` находится в тестовом classpath и запускает только локальный стенд
++с вымышленными профилями. Основной серверный JAR не содержит этот помощник.
+--- a/src/main/java/ru/dobrocode/visit/control/controller/ProfileController.java
++++ b/src/main/java/ru/dobrocode/visit/control/controller/ProfileController.java
+@@ -22,8 +22,7 @@
+ import ru.dobrocode.visit.control.service.ProfileService;
+ 
+ /**
+- * Свой профиль. Менять личные данные сам может только администратор; остальные роли меняют их
+- * через администратора (заявка на изменение — в планах).
++ * Авторизованный пользователь меняет свои личные данные без подтверждения администратора.
+  */
+ @Validated
+ @CrossOrigin
+@@ -35,15 +34,15 @@
+     private final ProfileService profileService;
+ 
+     /**
+-     * Администратор меняет свои ФИО, дату рождения и телефон. Пользователь — из токена.
++     * Пользователь меняет свои ФИО, дату рождения, пол и телефон. Пользователь — из токена.
+      */
+     @PutMapping("/me")
+-    @PreAuthorize("hasAuthority('USER_WRITE')")
+-    @Operation(summary = "Изменить свои личные данные (только администратор)",
+-            description = "ФИО, дата рождения, телефон. Email и пол не меняются. Передаются все поля целиком.")
++    @PreAuthorize("isAuthenticated()")
++    @Operation(summary = "Изменить свои личные данные",
++            description = "ФИО, дата рождения, пол и телефон. Email и права аккаунта не меняются.")
+     @ApiResponse(responseCode = "200", description = "Пользователь после изменения")
+     @ApiResponse(responseCode = "400", description = "Ошибка входных данных")
+-    @ApiResponse(responseCode = "403", description = "Не администратор")
++    @ApiResponse(responseCode = "401", description = "Нет действующей сессии")
+     @ApiResponse(responseCode = "409", description = "PHONE_TAKEN — телефон занят другим пользователем")
+     public Mono<ResponseEntity<UserDto>> updateMe(
+             @AuthenticationPrincipal final UserDetails userDetails,
+--- a/src/main/java/ru/dobrocode/visit/control/dto/UpdateOwnProfileDto.java
++++ b/src/main/java/ru/dobrocode/visit/control/dto/UpdateOwnProfileDto.java
+@@ -10,12 +10,13 @@
+ import lombok.Builder;
+ import lombok.Data;
+ import lombok.NoArgsConstructor;
++import ru.dobrocode.visit.control.enums.Gender;
+ 
+ import java.time.LocalDate;
+ 
+ /**
+- * Личные данные, которые администратор меняет себе сам (PUT /user/me). Передаются все поля целиком.
+- * Email не меняется — это логин и subject токена; пол не меняется — колонка не обновляется.
++ * Личные данные текущего пользователя (PUT /user/me). Передаются все поля целиком.
++ * Email не меняется — это логин и subject токена. Старые клиенты могут не передавать пол.
+  * Проверки — как у заявки на регистрацию.
+  */
+ @Data
+@@ -59,6 +60,12 @@
+     private LocalDate birthDate;
+ 
+     /**
++     * Пол; null или отсутствие поля сохраняет прежнее значение для совместимости со старыми клиентами.
++     */
++    @JsonProperty("gender")
++    private Gender gender;
++
++    /**
+      * Телефон в формате +7XXXXXXXXXX; null — без телефона.
+      */
+     @Pattern(regexp = "^\\+7\\d{10}$", message = "Phone must be in format +7XXXXXXXXXX.")
+--- a/src/main/java/ru/dobrocode/visit/control/entity/UserEntity.java
++++ b/src/main/java/ru/dobrocode/visit/control/entity/UserEntity.java
+@@ -107,7 +107,7 @@
+      * Пол пользователя.
+      */
+     @Enumerated(EnumType.STRING)
+-    @Column(updatable = false)
++    @Column
+     private Gender gender;
+ 
+     /**
+--- a/src/main/java/ru/dobrocode/visit/control/service/ProfileService.java
++++ b/src/main/java/ru/dobrocode/visit/control/service/ProfileService.java
+@@ -4,12 +4,12 @@
+ import ru.dobrocode.visit.control.dto.UserDto;
+ 
+ /**
+- * Изменение своих личных данных. Сам меняет данные только администратор, остальные — через администратора.
++ * Непосредственное изменение личных данных текущего пользователя.
+  */
+ public interface ProfileService {
+ 
+     /**
+-     * Обновляет ФИО, дату рождения и телефон текущего пользователя.
++     * Обновляет ФИО, дату рождения, пол и телефон текущего пользователя.
+      *
+      * @param email  Email из токена.
+      * @param update Новые данные.
+--- a/src/main/java/ru/dobrocode/visit/control/service/impl/ProfileServiceImpl.java
++++ b/src/main/java/ru/dobrocode/visit/control/service/impl/ProfileServiceImpl.java
+@@ -18,13 +18,23 @@
+ import ru.dobrocode.visit.control.utils.ContactNormalizer;
+ import ru.dobrocode.visit.control.utils.LogMasking;
+ 
++import java.time.LocalDate;
++import java.time.Period;
++import java.util.List;
++import java.util.Map;
++
+ /**
+- * Администратор меняет свои личные данные сам.
++ * Авторизованный пользователь меняет свои личные данные сам.
+  */
+ @Slf4j
+ @Service
+ @RequiredArgsConstructor
+ public class ProfileServiceImpl implements ProfileService {
++
++    /** Минимальный возраст пользователя, как в клиентской форме. */
++    private static final int MIN_AGE = 16;
++    /** Максимальный возраст пользователя, как в клиентской форме. */
++    private static final int MAX_AGE = 100;
+ 
+     private final UserRepository userRepository;
+     private final UserMapper userMapper;
+@@ -37,6 +47,8 @@
+         UserEntity user = userRepository.findActiveByEmail(email)
+                 .orElseThrow(() -> new EntityNotFoundException("User not found: " + maskedEmail));
+ 
++        validateBirthDate(update.getBirthDate());
++
+         String phone = ContactNormalizer.normalizePhone(update.getPhone());
+         // Свой же номер — не конфликт; занятый другим живым пользователем — 409, как при регистрации
+         if (phone != null && userRepository.existsByPhoneAndStatusInAndIdNot(
+@@ -48,7 +60,21 @@
+         user.setFirstName(update.getFirstName().trim());
+         user.setPatronymic(StringUtils.isBlank(update.getPatronymic()) ? null : update.getPatronymic().trim());
+         user.setBirthDate(update.getBirthDate());
++        if (update.getGender() != null) {
++            user.setGender(update.getGender());
++        }
+         user.setPhone(phone);
+         return userMapper.mapToUserDto(userRepository.save(user));
+     }
++
++    /**
++     * Возраст проверяется как в форме профиля; ошибка относится к полю даты рождения.
++     */
++    private static void validateBirthDate(final LocalDate birthDate) {
++        int age = birthDate == null ? -1 : Period.between(birthDate, LocalDate.now()).getYears();
++        if (age < MIN_AGE || age > MAX_AGE) {
++            throw new ApiException(HttpStatus.BAD_REQUEST, ErrorCode.VALIDATION, "Invalid birth date",
++                    Map.of("errors", Map.of("birth_date", List.of("Возраст должен быть от 16 до 100 лет"))));
++        }
++    }
+ }
+--- /dev/null
++++ b/src/test/java/ru/dobrocode/visit/control/ProfilePreviewLauncher.java
+@@ -0,0 +1,93 @@
++package ru.dobrocode.visit.control;
++
++import org.springframework.boot.SpringApplication;
++import org.springframework.context.ConfigurableApplicationContext;
++import org.springframework.security.crypto.password.PasswordEncoder;
++import ru.dobrocode.visit.control.entity.OrganizationEntity;
++import ru.dobrocode.visit.control.entity.PermissionEntity;
++import ru.dobrocode.visit.control.entity.RoleEntity;
++import ru.dobrocode.visit.control.entity.UserEntity;
++import ru.dobrocode.visit.control.enums.EntityStatus;
++import ru.dobrocode.visit.control.enums.Gender;
++import ru.dobrocode.visit.control.enums.Permission;
++import ru.dobrocode.visit.control.repository.OrganizationRepository;
++import ru.dobrocode.visit.control.repository.PermissionRepository;
++import ru.dobrocode.visit.control.repository.RoleRepository;
++import ru.dobrocode.visit.control.repository.UserRepository;
++
++import java.time.LocalDate;
++import java.util.Arrays;
++import java.util.HashMap;
++import java.util.HashSet;
++import java.util.Map;
++import java.util.Set;
++import java.util.UUID;
++
++/** Test classpath only: real local API, synthetic accounts, no production database or outgoing mail. */
++public final class ProfilePreviewLauncher {
++    private ProfilePreviewLauncher() {
++    }
++
++    public static void main(final String[] args) {
++        SpringApplication app = new SpringApplication(VisitControlApplication.class);
++        ConfigurableApplicationContext context = app.run(
++                "--spring.profiles.active=test", "--server.address=127.0.0.1", "--server.port=5221",
++                "--spring.datasource.url=jdbc:h2:mem:profile-preview;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;NON_KEYWORDS=USER,VALUE;DB_CLOSE_DELAY=-1",
++                "--spring.datasource.username=sa", "--spring.datasource.password=",
++                "--spring.datasource.driverClassName=org.h2.Driver",
++                "--spring.jpa.database-platform=org.hibernate.dialect.H2Dialect",
++                "--spring.jpa.hibernate.ddl-auto=create-drop", "--spring.jpa.properties.hibernate.default_schema=public",
++                "--spring.jpa.show-sql=false", "--spring.liquibase.enabled=false",
++                "--auth.user.enabled=true", "--auth.user.tokenLivingTimeoutMs=3600000",
++                "--auth.user.secretKey=synthetic-preview-only-signing-key-000000000000000000",
++                "--visit.test-user.enabled=false", "--email.enabled=false",
++                "--management.health.mail.enabled=false", "--logging.level.root=ERROR");
++        PermissionRepository permissions = context.getBean(PermissionRepository.class);
++        Map<String, PermissionEntity> allPermissions = new HashMap<>();
++        Arrays.stream(Permission.values()).forEach(value -> {
++            PermissionEntity permission = new PermissionEntity();
++            permission.setName(value.name());
++            allPermissions.put(value.name(), permissions.save(permission));
++        });
++        OrganizationEntity garden = new OrganizationEntity();
++        garden.setExternalKey(UUID.randomUUID());
++        garden.setName("Демонстрационный сад");
++        garden.setTimeZone("Europe/Moscow");
++        garden.setStatus(EntityStatus.ACTIVE);
++        garden = context.getBean(OrganizationRepository.class).save(garden);
++        Map<String, Integer> levels = Map.of("PARENT", 10, "EMPLOYEE", 50, "ADMIN", 80,
++                "DIRECTOR", 90, "TECH_ADMIN", 100);
++        for (String name : new String[]{"PARENT", "EMPLOYEE", "ADMIN", "DIRECTOR", "TECH_ADMIN"}) {
++            RoleEntity role = new RoleEntity();
++            role.setExternalKey(UUID.randomUUID());
++            role.setName(name);
++            role.setLevel(levels.get(name));
++            Set<String> allowed = Set.of("USER_READ", "VISIT_READ", "VISIT_WRITE", "GROUP_READ", "BRANCH_READ",
++                    "CHILD_REPRESENTATIVE_READ", "CHILD_REPRESENTATIVE_WRITE");
++            if (Set.of("ADMIN", "DIRECTOR", "TECH_ADMIN").contains(name)) {
++                allowed = allPermissions.keySet();
++            } else if ("EMPLOYEE".equals(name)) {
++                allowed = new HashSet<>(allowed);
++                allowed.add("VISIT_CONFIRM");
++                allowed.add("PRESENCE_READ");
++            }
++            Set<PermissionEntity> grants = new HashSet<>();
++            allowed.forEach(permission -> grants.add(allPermissions.get(permission)));
++            role.setPermissions(grants);
++            role = context.getBean(RoleRepository.class).save(role);
++            UserEntity user = new UserEntity();
++            user.setExternalKey(UUID.randomUUID());
++            user.setEmail(name.toLowerCase(java.util.Locale.ROOT) + "@example.test");
++            user.setSurname("Демо");
++            user.setFirstName("Анна");
++            user.setBirthDate(LocalDate.of(1990, 3, 14));
++            user.setGender(Gender.FEMALE);
++            user.setRole(role);
++            user.setStatus("ACTIVE");
++            user.setOrganization("TECH_ADMIN".equals(name) ? null : garden);
++            user.setPassword(context.getBean(PasswordEncoder.class).encode("synthetic-preview-password"));
++            context.getBean(UserRepository.class).save(user);
++        }
++        System.out.println("Synthetic preview ready on 127.0.0.1:5221; test classpath only");
++    }
++}
+--- a/src/test/java/ru/dobrocode/visit/control/controller/AdminOnlyAccessTest.java
++++ b/src/test/java/ru/dobrocode/visit/control/controller/AdminOnlyAccessTest.java
+@@ -10,7 +10,7 @@
+ import static org.assertj.core.api.Assertions.assertThat;
+ 
+ /**
+- * Создавать людей, разбирать заявки на регистрацию и менять свои личные данные может только администратор
++ * Создавать людей и разбирать заявки на регистрацию может только администратор
+  * (USER_WRITE).
+  * У сотрудника (EMPLOYEE) этого права нет: он видит весь сад, но ничего не создаёт и не одобряет.
+  */
+@@ -23,7 +23,6 @@
+             "ru.dobrocode.visit.control.controller.PeopleController, getRosterPdf",
+             "ru.dobrocode.visit.control.controller.GroupController, putChildInGroup",
+             "ru.dobrocode.visit.control.controller.GroupController, removeChildFromGroup",
+-            "ru.dobrocode.visit.control.controller.ProfileController, updateMe",
+             "ru.dobrocode.visit.control.controller.UserController, resetPassword",
+             "ru.dobrocode.visit.control.controller.UserController, getRoles",
+             "ru.dobrocode.visit.control.controller.UserController, changeRole",
+--- /dev/null
++++ b/src/test/java/ru/dobrocode/visit/control/controller/ProfileSelfEditIntegrationTest.java
+@@ -0,0 +1,224 @@
++package ru.dobrocode.visit.control.controller;
++
++import org.junit.jupiter.api.BeforeEach;
++import org.junit.jupiter.api.Test;
++import org.junit.jupiter.params.ParameterizedTest;
++import org.junit.jupiter.params.provider.ValueSource;
++import org.springframework.beans.factory.annotation.Autowired;
++import org.springframework.boot.test.context.SpringBootTest;
++import org.springframework.boot.test.web.server.LocalServerPort;
++import org.springframework.http.MediaType;
++import org.springframework.security.crypto.password.PasswordEncoder;
++import org.springframework.test.web.reactive.server.WebTestClient;
++import ru.dobrocode.visit.control.entity.OrganizationEntity;
++import ru.dobrocode.visit.control.entity.PermissionEntity;
++import ru.dobrocode.visit.control.entity.RoleEntity;
++import ru.dobrocode.visit.control.entity.UserEntity;
++import ru.dobrocode.visit.control.enums.EntityStatus;
++import ru.dobrocode.visit.control.enums.Gender;
++import ru.dobrocode.visit.control.repository.OrganizationRepository;
++import ru.dobrocode.visit.control.repository.PermissionRepository;
++import ru.dobrocode.visit.control.repository.RoleRepository;
++import ru.dobrocode.visit.control.repository.UserRepository;
++
++import java.time.Duration;
++import java.time.LocalDate;
++import java.util.HashMap;
++import java.util.Map;
++import java.util.Set;
++import java.util.UUID;
++
++import static org.assertj.core.api.Assertions.assertThat;
++
++/** Real HTTP authentication, authorization and database persistence on a separate synthetic H2 database. */
++@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = {
++        "spring.datasource.url=jdbc:h2:mem:profile-self-edit;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;NON_KEYWORDS=USER,VALUE;DB_CLOSE_DELAY=-1",
++        "spring.datasource.username=sa", "spring.datasource.password=",
++        "spring.datasource.driverClassName=org.h2.Driver", "spring.jpa.database-platform=org.hibernate.dialect.H2Dialect",
++        "spring.jpa.hibernate.ddl-auto=create-drop", "spring.jpa.properties.hibernate.default_schema=public",
++        "spring.liquibase.enabled=false", "auth.user.enabled=true",
++        "spring.jpa.show-sql=false",
++        "auth.user.secretKey=synthetic-profile-test-signing-key-0000000000000000",
++        "auth.user.tokenLivingTimeoutMs=3600000", "visit.test-user.enabled=false",
++        "email.enabled=false", "management.health.mail.enabled=false", "logging.level.root=ERROR"
++})
++class ProfileSelfEditIntegrationTest {
++
++    private static final String PASSWORD = "synthetic-profile-password";
++    @LocalServerPort
++    private int port;
++    @Autowired
++    private UserRepository users;
++    @Autowired
++    private RoleRepository roles;
++    @Autowired
++    private PermissionRepository permissions;
++    @Autowired
++    private OrganizationRepository organizations;
++    @Autowired
++    private PasswordEncoder encoder;
++    private WebTestClient client;
++    private UserEntity actor;
++
++    @BeforeEach
++    void prepareClient() {
++        client = WebTestClient.bindToServer().baseUrl("http://127.0.0.1:" + port)
++                .responseTimeout(Duration.ofSeconds(10)).build();
++    }
++
++    @ParameterizedTest
++    @ValueSource(strings = {"PARENT", "EMPLOYEE", "ADMIN", "DIRECTOR", "TECH_ADMIN"})
++    void everyRoleSavesOwnProfileImmediately(final String role) {
++        actor = createUser(role, null);
++        update(body()).expectStatus().isOk().expectBody()
++                .jsonPath("$.surname").isEqualTo("Новая")
++                .jsonPath("$.gender").isEqualTo("MALE")
++                .jsonPath("$.role.role").isEqualTo(role);
++        // Every repository read has a new persistence context; this catches updatable=false on gender.
++        UserEntity saved = reloadActor();
++        assertThat(saved.getSurname()).isEqualTo("Новая");
++        assertThat(saved.getFirstName()).isEqualTo("Мария");
++        assertThat(saved.getPatronymic()).isNull();
++        assertThat(saved.getGender()).isEqualTo(Gender.MALE);
++        assertThat(saved.getBirthDate()).isEqualTo(LocalDate.of(1990, 3, 14));
++        assertThat(saved.getRole().getName()).isEqualTo(role);
++    }
++
++    @Test
++    void cannotSelectAnotherUserOrChangeAccountPrivileges() {
++        actor = createUser("PARENT", null);
++        UserEntity other = createUser("PARENT", null);
++        String originalPassword = actor.getPassword();
++        Long originalOrganization = actor.getOrganization().getId();
++        Map<String, Object> request = body();
++        request.put("external_key", other.getExternalKey().toString());
++        request.put("email", other.getEmail());
++        request.put("role", Map.of("role", "TECH_ADMIN", "external_key", UUID.randomUUID().toString()));
++        request.put("organization", Map.of("external_key", UUID.randomUUID().toString()));
++        request.put("status", "BLOCKED");
++        request.put("password", "replacement-password");
++        update(request).expectStatus().isOk();
++        UserEntity saved = reloadActor();
++        assertThat(saved.getEmail()).isEqualTo(actor.getEmail());
++        assertThat(saved.getRole().getName()).isEqualTo("PARENT");
++        assertThat(saved.getOrganization().getId()).isEqualTo(originalOrganization);
++        assertThat(saved.getStatus()).isEqualTo("ACTIVE");
++        assertThat(saved.getPassword()).isEqualTo(originalPassword);
++        assertThat(users.findById(other.getId()).orElseThrow().getSurname()).isEqualTo("Исходная");
++    }
++
++    @Test
++    void anonymousRequestDoesNotSave() {
++        actor = createUser("PARENT", null);
++        client.put().uri("/user/me").contentType(MediaType.APPLICATION_JSON).bodyValue(body())
++                .exchange().expectStatus().isUnauthorized();
++        assertThat(reloadActor().getSurname()).isEqualTo("Исходная");
++    }
++
++    @Test
++    void oldClientWithoutGenderPreservesGenderAndOwnPhone() {
++        actor = createUser("ADMIN", "+70000000001");
++        Map<String, Object> request = body();
++        request.remove("gender");
++        request.put("phone", actor.getPhone());
++        update(request).expectStatus().isOk();
++        assertThat(reloadActor().getGender()).isEqualTo(Gender.FEMALE);
++        assertThat(reloadActor().getPhone()).isEqualTo("+70000000001");
++    }
++
++    @Test
++    void takenPhoneDoesNotPartiallySave() {
++        actor = createUser("ADMIN", null);
++        createUser("PARENT", "+70000000002");
++        Map<String, Object> request = body();
++        request.put("phone", "+70000000002");
++        update(request).expectStatus().isEqualTo(409).expectBody().jsonPath("$.code").isEqualTo("PHONE_TAKEN");
++        assertThat(reloadActor().getSurname()).isEqualTo("Исходная");
++        assertThat(reloadActor().getGender()).isEqualTo(Gender.FEMALE);
++    }
++
++    @ParameterizedTest
++    @ValueSource(ints = {15, 101})
++    void invalidAdultAgeDoesNotSave(final int age) {
++        actor = createUser("ADMIN", null);
++        Map<String, Object> request = body();
++        request.put("birth_date", LocalDate.now().minusYears(age).toString());
++        update(request).expectStatus().isBadRequest().expectBody()
++                .jsonPath("$.code").isEqualTo("VALIDATION").jsonPath("$.errors.birth_date").exists();
++        assertThat(reloadActor().getSurname()).isEqualTo("Исходная");
++    }
++
++    @Test
++    void impossibleDateDoesNotSave() {
++        actor = createUser("ADMIN", null);
++        Map<String, Object> request = body();
++        request.put("birth_date", "1990-02-31");
++        update(request).expectStatus().isBadRequest();
++        assertThat(reloadActor().getSurname()).isEqualTo("Исходная");
++    }
++
++    private Map<String, Object> body() {
++        Map<String, Object> body = new HashMap<>();
++        body.put("surname", "Новая");
++        body.put("first_name", "Мария");
++        body.put("patronymic", null);
++        body.put("birth_date", "1990-03-14");
++        body.put("phone", null);
++        body.put("gender", "MALE");
++        return body;
++    }
++
++    private WebTestClient.ResponseSpec update(final Map<String, Object> body) {
++        Map<?, ?> login = client.post().uri("/token").contentType(MediaType.APPLICATION_JSON)
++                .bodyValue(Map.of("username", actor.getEmail(), "password", PASSWORD))
++                .exchange().expectStatus().isOk().expectBody(Map.class).returnResult().getResponseBody();
++        assertThat(login).isNotNull();
++        return client.put().uri("/user/me").headers(headers -> headers.setBearerAuth((String) login.get("access_token")))
++                .contentType(MediaType.APPLICATION_JSON).bodyValue(body).exchange();
++    }
++
++    private UserEntity reloadActor() {
++        return users.findById(actor.getId()).orElseThrow();
++    }
++
++    private UserEntity createUser(final String name, final String phone) {
++        RoleEntity role = roles.findByName(name).orElseGet(() -> {
++            RoleEntity fresh = new RoleEntity();
++            fresh.setExternalKey(UUID.randomUUID());
++            fresh.setName(name);
++            fresh.setLevel("TECH_ADMIN".equals(name) ? 100 : "ADMIN".equals(name) ? 80 : 10);
++            if (Set.of("ADMIN", "DIRECTOR", "TECH_ADMIN").contains(name)) {
++                PermissionEntity write = permissions.findAll().stream().filter(p -> "USER_WRITE".equals(p.getName()))
++                        .findFirst().orElseGet(() -> {
++                            PermissionEntity permission = new PermissionEntity();
++                            permission.setName("USER_WRITE");
++                            return permissions.save(permission);
++                        });
++                fresh.setPermissions(Set.of(write));
++            }
++            return roles.save(fresh);
++        });
++        OrganizationEntity organization = null;
++        if (!"TECH_ADMIN".equals(name)) {
++            organization = new OrganizationEntity();
++            organization.setExternalKey(UUID.randomUUID());
++            organization.setName("Синтетический сад");
++            organization.setTimeZone("Europe/Moscow");
++            organization.setStatus(EntityStatus.ACTIVE);
++            organization = organizations.save(organization);
++        }
++        UserEntity user = new UserEntity();
++        user.setExternalKey(UUID.randomUUID());
++        user.setEmail(UUID.randomUUID() + "@example.test");
++        user.setSurname("Исходная");
++        user.setFirstName("Анна");
++        user.setBirthDate(LocalDate.of(1988, 5, 12));
++        user.setGender(Gender.FEMALE);
++        user.setPhone(phone);
++        user.setPassword(encoder.encode(PASSWORD));
++        user.setStatus("ACTIVE");
++        user.setRole(role);
++        user.setOrganization(organization);
++        return users.save(user);
++    }
++}
