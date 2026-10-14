@@ -11,7 +11,6 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useAppDispatch, useAppSelector } from '../../store';
 import { logoutRequested } from '../../store/reducers/auth';
 import { refreshProfile } from '../../store/reducers/profile';
-import { isAdminRole } from '../../store/types/auth';
 import { canAddChild } from '../../utils/child-requests';
 import { getAppVersionLabel } from '../../utils/app-version';
 import { formatBirthDate, formatPhoneForDisplay, genderLabel } from '../../utils/profile-format';
@@ -57,7 +56,7 @@ function InfoCard({ title, rows }: { title: string; rows: Row[] }) {
 /**
  * Профиль: личные данные, свои дети и «Добавить ребёнка», смена пароля, тема оформления и выход.
  * См. docs/profile-screen.md.
- * Свои данные меняет сам только администратор (кнопка «Изменить»), остальные — через администратора.
+ * Все роли меняют свои данные сразу через кнопку «Изменить».
  */
 export default function ProfileScreen() {
   const c = usePalette();
@@ -86,8 +85,6 @@ export default function ProfileScreen() {
     return null;
   }
 
-  const canEdit = isAdminRole(user.role);
-
   return (
     <ScrollView
       style={styles.screen}
@@ -98,17 +95,15 @@ export default function ProfileScreen() {
     >
       <Stack.Screen
         options={{
-          headerRight: canEdit
-            ? () => (
-                <TouchableOpacity
-                  onPress={() => router.push('/profile/edit')}
-                  accessibilityRole="button"
-                  hitSlop={8}
-                >
-                  <Text style={styles.headerButton}>Изменить</Text>
-                </TouchableOpacity>
-              )
-            : undefined,
+          headerRight: () => (
+            <TouchableOpacity
+              onPress={() => router.push('/profile/edit')}
+              accessibilityRole="button"
+              hitSlop={8}
+            >
+              <Text style={styles.headerButton}>Изменить</Text>
+            </TouchableOpacity>
+          ),
         }}
       />
       {/* Свою фотографию меняет сам пользователь; у технического администратора сада и фотографии нет */}
@@ -139,13 +134,6 @@ export default function ProfileScreen() {
       />
 
       {canAddChild(user.role) ? <ProfileChildren /> : null}
-
-      {canEdit ? null : (
-        <Text style={styles.note}>
-          Изменить личные данные может только администратор сада после проверки. Если что-то указано неверно,
-          обратитесь к нему.
-        </Text>
-      )}
 
       <View style={styles.card}>
         <TouchableOpacity
@@ -245,14 +233,6 @@ const useStyles = makeStyles((c) =>
     headerButton: {
       color: c.primary,
       fontSize: 16,
-    },
-    note: {
-      fontSize: 13,
-      color: c.textSecondary,
-      lineHeight: 18,
-      marginTop: -4,
-      marginBottom: 20,
-      marginHorizontal: 4,
     },
     actionRow: {
       flexDirection: 'row',

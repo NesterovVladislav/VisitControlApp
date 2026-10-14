@@ -17,11 +17,12 @@ export interface PasswordForm {
 export interface ProfileState {
   /** Идёт обновление, запущенное жестом pull-to-refresh. */
   refreshing: boolean;
-  /** Изменение своих данных (только администратор) */
+  /** Непосредственное изменение своих данных. */
   saveStatus: 'idle' | 'saving' | 'saved';
-  saveFieldErrors: Partial<Record<'surname' | 'firstName' | 'patronymic' | 'birthDate' | 'phone', string>>;
+  saveFieldErrors: ProfileEditErrors;
   saveError: string | null;
   passwordStatus: 'idle' | 'submitting' | 'changed';
   passwordFieldErrors: PasswordFieldErrors;
   passwordError: string | null;
 }
+import type { ProfileEditErrors } from '../../utils/profile-edit';

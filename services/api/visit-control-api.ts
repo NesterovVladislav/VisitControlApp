@@ -808,7 +808,7 @@ class VisitControlApiClient {
   }
 
   /**
-   * Изменение своих личных данных — только администратор (PUT /user/me). Без ретраев: это запись.
+   * Непосредственное изменение своих личных данных (PUT /user/me). Без ретраев: это запись.
    */
   async updateMe(update: ProfileUpdate): Promise<User> {
     const dto = await this.put<UserDto, ProfileUpdate>('/user/me', update, { skipLogging: true });

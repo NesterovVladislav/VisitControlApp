@@ -9,6 +9,29 @@ type TestClient = { client: { defaults: { adapter?: AxiosAdapter } } };
 const client = (visitControlApi as unknown as TestClient).client;
 const originalAdapter = client.defaults.adapter;
 
+describe('own profile update contract', () => {
+  afterEach(() => { client.defaults.adapter = originalAdapter; clearAuthToken(); });
+
+  it('sends gender to the own-profile endpoint and maps the saved response', async () => {
+    const update = {
+      surname: 'Смирнова', first_name: 'Анна', patronymic: null, birth_date: '1990-03-14',
+      phone: null, gender: 'MALE' as const,
+    };
+    let sent: InternalAxiosRequestConfig | undefined;
+    client.defaults.adapter = async (config) => {
+      sent = config;
+      return { config, data: { ...update, external_key: 'parent-1', email: 'parent@example.test',
+        role: { role: 'PARENT' }, organization: null }, headers: {}, status: 200, statusText: 'OK' };
+    };
+    setAuthToken('synthetic-session-token');
+    const saved = await visitControlApi.updateMe(update);
+    expect(sent?.method).toBe('put');
+    expect(sent?.url).toBe('/user/me');
+    expect(JSON.parse(sent?.data)).toEqual(update);
+    expect(saved).toMatchObject({ id: 'parent-1', surname: 'Смирнова', gender: 'MALE', role: 'PARENT' });
+  });
+});
+
 function unauthorized(config: InternalAxiosRequestConfig): AxiosError {
   const response: AxiosResponse = {
     config,

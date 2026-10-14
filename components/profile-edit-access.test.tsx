@@ -68,13 +68,13 @@ describe('application version in the profile', () => {
   });
 });
 
-describe('who can change personal data', () => {
+describe('editing own personal data', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockUseAppDispatch.mockReturnValue(jest.fn());
   });
 
-  it.each(['ADMIN', 'DIRECTOR'])('lets %s open the edit screen', async (role) => {
+  it.each(['PARENT', 'EMPLOYEE', 'ADMIN', 'DIRECTOR', 'TECH_ADMIN'])('lets %s open the edit screen', async (role) => {
     const screen = await renderProfile(role);
     expect(mockHeaderRight).toBeDefined();
     expect(screen.queryByText(/Изменить личные данные может только администратор/)).toBeNull();
@@ -84,11 +84,6 @@ describe('who can change personal data', () => {
     expect(mockPush).toHaveBeenCalledWith('/profile/edit');
   });
 
-  it.each(['PARENT', 'EMPLOYEE'])('sends %s to the administrator instead', async (role) => {
-    const screen = await renderProfile(role);
-    expect(mockHeaderRight).toBeUndefined();
-    expect(screen.getByText(/Изменить личные данные может только администратор/)).toBeTruthy();
-  });
 });
 
 describe('own children in the profile', () => {

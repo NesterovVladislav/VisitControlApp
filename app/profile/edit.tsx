@@ -16,6 +16,7 @@ import {
 } from 'react-native';
 import CheckboxRow from '../../components/checkbox-row';
 import FormField from '../../components/form-field';
+import SegmentedControl from '../../components/segmented-control';
 import { useAppDispatch, useAppSelector } from '../../store';
 import { clearSaveFieldError, resetProfileSave, saveProfileStart } from '../../store/reducers/profile';
 import { formatDate, formatPhone } from '../../utils/input-masks';
@@ -32,8 +33,7 @@ import {
 import { makeStyles, usePalette } from '../../hooks/use-palette';
 
 /**
- * Изменение своих личных данных. Доступно только администратору: остальные меняют данные через
- * администратора (docs/profile-screen.md). Email и пол не меняются.
+ * Непосредственное изменение своих личных данных для всех ролей. Email остаётся логином.
  */
 export default function ProfileEditScreen() {
   const c = usePalette();
@@ -187,6 +187,14 @@ export default function ProfileEditScreen() {
           onSubmitEditing={() => phoneRef.current?.focus()}
           editable={!saving}
         />
+        <SegmentedControl
+          label="Пол"
+          options={[{ value: 'FEMALE' as const, label: 'Женский' }, { value: 'MALE' as const, label: 'Мужской' }]}
+          value={form.gender}
+          onChange={(gender) => update({ gender }, 'gender')}
+          error={errorFor('gender')}
+          disabled={saving}
+        />
         <FormField
           ref={phoneRef}
           label="Телефон"
@@ -221,6 +229,7 @@ export default function ProfileEditScreen() {
           onPress={save}
           disabled={!changed || saving}
           accessibilityRole="button"
+          accessibilityLabel="Сохранить"
           accessibilityState={{ disabled: !changed || saving, busy: saving }}
         >
           {saving ? <ActivityIndicator color={c.onPrimary} /> : <Text style={styles.buttonText}>Сохранить</Text>}

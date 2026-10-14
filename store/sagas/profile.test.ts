@@ -172,13 +172,14 @@ describe('userRefreshed', () => {
   });
 });
 
-describe('saving own profile (administrator only)', () => {
+describe('saving own profile', () => {
   const update = {
     surname: 'Смирнова',
     first_name: 'Мария',
     patronymic: null,
     birth_date: '1990-03-14',
     phone: '+79123456789',
+    gender: 'FEMALE' as const,
   };
 
   beforeEach(() => {
@@ -210,5 +211,17 @@ describe('saving own profile (administrator only)', () => {
     expect(toSaveProfileFailure(new ApiError('Forbidden', 403))).toEqual({ formError: SAVE_ERRORS.forbidden });
     const timeout = new ApiError('timeout', null, '', null, new AxiosError('timeout', 'ECONNABORTED'));
     expect(toSaveProfileFailure(timeout)).toEqual({ formError: SAVE_ERRORS.network });
+    expect(toSaveProfileFailure(timeout).formError).toContain('Изменения могли сохраниться');
+  });
+
+  it('drops a successful save that finished after switching accounts', async () => {
+    let resolve: ((value: typeof user) => void) | undefined;
+    mockApi.updateMe.mockImplementation(() => new Promise((done) => { resolve = done; }));
+    const state = { auth: { sessionEpoch: 1 } };
+    const { dispatched, done } = run(saveProfileSaga, state, saveProfileStart(update));
+    state.auth = { sessionEpoch: 2 };
+    resolve?.(user);
+    await done;
+    expect(dispatched).toEqual([]);
   });
 });
