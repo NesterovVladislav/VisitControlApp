@@ -2,7 +2,7 @@ import { ApiError } from '@/services/errors/api-error';
 import { HandoverResult } from '@/store/types/visits';
 import { linkLabel } from './people-format';
 
-/** Начало содержимого QR-кода Visit Control: по нему отличаем свой код от постороннего. */
+/** Начало содержимого QR-кода ДоброВхода: по нему отличаем свой код от постороннего. */
 export const HANDOVER_PREFIX = 'vc1:';
 
 export function isHandoverCode(data: string): boolean {

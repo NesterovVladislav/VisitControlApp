@@ -8,6 +8,8 @@
     "android": "expo run:android",
     "ios": "expo run:ios",
     "web": "expo start --web",
+    "build:web": "EXPO_PUBLIC_API_URL=/api expo export --platform web",
+    "serve:web": "node ./scripts/serve-web.js",
     "lint": "expo lint",
     "test": "jest",
     "test:ci": "jest --runInBand",

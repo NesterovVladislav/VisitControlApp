@@ -1,7 +1,8 @@
 import { useFocusEffect } from '@react-navigation/native';
 import { Stack, useRouter } from 'expo-router';
 import React, { useCallback } from 'react';
-import { Alert, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { RefreshControl } from '../../components/ui/refresh-control';
 import PhotoEditor from '@/components/photo-editor';
 import ProfileChildren from '@/components/profile-children';
 import ProfileSummary from '@/components/profile-summary';

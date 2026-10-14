@@ -40,6 +40,7 @@ import {
 import { GardenGroup, PeoplePage, PeopleQuery, Person } from '../../store/types/people';
 import { ProfileUpdate } from '../../utils/profile-edit';
 import { getAuthToken, notifyUnauthorized } from '../auth/auth-token';
+import { photoForm } from '../photos/photo-form';
 import { PrivacyPolicy, PublicOrganization, RegistrationRequest } from '../../store/types/registration';
 
 // DTO бэкенда в snake_case живут только здесь, наружу отдаются модели в camelCase.
@@ -82,13 +83,6 @@ function mapPhotoRequest(dto: PhotoRequestDto): PhotoRequest {
     reason: dto.decision_comment ?? null,
     applicantName: dto.applicant ? shortName(dto.applicant) : null,
   };
-}
-
-/** Файл для multipart в React Native: FormData принимает объект с адресом файла на устройстве. */
-function photoForm(uri: string): FormData {
-  const form = new FormData();
-  form.append('file', { uri, name: 'photo.jpg', type: 'image/jpeg' } as unknown as Blob);
-  return form;
 }
 
 const MULTIPART: RequestConfig = { headers: { 'Content-Type': 'multipart/form-data' }, skipLogging: true };
@@ -1001,7 +995,7 @@ class VisitControlApiClient {
    */
   async submitPhoto(uri: string, childId?: string): Promise<PhotoRequest> {
     const endpoint = childId ? `/user/me/children/${childId}/photo` : '/user/me/photo';
-    const dto = await this.put<PhotoRequestDto, FormData>(endpoint, photoForm(uri), MULTIPART);
+    const dto = await this.put<PhotoRequestDto, FormData>(endpoint, await photoForm(uri), MULTIPART);
     return mapPhotoRequest(dto);
   }
 

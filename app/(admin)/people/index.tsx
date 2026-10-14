@@ -5,7 +5,6 @@ import {
   Linking,
   Modal,
   Pressable,
-  RefreshControl,
   SectionList,
   StyleSheet,
   Text,
@@ -13,6 +12,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { RefreshControl } from '../../../components/ui/refresh-control';
 import SegmentedControl from '../../../components/segmented-control';
 import Avatar from '@/components/avatar';
 import { IconSymbol } from '../../../components/ui/icon-symbol';

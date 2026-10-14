@@ -14,6 +14,7 @@ import {
 import { useAppDispatch, useAppSelector } from '../store';
 import { clearError, loginStart } from '../store/reducers/auth';
 import { LoginCredentials } from '../store/types/auth';
+import InstallHint from '../components/install-hint';
 import OrganizationLogo from '../components/organization-logo';
 import { makeStyles, usePalette } from '../hooks/use-palette';
 
@@ -78,6 +79,8 @@ export default function AuthScreen() {
     <KeyboardAvoidingView style={styles.screen} behavior="padding">
       <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
         <View style={styles.form}>
+          {/* Только в браузере на iPhone; на телефоне и в установленном PWA — ничего */}
+          <InstallHint />
           {brand ? (
             <View style={styles.brand}>
               <OrganizationLogo key={brand.logoUrl} name={brand.name} logoUrl={brand.logoUrl} size={72} />

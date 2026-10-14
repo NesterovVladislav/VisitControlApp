@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "VisitControlApp",
+    "name": "ДоброВход",
     "slug": "VisitControlApp",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -12,14 +12,21 @@
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE"
+        "foregroundImage": "./assets/images/android-icon-foreground.png",
+        "monochromeImage": "./assets/images/android-icon-monochrome.png",
+        "backgroundColor": "#007AFF"
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
       "package": "com.dobrocode.visitcontrolapp"
     },
     "web": {
-      "output": "static"
+      "output": "single",
+      "lang": "ru",
+      "name": "ДоброВход",
+      "shortName": "ДоброВход",
+      "backgroundColor": "#f5f5f5",
+      "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
       "expo-router",
@@ -27,22 +34,22 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "Разрешите Visit Control доступ к фотографиям, чтобы выбрать фотографию для профиля",
-          "cameraPermission": "Разрешите Visit Control использовать камеру, чтобы сканировать QR-код родителя и сделать фотографию для профиля",
+          "photosPermission": "Разрешите приложению «ДоброВход» доступ к фотографиям, чтобы выбрать фотографию для профиля",
+          "cameraPermission": "Разрешите приложению «ДоброВход» использовать камеру, чтобы сканировать QR-код родителя и сделать фотографию для профиля",
           "microphonePermission": false
         }
       ],
       [
         "expo-camera",
         {
-          "cameraPermission": "Разрешите Visit Control использовать камеру, чтобы сканировать QR-код родителя",
+          "cameraPermission": "Разрешите приложению «ДоброВход» использовать камеру, чтобы сканировать QR-код родителя",
           "recordAudioAndroid": false
         }
       ],
       [
         "expo-local-authentication",
         {
-          "faceIDPermission": "Разрешите Visit Control использовать Face ID для входа в приложение"
+          "faceIDPermission": "Разрешите приложению «ДоброВход» использовать Face ID для входа в приложение"
         }
       ],
       [
@@ -61,6 +68,7 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    }
+    },
+    "icon": "./assets/images/icon.png"
   }
 }

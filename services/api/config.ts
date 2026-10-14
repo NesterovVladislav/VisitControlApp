@@ -1,3 +1,5 @@
+import { Platform } from 'react-native';
+
 /** Централизованная конфигурация API приложения. */
 export interface BackendConfig {
   host: string;
@@ -33,6 +35,11 @@ export function getBackendUrl(backendName: string): string {
     const insecureTestBuild =
       process.env.EXPO_PUBLIC_ALLOW_INSECURE_HTTP === '1';
     if (override) {
+      // PWA раздаётся с того же адреса, что и API (docs/pwa-ios.md): путь `/api` без домена.
+      // Домен и HTTPS тогда задаёт страница, а не сборка
+      if (Platform.OS === 'web' && override.startsWith('/')) {
+        return override;
+      }
       if (!__DEV__ && !override.startsWith('https://') && !insecureTestBuild) {
         throw new Error(
           'EXPO_PUBLIC_API_URL must be set to an HTTPS URL for release builds',

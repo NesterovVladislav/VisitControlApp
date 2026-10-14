@@ -74,7 +74,7 @@ export function promptForBiometricUnlock(): Promise<BiometricPromptResult> {
   if (inFlightPrompt) return inFlightPrompt;
 
   inFlightPrompt = LocalAuthentication.authenticateAsync({
-    promptMessage: 'Разблокировать Visit Control',
+    promptMessage: 'Разблокировать ДоброВход',
     cancelLabel: 'Использовать PIN',
     fallbackLabel: '',
     disableDeviceFallback: true,

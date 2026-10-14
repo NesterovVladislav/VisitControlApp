@@ -29,6 +29,16 @@ describe('API environment config', () => {
     expect(getBackendUrl('visitControlServer')).toBe('https://api.example.invalid/api');
   });
 
+  it('rejects a same-origin path outside the browser', () => {
+    Object.defineProperty(global, '__DEV__', { configurable: true, value: false });
+    delete process.env.EXPO_PUBLIC_ALLOW_INSECURE_HTTP;
+    process.env.EXPO_PUBLIC_API_URL = '/api';
+
+    expect(() => getBackendUrl('visitControlServer')).toThrow(
+      'EXPO_PUBLIC_API_URL must be set to an HTTPS URL for release builds',
+    );
+  });
+
   it('fails fast when a release build has no HTTPS API URL', () => {
     Object.defineProperty(global, '__DEV__', { configurable: true, value: false });
     delete process.env.EXPO_PUBLIC_API_URL;

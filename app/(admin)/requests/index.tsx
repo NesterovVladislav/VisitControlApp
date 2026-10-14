@@ -4,12 +4,12 @@ import React, { useCallback } from 'react';
 import {
   ActivityIndicator,
   FlatList,
-  RefreshControl,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native';
+import { RefreshControl } from '../../../components/ui/refresh-control';
 import ChildChangesList from '@/components/child-changes-list';
 import ChildRequestsList from '@/components/child-requests-list';
 import PhotoRequestsList from '@/components/photo-requests-list';

@@ -45,7 +45,7 @@ export default function QrScannerSheet({ visible, onScanned, onClose }: QrScanne
     }
     busy.current = true;
     if (!isHandoverCode(data)) {
-      setState({ kind: 'failed', message: 'Это не код Visit Control. Попросите родителя открыть QR-код ребёнка' });
+      setState({ kind: 'failed', message: 'Это не код ДоброВхода. Попросите родителя открыть QR-код ребёнка' });
       return;
     }
     setState({ kind: 'sending' });

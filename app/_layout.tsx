@@ -5,6 +5,7 @@ import 'react-native-reanimated';
 import { Provider } from 'react-redux';
 
 import { SessionGate } from '../components/session/session-gate';
+import { WebAlertHost } from '../components/web-alert-host';
 import { Palette, palettes } from '../constants/palette';
 import { useScheme } from '../hooks/use-palette';
 import { loadThemePreference } from '../services/theme/theme-preference';
@@ -43,6 +44,8 @@ export default function RootLayout() {
     <Provider store={store}>
       <ThemeProvider value={themes[scheme]}>
         <SessionGate />
+        {/* Только в браузере: там нет системного Alert. На телефоне — null */}
+        <WebAlertHost />
         <StatusBar style="auto" />
       </ThemeProvider>
     </Provider>

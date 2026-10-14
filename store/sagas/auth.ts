@@ -13,7 +13,12 @@ import {
   getBiometricCapability,
   promptForBiometricUnlock,
 } from '../../services/auth/biometrics';
+import {
+  BiometricEnrollmentError,
+  BiometricEnrollmentFailure,
+} from '../../services/auth/biometric-enrollment-error';
 import { ensureCurrentInstallation } from '../../services/auth/install-marker';
+import { usesPinLock } from '../../services/auth/session-policy';
 import {
   ProtectedSessionRecord,
   protectedSessionRepository,
@@ -23,6 +28,8 @@ import { loadChildrenStart } from '../reducers/children';
 import { ApiError } from '../../services/errors/api-error';
 import { RootState } from '../reducers';
 import {
+  biometricEnrollmentFailed,
+  biometricOfferRequired,
   bootstrapLocked,
   bootstrapPinSetupRequired,
   bootstrapSession,
@@ -60,7 +67,26 @@ export const AUTH_ERRORS = {
   biometricsFailed: 'Не удалось подтвердить биометрию. Используйте PIN-код',
   validationUnavailable: 'Не удалось проверить сессию. Проверьте интернет и повторите',
   expired: 'Сессия истекла. Войдите снова',
+  // Браузер: PIN-кода нет, запасной путь — вход по паролю (docs/pwa-ios.md)
+  webBiometricsUnavailable: 'Face ID сейчас недоступен. Войдите по email и паролю',
+  webBiometricsFailed: 'Не удалось подтвердить Face ID. Попробуйте ещё раз или войдите по паролю',
+  webEnrollmentConfirm: 'Нажмите «Включить» ещё раз, чтобы подтвердить Face ID',
+  webEnrollmentUnsupported: 'На этом устройстве быстрый вход недоступен. Нажмите «Не сейчас»',
+  webEnrollmentFailed: 'Не удалось включить быстрый вход. Попробуйте ещё раз или нажмите «Не сейчас»',
 } as const;
+
+function enrollmentErrorText(reason: BiometricEnrollmentFailure): string | null {
+  switch (reason) {
+    case 'cancelled':
+      return null;
+    case 'confirmationRequired':
+      return AUTH_ERRORS.webEnrollmentConfirm;
+    case 'unsupported':
+      return AUTH_ERRORS.webEnrollmentUnsupported;
+    default:
+      return AUTH_ERRORS.webEnrollmentFailed;
+  }
+}
 
 function toLoginError(error: unknown): string {
   if (!(error instanceof ApiError)) return AUTH_ERRORS.generic;
@@ -154,15 +180,28 @@ export function* loginSaga(action: PayloadAction<LoginCredentials>) {
   }
 
   setAuthToken(token);
+  let record: ProtectedSessionRecord;
   try {
-    yield call(
+    record = yield call(
       [protectedSessionRepository, protectedSessionRepository.beginSession],
       token,
     );
-    yield put(bootstrapPinSetupRequired());
+    if (usesPinLock) {
+      yield put(bootstrapPinSetupRequired());
+      return;
+    }
+    // Браузер: PIN нет. Face ID предлагаем, если он есть; иначе сразу в приложение
+    const capability: Awaited<ReturnType<typeof getBiometricCapability>> =
+      yield call(getBiometricCapability);
+    if (capability.available) {
+      yield put(biometricOfferRequired());
+      return;
+    }
   } catch {
     yield* failProtectedStorage();
+    return;
   }
+  yield* validateProtectedRecord(record);
 }
 
 export function* completePinSetupSaga(
@@ -190,7 +229,12 @@ export function* submitBiometricPreferenceSaga(
       action.payload.enabled,
     );
     yield* validateProtectedRecord(record);
-  } catch {
+  } catch (error) {
+    // Только в браузере: Face ID не включился, но сессия цела — можно повторить или отказаться
+    if (error instanceof BiometricEnrollmentError) {
+      yield put(biometricEnrollmentFailed(enrollmentErrorText(error.reason)));
+      return;
+    }
     yield* failProtectedStorage();
   }
 }
@@ -231,11 +275,15 @@ export function* unlockWithBiometricsSaga() {
   if (result.kind !== 'success') {
     const error = result.kind === 'cancelled'
       ? null
-      : result.kind === 'lockedOut'
-        ? AUTH_ERRORS.biometricsLockedOut
-        : result.kind === 'unavailable'
-          ? AUTH_ERRORS.biometricsUnavailable
-          : AUTH_ERRORS.biometricsFailed;
+      : !usesPinLock
+        ? (result.kind === 'unavailable'
+          ? AUTH_ERRORS.webBiometricsUnavailable
+          : AUTH_ERRORS.webBiometricsFailed)
+        : result.kind === 'lockedOut'
+          ? AUTH_ERRORS.biometricsLockedOut
+          : result.kind === 'unavailable'
+            ? AUTH_ERRORS.biometricsUnavailable
+            : AUTH_ERRORS.biometricsFailed;
     yield put(unlockFailed({ error }));
     return;
   }

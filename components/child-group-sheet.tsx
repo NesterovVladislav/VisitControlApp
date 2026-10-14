@@ -4,12 +4,12 @@ import {
   FlatList,
   Modal,
   Platform,
-  RefreshControl,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native';
+import { RefreshControl } from './ui/refresh-control';
 import { useVisitListStyles } from './visit-list';
 import { makeStyles, usePalette } from '../hooks/use-palette';
 import { visitControlApi } from '../services/api';
