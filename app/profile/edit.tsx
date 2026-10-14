@@ -166,6 +166,7 @@ export default function ProfileEditScreen() {
         <View style={styles.checkbox}>
           <CheckboxRow
             checked={form.noPatronymic}
+            accessibilityLabel="Нет отчества"
             onChange={(checked) => update({ noPatronymic: checked }, 'patronymic')}
             disabled={saving}
           >

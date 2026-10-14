@@ -49,6 +49,7 @@ export default function SegmentedControl<T extends string>({
               disabled={disabled}
               accessibilityRole="radio"
               accessibilityState={{ checked: selected, disabled }}
+              aria-checked={selected}
             >
               <Text style={[styles.segmentText, selected && styles.segmentTextSelected]}>
                 {option.label}

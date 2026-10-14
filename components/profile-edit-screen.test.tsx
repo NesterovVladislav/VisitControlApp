@@ -36,6 +36,7 @@ describe('own profile form', () => {
     const screen = await render(<ProfileEditScreen />);
     expect(screen.getByRole('button', { name: 'Сохранить' })).toBeDisabled();
     expect(screen.getByLabelText('Email')).toBeDisabled();
+    expect(screen.getByRole('checkbox', { name: 'Нет отчества' })).toBeChecked();
     await fireEvent.press(screen.getByRole('radio', { name: 'Мужской' }));
     await fireEvent.press(screen.getByRole('button', { name: 'Сохранить' }));
     expect(dispatch).toHaveBeenCalledWith(saveProfileStart({
