@@ -13,6 +13,7 @@ import { logoutRequested } from '../../store/reducers/auth';
 import { refreshProfile } from '../../store/reducers/profile';
 import { isAdminRole } from '../../store/types/auth';
 import { canAddChild } from '../../utils/child-requests';
+import { getAppVersionLabel } from '../../utils/app-version';
 import { formatBirthDate, formatPhoneForDisplay, genderLabel } from '../../utils/profile-format';
 import { makeStyles, usePalette } from '../../hooks/use-palette';
 import { useThemePreference } from '../../hooks/use-theme-preference';
@@ -170,6 +171,7 @@ export default function ProfileScreen() {
           <Text style={styles.logout}>Выйти</Text>
         </TouchableOpacity>
       </View>
+      <Text style={styles.version} selectable>{getAppVersionLabel()}</Text>
     </ScrollView>
   );
 }
@@ -265,6 +267,13 @@ const useStyles = makeStyles((c) =>
     logout: {
       fontSize: 16,
       color: c.danger,
+    },
+    version: {
+      fontSize: 13,
+      lineHeight: 18,
+      color: c.textSecondary,
+      textAlign: 'center',
+      marginBottom: 4,
     },
   })
 );

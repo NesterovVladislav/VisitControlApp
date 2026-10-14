@@ -12,6 +12,7 @@ jest.mock('../store', () => ({
   useAppSelector: jest.fn(),
 }));
 jest.mock('@/components/ui/icon-symbol', () => ({ IconSymbol: () => null }));
+jest.mock('../utils/app-version', () => ({ getAppVersionLabel: () => 'Версия 1.0.2 · сборка 3' }));
 jest.mock('@react-navigation/native', () => ({ useFocusEffect: jest.fn() }));
 jest.mock('expo-router', () => ({
   useRouter: () => ({ push: mockPush }),
@@ -54,6 +55,18 @@ function renderProfile(role: string, state: { children?: object[]; childRequests
   );
   return render(<ProfileScreen />);
 }
+
+describe('application version in the profile', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockUseAppDispatch.mockReturnValue(jest.fn());
+  });
+
+  it.each(['PARENT', 'EMPLOYEE', 'ADMIN', 'DIRECTOR', 'TECH_ADMIN'])('shows a copyable version for %s', async (role) => {
+    const screen = await renderProfile(role);
+    expect(screen.getByText('Версия 1.0.2 · сборка 3').props.selectable).toBe(true);
+  });
+});
 
 describe('who can change personal data', () => {
   beforeEach(() => {
