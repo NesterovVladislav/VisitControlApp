@@ -83,6 +83,24 @@ export interface PasswordReset {
   message: string | null;
 }
 
+/** Деактивация (POST /user/{key}/deactivate): 'done' — пользователь отключён и убран из списка. */
+export interface PersonDeactivation {
+  personId: string;
+  status: 'pending' | 'done' | 'failed';
+  message: string | null;
+}
+
+/** Роль, которую директор назначает сотруднику: «Сделать администратором» / «Сделать сотрудником». */
+export type StaffRole = 'ADMIN' | 'EMPLOYEE';
+
+/** Смена роли (PATCH /user/{key}/role): 'done' — роль в списке уже обновлена. */
+export interface RoleChange {
+  personId: string;
+  role: StaffRole;
+  status: 'pending' | 'done' | 'failed';
+  message: string | null;
+}
+
 export interface PeopleState {
   query: PeopleQuery;
   items: Person[];
@@ -97,6 +115,10 @@ export interface PeopleState {
   requestId: number;
   /** Сброс пароля человеку из списка; null — сброса нет или результат уже показан */
   passwordReset: PasswordReset | null;
+  /** Деактивация человека из списка; null — нет или результат уже показан */
+  deactivation: PersonDeactivation | null;
+  /** Смена роли человека из списка; null — нет или результат уже показан */
+  roleChange: RoleChange | null;
   filterOptions: {
     status: LoadStatus;
     groups: GardenGroup[];

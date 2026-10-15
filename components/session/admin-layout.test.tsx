@@ -114,7 +114,7 @@ describe('administrator route authorization', () => {
       mode: 'admin',
     });
 
-    for (const tab of ['visits', 'requests', 'garden', 'people/index', 'more/index']) {
+    for (const tab of ['visits', 'requests', 'garden', 'people', 'more/index']) {
       expect(screen.getByText(tab)).toBeTruthy();
     }
     expect(dispatch).toHaveBeenCalledWith(expect.objectContaining({ type: 'requests/loadRequestsStart' }));
@@ -134,7 +134,7 @@ describe('administrator route authorization', () => {
     expect(screen.getByText('more/index')).toBeTruthy();
     expect(screen.queryByText('requests')).toBeNull();
     expect(screen.queryByText('garden')).toBeNull();
-    expect(screen.queryByText('people/index')).toBeNull();
+    expect(screen.queryByText('people')).toBeNull();
     expect(dispatch).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'requests/loadRequestsStart' }));
     // Очередь отметок нужна и сотруднику: по ней число на вкладке «Посещение»
     expect(dispatch).toHaveBeenCalledWith(expect.objectContaining({ type: 'visitQueue/openQueue' }));

@@ -2,11 +2,33 @@ import { runSaga } from 'redux-saga';
 
 import { visitControlApi } from '../../services/api';
 import { ApiError } from '../../services/errors/api-error';
-import { loadPeopleFailure, loadPeopleSuccess, resetPersonPassword, resetPersonPasswordFinished } from '../reducers/people';
-import { PASSWORD_RESET_ERRORS, loadFirstPageSaga, loadMoreSaga, resetPasswordSaga } from './people';
+import {
+  changePersonRole,
+  changePersonRoleFinished,
+  deactivatePerson,
+  deactivatePersonFinished,
+  loadPeopleFailure,
+  loadPeopleSuccess,
+  resetPersonPassword,
+  resetPersonPasswordFinished,
+} from '../reducers/people';
+import {
+  DEACTIVATION_ERRORS,
+  ROLE_CHANGE_ERRORS,
+  changeRoleSaga,
+  PASSWORD_RESET_ERRORS,
+  deactivateSaga,
+  loadFirstPageSaga,
+  loadMoreSaga,
+  resetPasswordSaga,
+} from './people';
 
 jest.mock('../../services/api', () => ({
-  visitControlApi: { getPeople: jest.fn(), getGroups: jest.fn(), getBranches: jest.fn(), resetPassword: jest.fn() },
+  visitControlApi: { getPeople: jest.fn(), getGroups: jest.fn(), getBranches: jest.fn(), resetPassword: jest.fn(),
+    deactivateUser: jest.fn(),
+    getAssignableRoles: jest.fn(),
+    changeUserRole: jest.fn(),
+  },
 }));
 
 const mockApi = visitControlApi as jest.Mocked<typeof visitControlApi>;
@@ -88,6 +110,40 @@ describe('people saga', () => {
     await expired.done;
     expect(expired.dispatched).toEqual([
       resetPersonPasswordFinished({ personId: 'a', status: 'failed', message: null }),
+    ]);
+  });
+
+  it('deactivates a user and explains a refusal', async () => {
+    mockApi.deactivateUser.mockResolvedValue(undefined);
+    const done = run(() => deactivateSaga(deactivatePerson('a')), {});
+    await done.done;
+    expect(mockApi.deactivateUser).toHaveBeenCalledWith('a');
+    expect(done.dispatched).toEqual([deactivatePersonFinished({ personId: 'a', status: 'done', message: null })]);
+
+    mockApi.deactivateUser.mockRejectedValue(new ApiError('Conflict', 409));
+    const failed = run(() => deactivateSaga(deactivatePerson('a')), {});
+    await failed.done;
+    expect(failed.dispatched).toEqual([
+      deactivatePersonFinished({ personId: 'a', status: 'failed', message: DEACTIVATION_ERRORS.inactive }),
+    ]);
+  });
+
+  it('assigns the role by its key from the assignable roles', async () => {
+    mockApi.getAssignableRoles.mockResolvedValue([{ id: 'r-admin', name: 'ADMIN' }, { id: 'r-emp', name: 'EMPLOYEE' }]);
+    mockApi.changeUserRole.mockResolvedValue(undefined);
+    const ok = run(() => changeRoleSaga(changePersonRole({ personId: 'ivan', role: 'ADMIN' })), {});
+    await ok.done;
+    expect(mockApi.changeUserRole).toHaveBeenCalledWith('ivan', 'r-admin');
+    expect(ok.dispatched).toEqual([changePersonRoleFinished({ personId: 'ivan', role: 'ADMIN', status: 'done', message: null })]);
+  });
+
+  it('refuses when the role cannot be assigned', async () => {
+    mockApi.getAssignableRoles.mockResolvedValue([{ id: 'r-emp', name: 'EMPLOYEE' }]);
+    const refused = run(() => changeRoleSaga(changePersonRole({ personId: 'ivan', role: 'ADMIN' })), {});
+    await refused.done;
+    expect(mockApi.changeUserRole).not.toHaveBeenCalled();
+    expect(refused.dispatched).toEqual([
+      changePersonRoleFinished({ personId: 'ivan', role: 'ADMIN', status: 'failed', message: ROLE_CHANGE_ERRORS.forbidden }),
     ]);
   });
 });

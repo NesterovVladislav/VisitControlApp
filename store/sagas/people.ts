@@ -13,8 +13,13 @@ import {
   loadPeopleSuccess,
   resetPersonPassword,
   resetPersonPasswordFinished,
+  deactivatePerson,
+  deactivatePersonFinished,
+  changePersonRole,
+  changePersonRoleFinished,
 } from '../reducers/people';
-import { GardenGroup, PeoplePage, PeopleState } from '../types/people';
+import { GardenGroup, PeoplePage, PeopleState, StaffRole } from '../types/people';
+import { AssignableRole } from '../types/requests';
 import { Branch } from '../types/visits';
 
 const selectSessionEpoch = (state: RootState) => state.auth.sessionEpoch;
@@ -119,6 +124,105 @@ export function* resetPasswordSaga(action: PayloadAction<string>) {
   }
 }
 
+export const DEACTIVATION_ERRORS = {
+  self: 'Свою учётную запись деактивировать нельзя.',
+  forbidden: 'Деактивировать можно только пользователя с ролью ниже вашей.',
+  notFound: 'Пользователь не найден. Обновите список.',
+  inactive: 'Пользователь уже не активен. Обновите список.',
+  network: 'Нет связи с сервером. Пользователь не деактивирован, попробуйте ещё раз.',
+  generic: 'Не удалось деактивировать пользователя. Попробуйте ещё раз.',
+};
+
+/** Текст ошибки деактивации; null — сообщение не нужно (401: приложение само выходит из аккаунта). */
+export function toDeactivationError(error: unknown): string | null {
+  if (!(error instanceof ApiError)) {
+    return DEACTIVATION_ERRORS.generic;
+  }
+  if (error.isNetworkError || error.isTimeoutError) {
+    return DEACTIVATION_ERRORS.network;
+  }
+  switch (error.status) {
+    case 401:
+      return null;
+    case 400:
+      return DEACTIVATION_ERRORS.self;
+    case 403:
+      return DEACTIVATION_ERRORS.forbidden;
+    case 404:
+      return DEACTIVATION_ERRORS.notFound;
+    case 409:
+      return DEACTIVATION_ERRORS.inactive;
+    default:
+      return DEACTIVATION_ERRORS.generic;
+  }
+}
+
+export function* deactivateSaga(action: PayloadAction<string>) {
+  const personId = action.payload;
+  const sessionEpoch: number = yield select(selectSessionEpoch);
+  try {
+    yield call([visitControlApi, visitControlApi.deactivateUser], personId);
+    if (!(yield* isCurrentSession(sessionEpoch))) return;
+    yield put(deactivatePersonFinished({ personId, status: 'done', message: null }));
+  } catch (error) {
+    if (!(yield* isCurrentSession(sessionEpoch))) return;
+    console.warn('[People Saga] Deactivation failed', error instanceof ApiError ? error.status : 'unknown');
+    yield put(deactivatePersonFinished({ personId, status: 'failed', message: toDeactivationError(error) }));
+  }
+}
+
+export const ROLE_CHANGE_ERRORS = {
+  forbidden: 'Назначать и снимать администраторов может только директор.',
+  notFound: 'Пользователь не найден. Обновите список.',
+  inactive: 'Пользователь не активен. Обновите список.',
+  network: 'Нет связи с сервером. Роль не изменена, попробуйте ещё раз.',
+  generic: 'Не удалось изменить роль. Попробуйте ещё раз.',
+};
+
+/** Текст ошибки смены роли; null — сообщение не нужно (401: приложение само выходит из аккаунта). */
+export function toRoleChangeError(error: unknown): string | null {
+  if (!(error instanceof ApiError)) {
+    return ROLE_CHANGE_ERRORS.generic;
+  }
+  if (error.isNetworkError || error.isTimeoutError) {
+    return ROLE_CHANGE_ERRORS.network;
+  }
+  switch (error.status) {
+    case 401:
+      return null;
+    case 403:
+      return ROLE_CHANGE_ERRORS.forbidden;
+    case 404:
+      return ROLE_CHANGE_ERRORS.notFound;
+    case 409:
+      return ROLE_CHANGE_ERRORS.inactive;
+    default:
+      return ROLE_CHANGE_ERRORS.generic;
+  }
+}
+
+export function* changeRoleSaga(action: PayloadAction<{ personId: string; role: StaffRole }>) {
+  const { personId, role } = action.payload;
+  const sessionEpoch: number = yield select(selectSessionEpoch);
+  try {
+    // Ключи ролей в каждой базе свои: берём из ролей, которые текущий пользователь может назначить
+    const roles: AssignableRole[] = yield call([visitControlApi, visitControlApi.getAssignableRoles]);
+    const target = roles.find((item) => item.name === role);
+    if (!target) {
+      if (!(yield* isCurrentSession(sessionEpoch))) return;
+      yield put(changePersonRoleFinished({ personId, role, status: 'failed', message: ROLE_CHANGE_ERRORS.forbidden }));
+      return;
+    }
+    yield call([visitControlApi, visitControlApi.changeUserRole], personId, target.id);
+    if (!(yield* isCurrentSession(sessionEpoch))) return;
+    yield put(changePersonRoleFinished({ personId, role, status: 'done', message: null }));
+  } catch (error) {
+    if (!(yield* isCurrentSession(sessionEpoch))) return;
+    console.warn('[People Saga] Role change failed', error instanceof ApiError ? error.status : 'unknown');
+    yield put(changePersonRoleFinished({ personId, role, status: 'failed', message: toRoleChangeError(error) }));
+  }
+}
+
 export function* watchPeople() {
   // takeLatest: при быстром наборе в поиске нужен только ответ на последний запрос
   yield takeLatest(loadPeople.type, loadFirstPageSaga);
@@ -127,4 +231,6 @@ export function* watchPeople() {
   yield takeLeading(loadPeopleFilters.type, loadFiltersSaga);
   // takeLeading: повторное нажатие, пока идёт сброс, второе письмо не отправляет
   yield takeLeading(resetPersonPassword.type, resetPasswordSaga);
+  yield takeLeading(deactivatePerson.type, deactivateSaga);
+  yield takeLeading(changePersonRole.type, changeRoleSaga);
 }

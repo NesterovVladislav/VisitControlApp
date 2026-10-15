@@ -1332,6 +1332,20 @@ class VisitControlApiClient {
   }
 
   /**
+   * Смена роли пользователя: новые права действуют сразу. Ключ роли — из GET /user/roles.
+   */
+  async changeUserRole(userId: string, roleId: string): Promise<void> {
+    await this.patch(`/user/${userId}/role`, { role_external_key: roleId });
+  }
+
+  /**
+   * Деактивация пользователя администратором: войти нельзя, из «Людей» пропадает.
+   */
+  async deactivateUser(userId: string): Promise<void> {
+    await this.post(`/user/${userId}/deactivate`);
+  }
+
+  /**
    * Привязка ребёнка к взрослому администратором. Роль связи — по имени: ключи ролей в каждой базе свои.
    */
   async linkChild(childId: string, representativeId: string, linkRole: LinkRole): Promise<void> {
