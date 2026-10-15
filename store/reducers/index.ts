@@ -13,6 +13,7 @@ import gardenReducer from './garden';
 import groupPeopleReducer from './group-people';
 import organizationReducer from './organization';
 import photosReducer from './photos';
+import childLinkReducer from './child-link';
 
 // Здесь будут импортироваться и объединяться все reducers
 const rootReducer = combineReducers({
@@ -30,6 +31,7 @@ const rootReducer = combineReducers({
   groupPeople: groupPeopleReducer,
   organization: organizationReducer,
   photos: photosReducer,
+  childLink: childLinkReducer,
   // Пример: visits: visitsReducer,
 });
 

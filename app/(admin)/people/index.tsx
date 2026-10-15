@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   Linking,
   Modal,
@@ -15,11 +16,26 @@ import {
 import { RefreshControl } from '../../../components/ui/refresh-control';
 import SegmentedControl from '../../../components/segmented-control';
 import Avatar from '@/components/avatar';
+import LinkChildSheet from '../../../components/link-child-sheet';
 import { IconSymbol } from '../../../components/ui/icon-symbol';
 import { LoadState, useVisitListStyles } from '../../../components/visit-list';
 import { useAppDispatch, useAppSelector } from '../../../store';
-import { loadMorePeople, loadPeople, loadPeopleFilters } from '../../../store/reducers/people';
-import { GardenGroup, PeopleCategory, PeopleGroupFilter, Person } from '../../../store/types/people';
+import {
+  clearPasswordReset,
+  loadMorePeople,
+  loadPeople,
+  loadPeopleFilters,
+  resetPersonPassword,
+} from '../../../store/reducers/people';
+import { openChildLink } from '../../../store/reducers/child-link';
+import { isAdminRole, outranks } from '../../../store/types/auth';
+import {
+  GardenGroup,
+  PasswordReset,
+  PeopleCategory,
+  PeopleGroupFilter,
+  Person,
+} from '../../../store/types/people';
 import {
   childSubtitle,
   countLabel,
@@ -42,14 +58,17 @@ const SEARCH_DELAY_MS = 300;
 /**
  * Вкладка «Люди»: дети, родители и сотрудники сада из GET /user/people (docs/admin-screens.md, «Люди»).
  * Поиск общий для всех групп и сохраняется при переключении. Карточек и создания людей пока нет.
+ * Администратор сбрасывает пароль родителю или сотруднику кнопкой 🔑 в строке, с подтверждением,
+ * и привязывает ко взрослому ребёнка сада кнопкой 🔗.
  */
 export default function PeopleScreen() {
   const c = usePalette();
   const styles = useStyles();
   const visitListStyles = useVisitListStyles();
   const dispatch = useAppDispatch();
-  const { query, items, total, status, refreshing, last, loadingMore, loadMoreFailed, filterOptions } =
+  const { query, items, total, status, refreshing, last, loadingMore, loadMoreFailed, filterOptions, passwordReset } =
     useAppSelector((state) => state.people);
+  const viewer = useAppSelector((state) => state.auth.user);
   const [text, setText] = useState(query.q);
   const [filterOpen, setFilterOpen] = useState(false);
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -64,6 +83,43 @@ export default function PeopleScreen() {
   }, [dispatch]);
 
   useEffect(() => () => cancelSearch(), []);
+
+  // Результат сброса пароля — диалогом, один раз
+  useEffect(() => {
+    if (!passwordReset || passwordReset.status === 'pending') {
+      return;
+    }
+    const message = passwordResetMessage(passwordReset);
+    if (message) {
+      Alert.alert(message.title, message.text);
+    }
+    dispatch(clearPasswordReset());
+  }, [passwordReset, dispatch]);
+
+  function canResetPassword(person: Person): boolean {
+    return (
+      query.category !== 'CHILD' &&
+      !!viewer &&
+      isAdminRole(viewer.role) &&
+      person.id !== viewer.id &&
+      !!person.email &&
+      outranks(viewer.role, person.role)
+    );
+  }
+
+  const canLinkChild = query.category !== 'CHILD' && isAdminRole(viewer?.role);
+
+  function confirmResetPassword(person: Person) {
+    Alert.alert(
+      'Сбросить пароль?',
+      `${personName(person)} получит новый пароль на ${person.email}. Старый пароль перестанет работать.`,
+      [
+        { text: 'Отмена', style: 'cancel' },
+        { text: 'Сбросить', style: 'destructive', onPress: () => dispatch(resetPersonPassword(person.id)) },
+      ],
+      { cancelable: true }
+    );
+  }
 
   function cancelSearch() {
     if (searchTimer.current) {
@@ -170,6 +226,10 @@ export default function PeopleScreen() {
               showBranch={showBranch}
               first={index === 0}
               last={index === items.length - 1}
+              canResetPassword={canResetPassword(item)}
+              resettingPassword={passwordReset?.personId === item.id && passwordReset.status === 'pending'}
+              onResetPassword={() => confirmResetPassword(item)}
+              onLinkChild={canLinkChild ? () => dispatch(openChildLink(item)) : null}
             />
           )}
           onEndReached={loadMore}
@@ -190,6 +250,8 @@ export default function PeopleScreen() {
         onSelect={selectGroupFilter}
         onClose={() => setFilterOpen(false)}
       />
+
+      <LinkChildSheet showBranch={showBranch} />
     </View>
   );
 }
@@ -205,18 +267,44 @@ function groupFilterLabel(filter: PeopleGroupFilter): string {
   }
 }
 
+/** Текст диалога с результатом сброса пароля; null — показывать нечего. */
+function passwordResetMessage(reset: PasswordReset): { title: string; text?: string } | null {
+  switch (reset.status) {
+    case 'sent':
+      return { title: 'Пароль сброшен', text: 'Новый пароль отправлен на email пользователя.' };
+    case 'notSent':
+      return {
+        title: 'Пароль сброшен, но письмо не отправлено',
+        text: 'Старый пароль уже не работает. Сбросьте пароль ещё раз, чтобы отправить письмо повторно.',
+      };
+    case 'failed':
+      return reset.message ? { title: 'Пароль не сброшен', text: reset.message } : null;
+    default:
+      return null;
+  }
+}
+
 function PersonRow({
   person,
   category,
   showBranch,
   first,
   last,
+  canResetPassword,
+  resettingPassword,
+  onResetPassword,
+  onLinkChild,
 }: {
   person: Person;
   category: PeopleCategory;
   showBranch: boolean;
   first: boolean;
   last: boolean;
+  canResetPassword: boolean;
+  resettingPassword: boolean;
+  onResetPassword: () => void;
+  /** null — кнопки привязки ребёнка нет */
+  onLinkChild: (() => void) | null;
 }) {
   const c = usePalette();
   const styles = useStyles();
@@ -248,9 +336,33 @@ function PersonRow({
           </Text>
         ) : null}
       </View>
+      {onLinkChild ? (
+        <TouchableOpacity
+          style={styles.action}
+          onPress={onLinkChild}
+          accessibilityRole="button"
+          accessibilityLabel={`Привязать ребёнка: ${personName(person)}`}
+          hitSlop={8}
+        >
+          <IconSymbol name="link" size={20} color={c.primary} />
+        </TouchableOpacity>
+      ) : null}
+      {resettingPassword ? (
+        <ActivityIndicator style={styles.action} color={c.textTertiary} accessibilityLabel="Сбрасываем пароль" />
+      ) : canResetPassword ? (
+        <TouchableOpacity
+          style={styles.action}
+          onPress={onResetPassword}
+          accessibilityRole="button"
+          accessibilityLabel={`Сбросить пароль: ${personName(person)}`}
+          hitSlop={8}
+        >
+          <IconSymbol name="key.fill" size={20} color={c.primary} />
+        </TouchableOpacity>
+      ) : null}
       {phone ? (
         <TouchableOpacity
-          style={styles.call}
+          style={styles.action}
           onPress={() => Linking.openURL(`tel:${phone}`)}
           accessibilityRole="button"
           accessibilityLabel={`Позвонить: ${personName(person)}`}
@@ -446,7 +558,7 @@ const useStyles = makeStyles((c) =>
       borderWidth: 1.5,
       borderColor: c.iconMuted,
     },
-    call: {
+    action: {
       marginLeft: 12,
       padding: 6,
     },

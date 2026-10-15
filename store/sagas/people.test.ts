@@ -1,11 +1,12 @@
 import { runSaga } from 'redux-saga';
 
 import { visitControlApi } from '../../services/api';
-import { loadPeopleFailure, loadPeopleSuccess } from '../reducers/people';
-import { loadFirstPageSaga, loadMoreSaga } from './people';
+import { ApiError } from '../../services/errors/api-error';
+import { loadPeopleFailure, loadPeopleSuccess, resetPersonPassword, resetPersonPasswordFinished } from '../reducers/people';
+import { PASSWORD_RESET_ERRORS, loadFirstPageSaga, loadMoreSaga, resetPasswordSaga } from './people';
 
 jest.mock('../../services/api', () => ({
-  visitControlApi: { getPeople: jest.fn(), getGroups: jest.fn(), getBranches: jest.fn() },
+  visitControlApi: { getPeople: jest.fn(), getGroups: jest.fn(), getBranches: jest.fn(), resetPassword: jest.fn() },
 }));
 
 const mockApi = visitControlApi as jest.Mocked<typeof visitControlApi>;
@@ -62,5 +63,31 @@ describe('people saga', () => {
     resolve?.(page);
     await stale.done;
     expect(stale.dispatched).toEqual([]);
+  });
+
+  const reset = () => resetPasswordSaga(resetPersonPassword('a'));
+
+  it('reports whether the new password email was sent', async () => {
+    mockApi.resetPassword.mockResolvedValue(false);
+    const { dispatched, done } = run(reset, {});
+    await done;
+    expect(mockApi.resetPassword).toHaveBeenCalledWith('a');
+    expect(dispatched).toEqual([resetPersonPasswordFinished({ personId: 'a', status: 'notSent', message: null })]);
+  });
+
+  it('explains why the password was not reset', async () => {
+    mockApi.resetPassword.mockRejectedValue(new ApiError('Forbidden', 403));
+    const forbidden = run(reset, {});
+    await forbidden.done;
+    expect(forbidden.dispatched).toEqual([
+      resetPersonPasswordFinished({ personId: 'a', status: 'failed', message: PASSWORD_RESET_ERRORS.forbidden }),
+    ]);
+
+    mockApi.resetPassword.mockRejectedValue(new ApiError('Unauthorized', 401));
+    const expired = run(reset, {});
+    await expired.done;
+    expect(expired.dispatched).toEqual([
+      resetPersonPasswordFinished({ personId: 'a', status: 'failed', message: null }),
+    ]);
   });
 });

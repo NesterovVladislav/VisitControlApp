@@ -2,17 +2,17 @@
   "expo": {
     "name": "ДоброВход",
     "slug": "VisitControlApp",
-    "version": "1.0.3",
+    "version": "1.0.5",
     "orientation": "portrait",
     "scheme": "visitcontrolapp",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "buildNumber": "4",
+      "buildNumber": "6",
       "supportsTablet": true
     },
     "android": {
-      "versionCode": 4,
+      "versionCode": 6,
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/android-icon-foreground.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png",

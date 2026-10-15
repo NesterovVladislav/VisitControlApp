@@ -1,5 +1,5 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
-import { GardenGroup, PeoplePage, PeopleQuery, PeopleState } from '../types/people';
+import { GardenGroup, PasswordReset, PeoplePage, PeopleQuery, PeopleState } from '../types/people';
 import { logoutCompleted } from './auth';
 
 const initialState: PeopleState = {
@@ -13,6 +13,7 @@ const initialState: PeopleState = {
   loadingMore: false,
   loadMoreFailed: false,
   requestId: 0,
+  passwordReset: null,
   filterOptions: { status: 'idle', groups: [], branches: [] },
 };
 
@@ -111,6 +112,25 @@ const peopleSlice = createSlice({
         state.filterOptions.status = 'failed';
       }
     },
+
+    /** Администратор подтвердил «Сбросить пароль»; пока идёт один сброс, второй не начинаем. */
+    resetPersonPassword: (state, action: PayloadAction<string>) => {
+      if (state.passwordReset?.status === 'pending') {
+        return;
+      }
+      state.passwordReset = { personId: action.payload, status: 'pending', message: null };
+    },
+    resetPersonPasswordFinished: (state, action: PayloadAction<PasswordReset>) => {
+      if (state.passwordReset?.personId === action.payload.personId) {
+        state.passwordReset = action.payload;
+      }
+    },
+    /** Результат сброса показан. */
+    clearPasswordReset: (state) => {
+      if (state.passwordReset?.status !== 'pending') {
+        state.passwordReset = null;
+      }
+    },
   },
   extraReducers: (builder) => {
     // Телефоны и email людей сада не должны пережить выход из аккаунта
@@ -126,5 +146,8 @@ export const {
   loadPeopleFilters,
   loadPeopleFiltersSuccess,
   loadPeopleFiltersFailure,
+  resetPersonPassword,
+  resetPersonPasswordFinished,
+  clearPasswordReset,
 } = peopleSlice.actions;
 export default peopleSlice.reducer;

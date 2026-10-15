@@ -37,7 +37,7 @@ import {
   RegistrationRequestsPage,
   RegistrationRequestView,
 } from '../../store/types/requests';
-import { GardenGroup, PeoplePage, PeopleQuery, Person } from '../../store/types/people';
+import { GardenGroup, LinkRole, PeoplePage, PeopleQuery, Person } from '../../store/types/people';
 import { ProfileUpdate } from '../../utils/profile-edit';
 import { getAuthToken, notifyUnauthorized } from '../auth/auth-token';
 import { photoForm } from '../photos/photo-form';
@@ -1329,6 +1329,17 @@ class VisitControlApiClient {
   async resetPassword(userId: string): Promise<boolean> {
     const result = await this.post<{ password_sent: boolean }>(`/user/${userId}/password/reset`);
     return result.password_sent;
+  }
+
+  /**
+   * Привязка ребёнка к взрослому администратором. Роль связи — по имени: ключи ролей в каждой базе свои.
+   */
+  async linkChild(childId: string, representativeId: string, linkRole: LinkRole): Promise<void> {
+    await this.post('/child-representative', {
+      child_external_key: childId,
+      representative_external_key: representativeId,
+      role: { role: linkRole },
+    });
   }
 
   /**

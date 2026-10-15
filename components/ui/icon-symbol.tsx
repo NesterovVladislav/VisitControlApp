@@ -27,6 +27,8 @@ const MAPPING = {
   'eye': 'visibility',
   'eye.slash': 'visibility-off',
   'phone.fill': 'phone',
+  'key.fill': 'vpn-key',
+  'link': 'link',
   'magnifyingglass': 'search',
   'xmark.circle.fill': 'cancel',
   'chevron.down': 'expand-more',

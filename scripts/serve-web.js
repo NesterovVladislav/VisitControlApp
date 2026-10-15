@@ -2,22 +2,24 @@
 /**
  * Проверка PWA на компьютере (docs/pwa-ios.md, «Проверка в Chrome на компьютере»).
  *
- * Раздаёт веб-сборку из dist/ и пересылает /api на стенд — как Caddy на сервере, только локально.
+ * Раздаёт веб-сборку из dist/ и пересылает /api на API — как Caddy на app.dobrovhod.ru, только локально.
  * Адрес localhost браузер считает защищённым, поэтому WebAuthn (Face ID) и service worker работают
  * без HTTPS.
  *
  *   npm run build:web
- *   npm run serve:web            # http://localhost:8099, API — стенд
+ *   npm run serve:web            # http://localhost:8099, API — https://core.dobrovhod.ru/api
  *   API_TARGET=http://localhost:8080 PORT=3000 npm run serve:web
  */
 const fs = require('fs');
 const http = require('http');
+const https = require('https');
 const path = require('path');
 
 const root = path.resolve(__dirname, '..', 'dist');
 const port = Number(process.env.PORT || 8099);
-// Бэкенд без префикса /api: на стенде его снимает Caddy, здесь — этот скрипт
-const apiTarget = new URL(process.env.API_TARGET || 'http://93.77.168.178/api');
+// Адрес API с префиксом /api, как его видят клиенты; префикс страницы /api заменяется на путь из адреса
+const apiTarget = new URL(process.env.API_TARGET || 'https://core.dobrovhod.ru/api');
+const apiClient = apiTarget.protocol === 'https:' ? https : http;
 
 const types = {
   '.html': 'text/html; charset=utf-8',
@@ -36,10 +38,10 @@ if (!fs.existsSync(path.join(root, 'index.html'))) {
 
 function proxyApi(req, res, pathname, search) {
   const targetPath = `${apiTarget.pathname.replace(/\/$/, '')}${pathname.replace(/^\/api/, '')}${search}`;
-  const upstream = http.request(
+  const upstream = apiClient.request(
     {
       hostname: apiTarget.hostname,
-      port: apiTarget.port || 80,
+      port: apiTarget.port || (apiTarget.protocol === 'https:' ? 443 : 80),
       path: targetPath,
       method: req.method,
       headers: { ...req.headers, host: apiTarget.host },

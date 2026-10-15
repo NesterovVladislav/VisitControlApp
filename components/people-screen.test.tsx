@@ -1,9 +1,10 @@
 import { act, fireEvent, render } from '@testing-library/react-native';
-import { Linking } from 'react-native';
+import { Alert, Linking } from 'react-native';
 
 import PeopleScreen from '../app/(admin)/people';
 import { useAppDispatch, useAppSelector } from '../store';
-import { loadPeople } from '../store/reducers/people';
+import { loadPeople, resetPersonPassword } from '../store/reducers/people';
+import { openChildLink } from '../store/reducers/child-link';
 import { PeopleState, Person } from '../store/types/people';
 
 jest.mock('../store', () => ({
@@ -29,7 +30,7 @@ const base: Omit<Person, 'id' | 'firstName'> = {
   children: null,
 };
 
-function givenPeople(people: Partial<PeopleState>) {
+function givenPeople(people: Partial<PeopleState>, viewerRole = 'ADMIN') {
   const state: PeopleState = {
     query: { category: 'CHILD', q: '', groupFilter: { kind: 'all' } },
     items: [],
@@ -41,10 +42,13 @@ function givenPeople(people: Partial<PeopleState>) {
     loadingMore: false,
     loadMoreFailed: false,
     requestId: 1,
+    passwordReset: null,
     filterOptions: { status: 'loaded', groups: [], branches: [{ id: 'b1', name: 'Центральный' }] },
     ...people,
   };
-  mockUseAppSelector.mockImplementation((selector) => selector({ people: state } as never));
+  const auth = { user: { id: 'me', role: viewerRole } };
+  const childLink = { adult: null, q: '', candidates: [], status: 'idle', requestId: 0, link: null };
+  mockUseAppSelector.mockImplementation((selector) => selector({ people: state, auth, childLink } as never));
   return state;
 }
 
@@ -130,5 +134,73 @@ describe('PeopleScreen', () => {
     givenPeople({ query: { category: 'PARENT', q: 'Иваноа', groupFilter: { kind: 'all' } } });
     const screen = await render(<PeopleScreen />);
     expect(screen.getByText('Никого не нашли по запросу «Иваноа»')).toBeTruthy();
+  });
+
+  const staff = (role: string): Person => ({
+    ...base,
+    id: role,
+    firstName: role,
+    role,
+    email: `${role}@example.com`,
+  });
+
+  it('resets the password of a lower role only after confirmation', async () => {
+    const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    givenPeople({
+      query: { category: 'STAFF', q: '', groupFilter: { kind: 'all' } },
+      total: 2,
+      items: [staff('EMPLOYEE'), staff('ADMIN')],
+    });
+    const screen = await render(<PeopleScreen />);
+
+    expect(screen.queryByLabelText('Сбросить пароль: Иванова ADMIN')).toBeNull();
+    await fireEvent.press(screen.getByLabelText('Сбросить пароль: Иванова EMPLOYEE'));
+    expect(dispatch).not.toHaveBeenCalledWith(resetPersonPassword('EMPLOYEE'));
+
+    const buttons = alert.mock.calls[0][2]!;
+    expect(alert.mock.calls[0][1]).toContain('EMPLOYEE@example.com');
+    buttons.find((button) => button.text === 'Сбросить')!.onPress!();
+    expect(dispatch).toHaveBeenCalledWith(resetPersonPassword('EMPLOYEE'));
+  });
+
+  it('does not offer a password reset to employees', async () => {
+    givenPeople({
+      query: { category: 'PARENT', q: '', groupFilter: { kind: 'all' } },
+      total: 1,
+      items: [staff('PARENT')],
+    }, 'EMPLOYEE');
+    const screen = await render(<PeopleScreen />);
+    expect(screen.queryByLabelText('Сбросить пароль: Иванова PARENT')).toBeNull();
+  });
+
+  it('shows the reset result once', async () => {
+    const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    givenPeople({ passwordReset: { personId: 'p1', status: 'sent', message: null } });
+    await render(<PeopleScreen />);
+    expect(alert).toHaveBeenCalledWith('Пароль сброшен', 'Новый пароль отправлен на email пользователя.');
+    expect(dispatch).toHaveBeenCalledWith({ type: 'people/clearPasswordReset' });
+  });
+
+  it('opens child linking for an adult, but not for children or employees', async () => {
+    givenPeople({
+      query: { category: 'PARENT', q: '', groupFilter: { kind: 'all' } },
+      total: 1,
+      items: [staff('PARENT')],
+    });
+    const screen = await render(<PeopleScreen />);
+    await fireEvent.press(screen.getByLabelText('Привязать ребёнка: Иванова PARENT'));
+    expect(dispatch).toHaveBeenCalledWith(openChildLink(staff('PARENT')));
+
+    givenPeople({ total: 1, items: [{ ...base, id: 'c1', firstName: 'Мария', role: 'VISITOR' }] });
+    const children = await render(<PeopleScreen />);
+    expect(children.queryByLabelText('Привязать ребёнка: Иванова Мария')).toBeNull();
+
+    givenPeople({
+      query: { category: 'PARENT', q: '', groupFilter: { kind: 'all' } },
+      total: 1,
+      items: [staff('PARENT')],
+    }, 'EMPLOYEE');
+    const employee = await render(<PeopleScreen />);
+    expect(employee.queryByLabelText('Привязать ребёнка: Иванова PARENT')).toBeNull();
   });
 });

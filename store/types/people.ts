@@ -11,6 +11,9 @@ export interface PersonGroup {
   branchName: string | null;
 }
 
+/** Кем взрослый приходится ребёнку: роль связи «ребёнок — представитель». */
+export type LinkRole = 'PARENT' | 'RELATIVE' | 'ACQUAINTANCE';
+
 /** Ребёнок в строке родителя: «мама: Мария». */
 export interface PersonChild {
   id: string;
@@ -70,6 +73,16 @@ export interface GardenGroup {
   branchId: string | null;
 }
 
+/**
+ * Сброс пароля (POST /user/{key}/password/reset): 'sent' — письмо ушло, 'notSent' — пароль сменён,
+ * но письмо не ушло, 'failed' — пароль не сменён, причина в message.
+ */
+export interface PasswordReset {
+  personId: string;
+  status: 'pending' | 'sent' | 'notSent' | 'failed';
+  message: string | null;
+}
+
 export interface PeopleState {
   query: PeopleQuery;
   items: Person[];
@@ -82,6 +95,8 @@ export interface PeopleState {
   loadMoreFailed: boolean;
   /** Номер запроса первой страницы: ответ на устаревший запрос отбрасывается */
   requestId: number;
+  /** Сброс пароля человеку из списка; null — сброса нет или результат уже показан */
+  passwordReset: PasswordReset | null;
   filterOptions: {
     status: LoadStatus;
     groups: GardenGroup[];
