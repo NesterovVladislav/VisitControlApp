@@ -3,6 +3,7 @@ import { createApiClient, setupAuthToken } from './client';
 import { RequestConfig, ApiResponse } from './types';
 import { ApiError } from '../errors/api-error';
 import { retryRequest, createRetryConfig } from './retry';
+import { requestSessionProfile } from './session-validation';
 import { LoginCredentials, User } from '../../store/types/auth';
 import { Child, ChildGroup, ChildVisit } from '../../store/types/children';
 import { OrganizationBrand } from '../../store/types/organization';
@@ -800,9 +801,8 @@ class VisitControlApiClient {
    * Текущий пользователь по токену.
    */
   async getMe(): Promise<User> {
-    const dto = await retryRequest(
-      () => this.get<UserDto>('/user', { skipLogging: true }),
-      createRetryConfig(2, 500)
+    const dto = await requestSessionProfile(
+      (config) => this.get<UserDto>('/user', { ...config, skipLogging: true })
     );
     return mapUser(dto);
   }
