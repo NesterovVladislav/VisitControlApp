@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { useRouter } from 'expo-router';
 import {
   ActivityIndicator,
   FlatList,
@@ -41,13 +42,15 @@ const SEARCH_DELAY_MS = 300;
 
 /**
  * Вкладка «Люди»: дети, родители и сотрудники сада из GET /user/people (docs/admin-screens.md, «Люди»).
- * Поиск общий для всех групп и сохраняется при переключении. Карточек и создания людей пока нет.
+ * Поиск общий для всех групп и сохраняется при переключении. Нажатие на строку открывает карточку
+ * человека (`[id].tsx`) со всеми действиями. Создания людей пока нет.
  */
 export default function PeopleScreen() {
   const c = usePalette();
   const styles = useStyles();
   const visitListStyles = useVisitListStyles();
   const dispatch = useAppDispatch();
+  const router = useRouter();
   const { query, items, total, status, refreshing, last, loadingMore, loadMoreFailed, filterOptions } =
     useAppSelector((state) => state.people);
   const [text, setText] = useState(query.q);
@@ -170,6 +173,7 @@ export default function PeopleScreen() {
               showBranch={showBranch}
               first={index === 0}
               last={index === items.length - 1}
+              onOpen={() => router.push({ pathname: '/people/[id]', params: { id: item.id } })}
             />
           )}
           onEndReached={loadMore}
@@ -211,12 +215,14 @@ function PersonRow({
   showBranch,
   first,
   last,
+  onOpen,
 }: {
   person: Person;
   category: PeopleCategory;
   showBranch: boolean;
   first: boolean;
   last: boolean;
+  onOpen: () => void;
 }) {
   const c = usePalette();
   const styles = useStyles();
@@ -230,7 +236,12 @@ function PersonRow({
   const phone = category === 'CHILD' ? null : person.phone;
 
   return (
-    <View style={[visitListStyles.row, first && visitListStyles.rowFirst, last && visitListStyles.rowLast]}>
+    <TouchableOpacity
+      style={[visitListStyles.row, first && visitListStyles.rowFirst, last && visitListStyles.rowLast]}
+      onPress={onOpen}
+      accessibilityRole="button"
+      accessibilityLabel={`Открыть карточку: ${personName(person)}`}
+    >
       {category === 'CHILD' ? (
         <View
           style={[visitListStyles.dot, person.present ? visitListStyles.dotIn : styles.dotAway]}
@@ -250,7 +261,7 @@ function PersonRow({
       </View>
       {phone ? (
         <TouchableOpacity
-          style={styles.call}
+          style={styles.action}
           onPress={() => Linking.openURL(`tel:${phone}`)}
           accessibilityRole="button"
           accessibilityLabel={`Позвонить: ${personName(person)}`}
@@ -259,7 +270,8 @@ function PersonRow({
           <IconSymbol name="phone.fill" size={20} color={c.primary} />
         </TouchableOpacity>
       ) : null}
-    </View>
+      <IconSymbol name="chevron.right" size={20} color={c.iconMuted} style={styles.chevron} />
+    </TouchableOpacity>
   );
 }
 
@@ -446,7 +458,10 @@ const useStyles = makeStyles((c) =>
       borderWidth: 1.5,
       borderColor: c.iconMuted,
     },
-    call: {
+    chevron: {
+      marginLeft: 8,
+    },
+    action: {
       marginLeft: 12,
       padding: 6,
     },

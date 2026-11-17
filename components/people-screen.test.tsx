@@ -11,6 +11,8 @@ jest.mock('../store', () => ({
   useAppSelector: jest.fn(),
 }));
 jest.mock('../components/ui/icon-symbol', () => ({ IconSymbol: () => null }));
+const mockPush = jest.fn();
+jest.mock('expo-router', () => ({ useRouter: () => ({ push: mockPush }) }));
 
 const mockUseAppDispatch = useAppDispatch as jest.MockedFunction<typeof useAppDispatch>;
 const mockUseAppSelector = useAppSelector as jest.MockedFunction<typeof useAppSelector>;
@@ -29,7 +31,7 @@ const base: Omit<Person, 'id' | 'firstName'> = {
   children: null,
 };
 
-function givenPeople(people: Partial<PeopleState>) {
+function givenPeople(people: Partial<PeopleState>, viewerRole = 'ADMIN') {
   const state: PeopleState = {
     query: { category: 'CHILD', q: '', groupFilter: { kind: 'all' } },
     items: [],
@@ -41,10 +43,15 @@ function givenPeople(people: Partial<PeopleState>) {
     loadingMore: false,
     loadMoreFailed: false,
     requestId: 1,
+    passwordReset: null,
+    deactivation: null,
+    roleChange: null,
     filterOptions: { status: 'loaded', groups: [], branches: [{ id: 'b1', name: 'Центральный' }] },
     ...people,
   };
-  mockUseAppSelector.mockImplementation((selector) => selector({ people: state } as never));
+  const auth = { user: { id: 'me', role: viewerRole } };
+  const childLink = { adult: null, q: '', candidates: [], status: 'idle', requestId: 0, link: null };
+  mockUseAppSelector.mockImplementation((selector) => selector({ people: state, auth, childLink } as never));
   return state;
 }
 
@@ -130,5 +137,17 @@ describe('PeopleScreen', () => {
     givenPeople({ query: { category: 'PARENT', q: 'Иваноа', groupFilter: { kind: 'all' } } });
     const screen = await render(<PeopleScreen />);
     expect(screen.getByText('Никого не нашли по запросу «Иваноа»')).toBeTruthy();
+  });
+
+  it('opens the person card from a row', async () => {
+    givenPeople({
+      query: { category: 'PARENT', q: '', groupFilter: { kind: 'all' } },
+      total: 1,
+      items: [{ ...base, id: 'p1', firstName: 'Анна' }],
+    });
+    const screen = await render(<PeopleScreen />);
+
+    await fireEvent.press(screen.getByLabelText('Открыть карточку: Иванова Анна'));
+    expect(mockPush).toHaveBeenCalledWith({ pathname: '/people/[id]', params: { id: 'p1' } });
   });
 });

@@ -12,6 +12,7 @@ jest.mock('../store', () => ({
   useAppSelector: jest.fn(),
 }));
 jest.mock('@/components/ui/icon-symbol', () => ({ IconSymbol: () => null }));
+jest.mock('../utils/app-version', () => ({ getAppVersionLabel: () => 'Версия 1.0.2 · сборка 3' }));
 jest.mock('@react-navigation/native', () => ({ useFocusEffect: jest.fn() }));
 jest.mock('expo-router', () => ({
   useRouter: () => ({ push: mockPush }),
@@ -55,13 +56,25 @@ function renderProfile(role: string, state: { children?: object[]; childRequests
   return render(<ProfileScreen />);
 }
 
-describe('who can change personal data', () => {
+describe('application version in the profile', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockUseAppDispatch.mockReturnValue(jest.fn());
   });
 
-  it.each(['ADMIN', 'DIRECTOR'])('lets %s open the edit screen', async (role) => {
+  it.each(['PARENT', 'EMPLOYEE', 'ADMIN', 'DIRECTOR', 'TECH_ADMIN'])('shows a copyable version for %s', async (role) => {
+    const screen = await renderProfile(role);
+    expect(screen.getByText('Версия 1.0.2 · сборка 3').props.selectable).toBe(true);
+  });
+});
+
+describe('editing own personal data', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockUseAppDispatch.mockReturnValue(jest.fn());
+  });
+
+  it.each(['PARENT', 'EMPLOYEE', 'ADMIN', 'DIRECTOR', 'TECH_ADMIN'])('lets %s open the edit screen', async (role) => {
     const screen = await renderProfile(role);
     expect(mockHeaderRight).toBeDefined();
     expect(screen.queryByText(/Изменить личные данные может только администратор/)).toBeNull();
@@ -71,11 +84,6 @@ describe('who can change personal data', () => {
     expect(mockPush).toHaveBeenCalledWith('/profile/edit');
   });
 
-  it.each(['PARENT', 'EMPLOYEE'])('sends %s to the administrator instead', async (role) => {
-    const screen = await renderProfile(role);
-    expect(mockHeaderRight).toBeUndefined();
-    expect(screen.getByText(/Изменить личные данные может только администратор/)).toBeTruthy();
-  });
 });
 
 describe('own children in the profile', () => {

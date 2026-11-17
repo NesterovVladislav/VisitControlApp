@@ -39,7 +39,7 @@ import {
   RegistrationRequestsPage,
   RegistrationRequestView,
 } from '../../store/types/requests';
-import { GardenGroup, PeoplePage, PeopleQuery, Person } from '../../store/types/people';
+import { GardenGroup, LinkRole, PeoplePage, PeopleQuery, Person } from '../../store/types/people';
 import { ProfileUpdate } from '../../utils/profile-edit';
 import { getAuthToken, notifyUnauthorized } from '../auth/auth-token';
 import { photoForm } from '../photos/photo-form';
@@ -851,7 +851,7 @@ class VisitControlApiClient {
   }
 
   /**
-   * Изменение своих личных данных — только администратор (PUT /user/me). Без ретраев: это запись.
+   * Непосредственное изменение своих личных данных (PUT /user/me). Без ретраев: это запись.
    */
   async updateMe(update: ProfileUpdate): Promise<User> {
     const dto = await this.put<UserDto, ProfileUpdate>('/user/me', update, { skipLogging: true });
@@ -1374,6 +1374,31 @@ class VisitControlApiClient {
   async resetPassword(userId: string): Promise<boolean> {
     const result = await this.post<{ password_sent: boolean }>(`/user/${userId}/password/reset`);
     return result.password_sent;
+  }
+
+  /**
+   * Смена роли пользователя: новые права действуют сразу. Ключ роли — из GET /user/roles.
+   */
+  async changeUserRole(userId: string, roleId: string): Promise<void> {
+    await this.patch(`/user/${userId}/role`, { role_external_key: roleId });
+  }
+
+  /**
+   * Деактивация пользователя администратором: войти нельзя, из «Людей» пропадает.
+   */
+  async deactivateUser(userId: string): Promise<void> {
+    await this.post(`/user/${userId}/deactivate`);
+  }
+
+  /**
+   * Привязка ребёнка к взрослому администратором. Роль связи — по имени: ключи ролей в каждой базе свои.
+   */
+  async linkChild(childId: string, representativeId: string, linkRole: LinkRole): Promise<void> {
+    await this.post('/child-representative', {
+      child_external_key: childId,
+      representative_external_key: representativeId,
+      role: { role: linkRole },
+    });
   }
 
   /**

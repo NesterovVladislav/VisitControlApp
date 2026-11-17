@@ -1,11 +1,34 @@
 import { runSaga } from 'redux-saga';
 
 import { visitControlApi } from '../../services/api';
-import { loadPeopleFailure, loadPeopleSuccess } from '../reducers/people';
-import { loadFirstPageSaga, loadMoreSaga } from './people';
+import { ApiError } from '../../services/errors/api-error';
+import {
+  changePersonRole,
+  changePersonRoleFinished,
+  deactivatePerson,
+  deactivatePersonFinished,
+  loadPeopleFailure,
+  loadPeopleSuccess,
+  resetPersonPassword,
+  resetPersonPasswordFinished,
+} from '../reducers/people';
+import {
+  DEACTIVATION_ERRORS,
+  ROLE_CHANGE_ERRORS,
+  changeRoleSaga,
+  PASSWORD_RESET_ERRORS,
+  deactivateSaga,
+  loadFirstPageSaga,
+  loadMoreSaga,
+  resetPasswordSaga,
+} from './people';
 
 jest.mock('../../services/api', () => ({
-  visitControlApi: { getPeople: jest.fn(), getGroups: jest.fn(), getBranches: jest.fn() },
+  visitControlApi: { getPeople: jest.fn(), getGroups: jest.fn(), getBranches: jest.fn(), resetPassword: jest.fn(),
+    deactivateUser: jest.fn(),
+    getAssignableRoles: jest.fn(),
+    changeUserRole: jest.fn(),
+  },
 }));
 
 const mockApi = visitControlApi as jest.Mocked<typeof visitControlApi>;
@@ -62,5 +85,65 @@ describe('people saga', () => {
     resolve?.(page);
     await stale.done;
     expect(stale.dispatched).toEqual([]);
+  });
+
+  const reset = () => resetPasswordSaga(resetPersonPassword('a'));
+
+  it('reports whether the new password email was sent', async () => {
+    mockApi.resetPassword.mockResolvedValue(false);
+    const { dispatched, done } = run(reset, {});
+    await done;
+    expect(mockApi.resetPassword).toHaveBeenCalledWith('a');
+    expect(dispatched).toEqual([resetPersonPasswordFinished({ personId: 'a', status: 'notSent', message: null })]);
+  });
+
+  it('explains why the password was not reset', async () => {
+    mockApi.resetPassword.mockRejectedValue(new ApiError('Forbidden', 403));
+    const forbidden = run(reset, {});
+    await forbidden.done;
+    expect(forbidden.dispatched).toEqual([
+      resetPersonPasswordFinished({ personId: 'a', status: 'failed', message: PASSWORD_RESET_ERRORS.forbidden }),
+    ]);
+
+    mockApi.resetPassword.mockRejectedValue(new ApiError('Unauthorized', 401));
+    const expired = run(reset, {});
+    await expired.done;
+    expect(expired.dispatched).toEqual([
+      resetPersonPasswordFinished({ personId: 'a', status: 'failed', message: null }),
+    ]);
+  });
+
+  it('deactivates a user and explains a refusal', async () => {
+    mockApi.deactivateUser.mockResolvedValue(undefined);
+    const done = run(() => deactivateSaga(deactivatePerson('a')), {});
+    await done.done;
+    expect(mockApi.deactivateUser).toHaveBeenCalledWith('a');
+    expect(done.dispatched).toEqual([deactivatePersonFinished({ personId: 'a', status: 'done', message: null })]);
+
+    mockApi.deactivateUser.mockRejectedValue(new ApiError('Conflict', 409));
+    const failed = run(() => deactivateSaga(deactivatePerson('a')), {});
+    await failed.done;
+    expect(failed.dispatched).toEqual([
+      deactivatePersonFinished({ personId: 'a', status: 'failed', message: DEACTIVATION_ERRORS.inactive }),
+    ]);
+  });
+
+  it('assigns the role by its key from the assignable roles', async () => {
+    mockApi.getAssignableRoles.mockResolvedValue([{ id: 'r-admin', name: 'ADMIN' }, { id: 'r-emp', name: 'EMPLOYEE' }]);
+    mockApi.changeUserRole.mockResolvedValue(undefined);
+    const ok = run(() => changeRoleSaga(changePersonRole({ personId: 'ivan', role: 'ADMIN' })), {});
+    await ok.done;
+    expect(mockApi.changeUserRole).toHaveBeenCalledWith('ivan', 'r-admin');
+    expect(ok.dispatched).toEqual([changePersonRoleFinished({ personId: 'ivan', role: 'ADMIN', status: 'done', message: null })]);
+  });
+
+  it('refuses when the role cannot be assigned', async () => {
+    mockApi.getAssignableRoles.mockResolvedValue([{ id: 'r-emp', name: 'EMPLOYEE' }]);
+    const refused = run(() => changeRoleSaga(changePersonRole({ personId: 'ivan', role: 'ADMIN' })), {});
+    await refused.done;
+    expect(mockApi.changeUserRole).not.toHaveBeenCalled();
+    expect(refused.dispatched).toEqual([
+      changePersonRoleFinished({ personId: 'ivan', role: 'ADMIN', status: 'failed', message: ROLE_CHANGE_ERRORS.forbidden }),
+    ]);
   });
 });

@@ -13,6 +13,7 @@ import { watchGarden } from './garden';
 import { watchGroupPeople } from './group-people';
 import { watchOrganization } from './organization';
 import { watchPhotos } from './photos';
+import { watchChildLink } from './child-link';
 
 // Здесь будут импортироваться и объединяться все sagas
 export function* rootSaga() {
@@ -32,6 +33,7 @@ export function* rootSaga() {
     fork(watchGroupPeople),
     fork(watchOrganization),
     fork(watchPhotos),
+    fork(watchChildLink),
     // Пример: fork(visitsSaga),
   ]);
   console.log('[Root Saga] Root saga started');

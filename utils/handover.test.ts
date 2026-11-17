@@ -8,7 +8,7 @@ import {
 } from './handover';
 
 describe('QR handover', () => {
-  it('tells a Visit Control code from any other QR code', () => {
+  it('tells a ДоброВход code from any other QR code', () => {
     expect(isHandoverCode('vc1:QRot21ERJnIw1PuVdBzE9KUgwN29dvGcluGD5QFJIwc')).toBe(true);
     expect(isHandoverCode('  vc1:abc ')).toBe(true);
     expect(isHandoverCode('https://example.com')).toBe(false);

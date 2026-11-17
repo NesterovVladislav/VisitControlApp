@@ -1,5 +1,14 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
-import { GardenGroup, PeoplePage, PeopleQuery, PeopleState } from '../types/people';
+import {
+  GardenGroup,
+  PasswordReset,
+  PeoplePage,
+  PeopleQuery,
+  PeopleState,
+  PersonDeactivation,
+  RoleChange,
+  StaffRole,
+} from '../types/people';
 import { logoutCompleted } from './auth';
 
 const initialState: PeopleState = {
@@ -13,6 +22,9 @@ const initialState: PeopleState = {
   loadingMore: false,
   loadMoreFailed: false,
   requestId: 0,
+  passwordReset: null,
+  deactivation: null,
+  roleChange: null,
   filterOptions: { status: 'idle', groups: [], branches: [] },
 };
 
@@ -111,6 +123,74 @@ const peopleSlice = createSlice({
         state.filterOptions.status = 'failed';
       }
     },
+
+    /** Администратор подтвердил «Сбросить пароль»; пока идёт один сброс, второй не начинаем. */
+    resetPersonPassword: (state, action: PayloadAction<string>) => {
+      if (state.passwordReset?.status === 'pending') {
+        return;
+      }
+      state.passwordReset = { personId: action.payload, status: 'pending', message: null };
+    },
+    resetPersonPasswordFinished: (state, action: PayloadAction<PasswordReset>) => {
+      if (state.passwordReset?.personId === action.payload.personId) {
+        state.passwordReset = action.payload;
+      }
+    },
+    /** Администратор подтвердил «Деактивировать»; пока идёт одна деактивация, вторую не начинаем. */
+    deactivatePerson: (state, action: PayloadAction<string>) => {
+      if (state.deactivation?.status === 'pending') {
+        return;
+      }
+      state.deactivation = { personId: action.payload, status: 'pending', message: null };
+    },
+    deactivatePersonFinished: (state, action: PayloadAction<PersonDeactivation>) => {
+      if (state.deactivation?.personId !== action.payload.personId) {
+        return;
+      }
+      state.deactivation = action.payload;
+      // Список показывает только активных: отключённого убираем сразу, не перезагружая страницы
+      if (action.payload.status === 'done' && state.items.some((person) => person.id === action.payload.personId)) {
+        state.items = state.items.filter((person) => person.id !== action.payload.personId);
+        state.total = Math.max(0, state.total - 1);
+      }
+    },
+    /** Директор подтвердил смену роли; пока идёт одна смена, вторую не начинаем. */
+    changePersonRole: (state, action: PayloadAction<{ personId: string; role: StaffRole }>) => {
+      if (state.roleChange?.status === 'pending') {
+        return;
+      }
+      state.roleChange = { ...action.payload, status: 'pending', message: null };
+    },
+    changePersonRoleFinished: (state, action: PayloadAction<RoleChange>) => {
+      if (state.roleChange?.personId !== action.payload.personId) {
+        return;
+      }
+      state.roleChange = action.payload;
+      if (action.payload.status === 'done') {
+        const person = state.items.find((item) => item.id === action.payload.personId);
+        if (person) {
+          person.role = action.payload.role;
+        }
+      }
+    },
+    /** Результат смены роли показан. */
+    clearRoleChange: (state) => {
+      if (state.roleChange?.status !== 'pending') {
+        state.roleChange = null;
+      }
+    },
+    /** Результат деактивации показан. */
+    clearDeactivation: (state) => {
+      if (state.deactivation?.status !== 'pending') {
+        state.deactivation = null;
+      }
+    },
+    /** Результат сброса показан. */
+    clearPasswordReset: (state) => {
+      if (state.passwordReset?.status !== 'pending') {
+        state.passwordReset = null;
+      }
+    },
   },
   extraReducers: (builder) => {
     // Телефоны и email людей сада не должны пережить выход из аккаунта
@@ -126,5 +206,14 @@ export const {
   loadPeopleFilters,
   loadPeopleFiltersSuccess,
   loadPeopleFiltersFailure,
+  resetPersonPassword,
+  resetPersonPasswordFinished,
+  clearPasswordReset,
+  deactivatePerson,
+  deactivatePersonFinished,
+  clearDeactivation,
+  changePersonRole,
+  changePersonRoleFinished,
+  clearRoleChange,
 } = peopleSlice.actions;
 export default peopleSlice.reducer;

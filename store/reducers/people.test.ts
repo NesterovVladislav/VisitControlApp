@@ -1,4 +1,16 @@
-import reducer, { loadMorePeople, loadPeople, loadPeopleFailure, loadPeopleSuccess } from './people';
+import reducer, {
+  changePersonRole,
+  changePersonRoleFinished,
+  clearPasswordReset,
+  deactivatePerson,
+  deactivatePersonFinished,
+  loadMorePeople,
+  loadPeople,
+  loadPeopleFailure,
+  loadPeopleSuccess,
+  resetPersonPassword,
+  resetPersonPasswordFinished,
+} from './people';
 import { logoutCompleted } from './auth';
 import { Person, PeopleQuery } from '../types/people';
 
@@ -68,5 +80,40 @@ describe('people reducer', () => {
     state = reducer(state, loadPeopleSuccess({ requestId: state.requestId, result: { items: [person('a')], page: 0, last: true, total: 1 } }));
     const signedOut = reducer(state, logoutCompleted({ reason: 'user' }));
     expect(JSON.stringify(signedOut)).not.toContain('+79123456789');
+  });
+
+  it('runs one password reset at a time and keeps the result until it is shown', () => {
+    let state = reducer(undefined, resetPersonPassword('a'));
+    expect(state.passwordReset).toEqual({ personId: 'a', status: 'pending', message: null });
+
+    state = reducer(state, resetPersonPassword('b'));
+    expect(state.passwordReset?.personId).toBe('a');
+    state = reducer(state, clearPasswordReset());
+    expect(state.passwordReset?.status).toBe('pending');
+
+    state = reducer(state, resetPersonPasswordFinished({ personId: 'a', status: 'sent', message: null }));
+    expect(state.passwordReset).toMatchObject({ personId: 'a', status: 'sent' });
+    state = reducer(state, clearPasswordReset());
+    expect(state.passwordReset).toBeNull();
+  });
+
+  it('removes a deactivated person from the list', () => {
+    let state = reducer(undefined, loadPeople({ query: parents }));
+    state = reducer(state, loadPeopleSuccess({ requestId: state.requestId, result: { items: [person('a'), person('b')], page: 0, last: true, total: 2 } }));
+    state = reducer(state, deactivatePerson('a'));
+    expect(state.items).toHaveLength(2);
+
+    state = reducer(state, deactivatePersonFinished({ personId: 'a', status: 'done', message: null }));
+    expect(state.items.map((p) => p.id)).toEqual(['b']);
+    expect(state.total).toBe(1);
+  });
+
+  it('updates the role in the list after a role change', () => {
+    let state = reducer(undefined, loadPeople({ query: parents }));
+    state = reducer(state, loadPeopleSuccess({ requestId: state.requestId, result: { items: [person('a')], page: 0, last: true, total: 1 } }));
+    state = reducer(state, changePersonRole({ personId: 'a', role: 'ADMIN' }));
+    expect(state.items[0].role).toBe('PARENT');
+    state = reducer(state, changePersonRoleFinished({ personId: 'a', role: 'ADMIN', status: 'done', message: null }));
+    expect(state.items[0].role).toBe('ADMIN');
   });
 });
