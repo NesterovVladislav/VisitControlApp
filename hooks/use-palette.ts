@@ -1,4 +1,4 @@
-import { useColorScheme } from 'react-native';
+import { useColorScheme } from './use-color-scheme';
 import { ColorScheme, Palette, palettes } from '../constants/palette';
 
 /** Текущая тема: выбранная в профиле или системная (см. services/theme/theme-preference.ts). */

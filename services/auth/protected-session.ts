@@ -35,6 +35,7 @@ type PinCrypto = {
 
 export interface ProtectedSessionRepository {
   load(): Promise<ProtectedSessionRecord | null>;
+  replaceToken(expectedToken: string, token: string): Promise<boolean>;
   beginSession(token: string): Promise<ProtectedSessionRecord>;
   completePinSetup(pin: string): Promise<ProtectedSessionRecord>;
   verifyPin(pin: string): Promise<PinAttemptResult>;
@@ -133,6 +134,14 @@ export function createProtectedSessionRepository(
         failedPinAttempts: 0,
         biometricsEnabled: false,
       });
+    }),
+
+    replaceToken: (expectedToken, token) => serialize(async () => {
+      const record = await readRecord();
+      if (record?.token !== expectedToken) return false;
+      if (!token.trim()) throw new Error('Session token must not be empty');
+      await persist({ ...record, token });
+      return true;
     }),
 
     completePinSetup: (pin) => serialize(async () => {

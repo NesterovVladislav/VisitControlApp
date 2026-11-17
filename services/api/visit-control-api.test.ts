@@ -223,3 +223,92 @@ describe('visit time from the backend', () => {
     expect(toUtcIso('2026-10-12T08:35:00.482915')).toBe('2026-10-12T08:35:00.482Z');
   });
 });
+
+describe('public password reset API', () => {
+  afterEach(() => {
+    client.defaults.adapter = originalAdapter;
+    clearAuthToken();
+  });
+
+  it('sends each POST once, without the current session token', async () => {
+    setAuthToken('existing-session');
+    const adapter = jest.fn(async (config: InternalAxiosRequestConfig) => {
+      const replies: Record<string, object> = {
+        '/password/reset/request': { resend_after_sec: 60, code_ttl_sec: 900 },
+        '/password/reset/verify': { reset_token: 'synthetic-reset', expires_in_sec: 600 },
+        '/password/reset/confirm': { access_token: 'synthetic-session' },
+      };
+      return { config, data: replies[config.url ?? ''], headers: {}, status: 200, statusText: 'OK' };
+    });
+    client.defaults.adapter = adapter;
+    const { signal } = new AbortController();
+
+    await expect(visitControlApi.requestPasswordReset('parent@example.org', signal)).resolves.toEqual({
+      resend_after_sec: 60, code_ttl_sec: 900,
+    });
+    await expect(visitControlApi.verifyPasswordReset('parent@example.org', '012345', signal)).resolves.toEqual({
+      reset_token: 'synthetic-reset', expires_in_sec: 600,
+    });
+    await expect(visitControlApi.confirmPasswordReset('synthetic-reset', ' new password ', signal))
+      .resolves.toBe('synthetic-session');
+    expect(adapter.mock.calls.map(([config]) => [config.url, JSON.parse(config.data)])).toEqual([
+      ['/password/reset/request', { email: 'parent@example.org' }],
+      ['/password/reset/verify', { email: 'parent@example.org', code: '012345' }],
+      ['/password/reset/confirm', { reset_token: 'synthetic-reset', new_password: ' new password ' }],
+    ]);
+    for (const [config] of adapter.mock.calls) {
+      expect(config.headers.toJSON().Authorization).toBeUndefined();
+      expect(config).toMatchObject({ skipLogging: true, skipErrorHandling: true, signal });
+    }
+  });
+
+  it('retains Retry-After and attempts_left without retaining the request or server text', async () => {
+    const { signal } = new AbortController();
+    function fail(status: number, data: object, headers: Record<string, string> = {}) {
+      client.defaults.adapter = async (config) => {
+        throw new AxiosError('fixture error', 'ERR_BAD_REQUEST', config, {}, {
+          config, status, statusText: 'Error', headers, data,
+        });
+      };
+    }
+    fail(400, { code: 'RESET_CODE_INVALID', attempts_left: 2, message: 'untrusted response text' });
+    const invalid = await visitControlApi.verifyPasswordReset('parent@example.org', '012345', signal)
+      .catch((error: unknown) => error);
+    expect(invalid).toMatchObject({ status: 400, code: 'RESET_CODE_INVALID', attemptsLeft: 2 });
+    expect(invalid).not.toHaveProperty('originalError');
+    expect(invalid).not.toHaveProperty('data');
+    fail(429, {}, { 'Retry-After': '60' });
+    const after = Date.now() + 60_000;
+    const throttled = await visitControlApi.requestPasswordReset('parent@example.org', signal)
+      .catch((error: unknown) => error) as { status: number; retryAt: number };
+    expect(throttled.status).toBe(429);
+    expect(throttled.retryAt).toBeGreaterThanOrEqual(after);
+    expect(throttled.retryAt).toBeLessThan(after + 1000);
+  });
+});
+
+describe('profile password change response', () => {
+  afterEach(() => {
+    client.defaults.adapter = originalAdapter;
+    clearAuthToken();
+  });
+
+  it.each([
+    [200, { access_token: 'replacement' }, 'replacement'],
+    [204, undefined, undefined],
+    [200, {}, undefined],
+    [200, '', undefined],
+  ])('accepts status %s with response %j', async (status, data, expected) => {
+    setAuthToken('current-session');
+    const adapter = jest.fn(async (config: InternalAxiosRequestConfig) => ({
+      config, data, status, statusText: 'Success', headers: {},
+    }));
+    client.defaults.adapter = adapter;
+
+    await expect(visitControlApi.changePassword('old-password', 'new-password')).resolves.toBe(expected);
+    expect(adapter).toHaveBeenCalledTimes(1);
+    const [[request]] = adapter.mock.calls;
+    expect(request).toMatchObject({ method: 'patch', url: '/user/password', skipLogging: true });
+    expect(request.headers.Authorization).toBe('Bearer current-session');
+  });
+});

@@ -1,8 +1,10 @@
+import { PasswordResetError, ResetCodeTiming, sanitizePasswordResetError, VerifiedResetCode } from './password-reset-contract';
 import { AxiosError, AxiosInstance, AxiosResponse } from 'axios';
 import { createApiClient, setupAuthToken } from './client';
 import { RequestConfig, ApiResponse } from './types';
 import { ApiError } from '../errors/api-error';
 import { retryRequest, createRetryConfig } from './retry';
+import { requestSessionProfile } from './session-validation';
 import { LoginCredentials, User } from '../../store/types/auth';
 import { Child, ChildGroup, ChildVisit } from '../../store/types/children';
 import { OrganizationBrand } from '../../store/types/organization';
@@ -40,6 +42,7 @@ import {
 import { GardenGroup, PeoplePage, PeopleQuery, Person } from '../../store/types/people';
 import { ProfileUpdate } from '../../utils/profile-edit';
 import { getAuthToken, notifyUnauthorized } from '../auth/auth-token';
+import { photoForm } from '../photos/photo-form';
 import { PrivacyPolicy, PublicOrganization, RegistrationRequest } from '../../store/types/registration';
 
 // DTO бэкенда в snake_case живут только здесь, наружу отдаются модели в camelCase.
@@ -82,13 +85,6 @@ function mapPhotoRequest(dto: PhotoRequestDto): PhotoRequest {
     reason: dto.decision_comment ?? null,
     applicantName: dto.applicant ? shortName(dto.applicant) : null,
   };
-}
-
-/** Файл для multipart в React Native: FormData принимает объект с адресом файла на устройстве. */
-function photoForm(uri: string): FormData {
-  const form = new FormData();
-  form.append('file', { uri, name: 'photo.jpg', type: 'image/jpeg' } as unknown as Blob);
-  return form;
 }
 
 const MULTIPART: RequestConfig = { headers: { 'Content-Type': 'multipart/form-data' }, skipLogging: true };
@@ -802,13 +798,54 @@ class VisitControlApiClient {
     return response.access_token;
   }
 
+  private async postPasswordReset<T>(step: string, body: object, signal: AbortSignal): Promise<T> {
+    try {
+      return await this.post<T>('/password/reset/' + step, body, {
+        signal,
+        skipLogging: true,
+        skipErrorHandling: true,
+        headers: { Authorization: false },
+      });
+    } catch (error) {
+      throw sanitizePasswordResetError(error);
+    }
+  }
+
+  async requestPasswordReset(email: string, signal: AbortSignal): Promise<ResetCodeTiming> {
+    const result = await this.postPasswordReset<ResetCodeTiming>('request', { email }, signal);
+    if (!Number.isFinite(result?.resend_after_sec) || result.resend_after_sec < 0 ||
+        !Number.isFinite(result?.code_ttl_sec) || result.code_ttl_sec <= 0) {
+      throw new PasswordResetError(null);
+    }
+    return result;
+  }
+
+  async verifyPasswordReset(email: string, code: string, signal: AbortSignal): Promise<VerifiedResetCode> {
+    const result = await this.postPasswordReset<VerifiedResetCode>('verify', { email, code }, signal);
+    if (typeof result?.reset_token !== 'string' || !result.reset_token ||
+        !Number.isFinite(result.expires_in_sec) || result.expires_in_sec <= 0) {
+      throw new PasswordResetError(null);
+    }
+    return result;
+  }
+
+  async confirmPasswordReset(resetToken: string, password: string, signal: AbortSignal): Promise<string> {
+    const result = await this.postPasswordReset<AuthResponseDto>('confirm', {
+      reset_token: resetToken,
+      new_password: password,
+    }, signal);
+    if (typeof result?.access_token !== 'string' || !result.access_token.trim()) {
+      throw new PasswordResetError(null);
+    }
+    return result.access_token;
+  }
+
   /**
    * Текущий пользователь по токену.
    */
   async getMe(): Promise<User> {
-    const dto = await retryRequest(
-      () => this.get<UserDto>('/user', { skipLogging: true }),
-      createRetryConfig(2, 500)
+    const dto = await requestSessionProfile(
+      (config) => this.get<UserDto>('/user', { ...config, skipLogging: true })
     );
     return mapUser(dto);
   }
@@ -825,12 +862,14 @@ class VisitControlApiClient {
    * Смена своего пароля: пользователь определяется по токену.
    * Без ретраев: если первый запрос дошёл, повтор со старым паролем вернёт «неверный текущий пароль».
    */
-  async changePassword(oldPassword: string, newPassword: string): Promise<void> {
-    await this.patch<void, ChangePasswordDto>(
+  async changePassword(oldPassword: string, newPassword: string): Promise<string | undefined> {
+    const result = await this.patch<Partial<AuthResponseDto> | undefined, ChangePasswordDto>(
       '/user/password',
       { old_password: oldPassword, new_password: newPassword },
-      { skipLogging: true }
+      { skipLogging: true, skipErrorHandling: true }
     );
+    const token = result?.access_token;
+    return typeof token === 'string' && token.trim() ? token : undefined;
   }
 
   /**
@@ -1001,7 +1040,7 @@ class VisitControlApiClient {
    */
   async submitPhoto(uri: string, childId?: string): Promise<PhotoRequest> {
     const endpoint = childId ? `/user/me/children/${childId}/photo` : '/user/me/photo';
-    const dto = await this.put<PhotoRequestDto, FormData>(endpoint, photoForm(uri), MULTIPART);
+    const dto = await this.put<PhotoRequestDto, FormData>(endpoint, await photoForm(uri), MULTIPART);
     return mapPhotoRequest(dto);
   }
 

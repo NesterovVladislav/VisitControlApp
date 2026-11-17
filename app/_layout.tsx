@@ -1,13 +1,16 @@
 import { DarkTheme, DefaultTheme, Theme, ThemeProvider } from '@react-navigation/native';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
+import { Platform } from 'react-native';
 import 'react-native-reanimated';
 import { Provider } from 'react-redux';
 
 import { SessionGate } from '../components/session/session-gate';
+import { WebAlertHost } from '../components/web-alert-host';
 import { Palette, palettes } from '../constants/palette';
 import { useScheme } from '../hooks/use-palette';
 import { loadThemePreference } from '../services/theme/theme-preference';
+import { syncBrowserTheme } from '../services/theme/browser-theme';
 import { store } from '../store';
 
 /** Шапки, таб-бар и фон под экранами — из той же палитры, что и сами экраны. */
@@ -39,10 +42,16 @@ export default function RootLayout() {
     void loadThemePreference();
   }, []);
 
+  useEffect(() => {
+    if (Platform.OS === 'web') syncBrowserTheme(scheme);
+  }, [scheme]);
+
   return (
     <Provider store={store}>
       <ThemeProvider value={themes[scheme]}>
         <SessionGate />
+        {/* Только в браузере: там нет системного Alert. На телефоне — null */}
+        <WebAlertHost />
         <StatusBar style="auto" />
       </ThemeProvider>
     </Provider>

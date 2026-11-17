@@ -43,7 +43,7 @@ export type AuthPhase =
   | 'storageUnavailable';
 
 export type SetupStep = 'createPin' | 'offerBiometrics' | null;
-export type LogoutReason = 'user' | 'switchAccount' | 'expired';
+export type LogoutReason = 'user' | 'switchAccount' | 'expired' | 'passwordChanged';
 
 /**
  * Режим работы. Для сотрудника или администратора, который ещё и родитель, — что сейчас на экране:

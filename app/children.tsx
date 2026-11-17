@@ -6,12 +6,12 @@ import {
   Alert,
   AppState,
   FlatList,
-  RefreshControl,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native';
+import { RefreshControl } from '../components/ui/refresh-control';
 import ChildCard, { commentLabel, markActionLabel } from '../components/child-card';
 import CommentSheet from '../components/comment-sheet';
 import ChildGroupSheet from '../components/child-group-sheet';

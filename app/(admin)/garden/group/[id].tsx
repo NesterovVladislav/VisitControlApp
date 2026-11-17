@@ -6,12 +6,12 @@ import {
   Alert,
   FlatList,
   Linking,
-  RefreshControl,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native';
+import { RefreshControl } from '../../../../components/ui/refresh-control';
 import { useGardenStyles } from '../../../../components/garden-styles';
 import OptionSheet, { SheetOption } from '../../../../components/option-sheet';
 import SegmentedControl from '../../../../components/segmented-control';

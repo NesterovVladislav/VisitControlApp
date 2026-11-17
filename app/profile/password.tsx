@@ -2,7 +2,6 @@ import { useHeaderHeight } from '@react-navigation/elements';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
 import {
-  ActivityIndicator,
   Alert,
   Keyboard,
   KeyboardAvoidingView,
@@ -10,10 +9,10 @@ import {
   StyleSheet,
   Text,
   TextInput,
-  TouchableOpacity,
   View,
 } from 'react-native';
-import PasswordField from '../../components/password-field';
+import { ActionButton, FormCard, PasswordField, StatusMessage } from '../../components/ui';
+import { space, typeSize } from '../../constants/ui-tokens';
 import { useAppDispatch, useAppSelector } from '../../store';
 import {
   changePasswordStart,
@@ -22,7 +21,7 @@ import {
 } from '../../store/reducers/profile';
 import { PasswordField as Field, PasswordFieldErrors, PasswordForm } from '../../store/types/profile';
 import { validatePasswordField, validatePasswordForm } from '../../utils/password-validation';
-import { makeStyles, usePalette } from '../../hooks/use-palette';
+import { makeStyles } from '../../hooks/use-palette';
 
 const EMPTY_FORM: PasswordForm = {
   currentPassword: '',
@@ -34,7 +33,6 @@ const EMPTY_FORM: PasswordForm = {
  * Смена своего пароля. Пароли живут только в useState этого экрана. См. docs/profile-screen.md.
  */
 export default function ChangePasswordScreen() {
-  const c = usePalette();
   const styles = useStyles();
   const router = useRouter();
   const headerHeight = useHeaderHeight();
@@ -121,69 +119,58 @@ export default function ChangePasswordScreen() {
       keyboardVerticalOffset={headerHeight}
     >
       <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
-        <PasswordField
-          label="Текущий пароль"
-          value={form.currentPassword}
-          onChangeText={(value) => setField('currentPassword', value)}
-          onBlur={() => validateOnBlur('currentPassword')}
-          error={errorFor('currentPassword')}
-          autoComplete="current-password"
-          textContentType="password"
-          returnKeyType="next"
-          submitBehavior="submit"
-          onSubmitEditing={() => newPasswordRef.current?.focus()}
-          editable={!isSubmitting}
-        />
-        <PasswordField
-          ref={newPasswordRef}
-          label="Новый пароль"
-          value={form.newPassword}
-          onChangeText={(value) => setField('newPassword', value)}
-          onBlur={() => validateOnBlur('newPassword')}
-          error={errorFor('newPassword')}
-          hint="Не меньше 8 символов"
-          autoComplete="new-password"
-          textContentType="newPassword"
-          returnKeyType="next"
-          submitBehavior="submit"
-          onSubmitEditing={() => confirmPasswordRef.current?.focus()}
-          editable={!isSubmitting}
-        />
-        <PasswordField
-          ref={confirmPasswordRef}
-          label="Повторите новый пароль"
-          value={form.confirmPassword}
-          onChangeText={(value) => setField('confirmPassword', value)}
-          onBlur={() => validateOnBlur('confirmPassword')}
-          error={errorFor('confirmPassword')}
-          autoComplete="new-password"
-          textContentType="newPassword"
-          returnKeyType="done"
-          onSubmitEditing={submit}
-          editable={!isSubmitting}
-        />
+        <FormCard>
+          <PasswordField
+            label="Текущий пароль"
+            value={form.currentPassword}
+            onChangeText={(value) => setField('currentPassword', value)}
+            onBlur={() => validateOnBlur('currentPassword')}
+            error={errorFor('currentPassword')}
+            autoComplete="current-password"
+            textContentType="password"
+            returnKeyType="next"
+            submitBehavior="submit"
+            onSubmitEditing={() => newPasswordRef.current?.focus()}
+            editable={!isSubmitting}
+          />
+          <PasswordField
+            ref={newPasswordRef}
+            label="Новый пароль"
+            value={form.newPassword}
+            onChangeText={(value) => setField('newPassword', value)}
+            onBlur={() => validateOnBlur('newPassword')}
+            error={errorFor('newPassword')}
+            hint="Не меньше 8 символов"
+            autoComplete="new-password"
+            textContentType="newPassword"
+            returnKeyType="next"
+            submitBehavior="submit"
+            onSubmitEditing={() => confirmPasswordRef.current?.focus()}
+            editable={!isSubmitting}
+          />
+          <PasswordField
+            ref={confirmPasswordRef}
+            label="Повторите новый пароль"
+            value={form.confirmPassword}
+            onChangeText={(value) => setField('confirmPassword', value)}
+            onBlur={() => validateOnBlur('confirmPassword')}
+            error={errorFor('confirmPassword')}
+            autoComplete="new-password"
+            textContentType="newPassword"
+            returnKeyType="done"
+            onSubmitEditing={submit}
+            editable={!isSubmitting}
+          />
 
-        {passwordError ? (
-          <View style={styles.banner} accessibilityLiveRegion="polite">
-            <Text style={styles.bannerText}>{passwordError}</Text>
-          </View>
-        ) : null}
+          {passwordError ? (
+            <View style={styles.banner}>
+              <StatusMessage message={passwordError} tone="error" />
+            </View>
+          ) : null}
 
-        <TouchableOpacity
-          style={[styles.button, isSubmitting && styles.buttonDisabled]}
-          onPress={submit}
-          disabled={isSubmitting}
-          accessibilityRole="button"
-          accessibilityState={{ disabled: isSubmitting, busy: isSubmitting }}
-        >
-          {isSubmitting ? (
-            <ActivityIndicator color={c.onPrimary} />
-          ) : (
-            <Text style={styles.buttonText}>Сменить пароль</Text>
-          )}
-        </TouchableOpacity>
-
-        <Text style={styles.footer}>После смены вход на этом устройстве сохранится</Text>
+          <ActionButton label="Сменить пароль" onPress={submit} loading={isSubmitting} />
+          <Text style={styles.footer}>После смены вход на этом устройстве сохранится</Text>
+        </FormCard>
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -196,44 +183,15 @@ const useStyles = makeStyles((c) =>
       backgroundColor: c.background,
     },
     container: {
-      padding: 20,
-      width: '100%',
-      maxWidth: 440,
-      alignSelf: 'center',
-    },
-    banner: {
-      backgroundColor: c.dangerSoft,
-      borderRadius: 8,
-      padding: 12,
-      marginBottom: 12,
-    },
-    bannerText: {
-      color: c.danger,
-      fontSize: 14,
-      lineHeight: 20,
-    },
-    button: {
-      backgroundColor: c.primary,
-      borderRadius: 8,
-      padding: 16,
+      padding: space.xl,
       alignItems: 'center',
-      justifyContent: 'center',
-      marginTop: 8,
-      minHeight: 50,
     },
-    buttonDisabled: {
-      backgroundColor: c.disabled,
-    },
-    buttonText: {
-      color: c.onPrimary,
-      fontSize: 16,
-      fontWeight: '600',
-    },
+    banner: { marginBottom: space.md },
     footer: {
-      marginTop: 16,
-      fontSize: 14,
+      marginTop: space.lg,
+      fontSize: typeSize.label,
       color: c.textSecondary,
       textAlign: 'center',
     },
-  })
+  }),
 );

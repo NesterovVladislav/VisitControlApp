@@ -65,6 +65,26 @@ describe('ProtectedSessionRepository', () => {
     await expect(repository.load()).resolves.toMatchObject({ token: 'jwt', status: 'pin_setup_required' });
   });
 
+  it('replaces only the matching token while preserving PIN, attempts, and biometrics', async () => {
+    const storage = new MemoryStorage();
+    const repository = createProtectedSessionRepository(storage, pinCrypto);
+    await repository.beginSession('old-jwt');
+    await repository.completePinSetup('1234');
+    await repository.setBiometricsEnabled(true);
+    await repository.verifyPin('wrong');
+    const before = await repository.load();
+
+    await expect(repository.replaceToken('other-jwt', 'new-jwt')).resolves.toBe(false);
+    await expect(repository.replaceToken('old-jwt', 'new-jwt')).resolves.toBe(true);
+    const reopened = createProtectedSessionRepository(storage, pinCrypto);
+    await expect(reopened.load()).resolves.toEqual({ ...before, token: 'new-jwt' });
+    await expect(reopened.verifyPin('1234')).resolves.toMatchObject({
+      kind: 'success', record: { token: 'new-jwt', biometricsEnabled: true },
+    });
+    await reopened.clear();
+    await expect(reopened.replaceToken('new-jwt', 'late-jwt')).resolves.toBe(false);
+  });
+
   it('rejects an empty bearer token', async () => {
     const repository = createProtectedSessionRepository(new MemoryStorage(), pinCrypto);
     await expect(repository.beginSession('   ')).rejects.toThrow('token');

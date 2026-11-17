@@ -7,11 +7,11 @@ export function PrivacyShield() {
   return (
     <View
       accessibilityRole="progressbar"
-      accessibilityLabel="Visit Control защищает данные"
+      accessibilityLabel="ДоброВход защищает данные"
       style={styles.container}
       testID="privacy-shield"
     >
-      <Text style={styles.title}>Visit Control</Text>
+      <Text style={styles.title}>ДоброВход</Text>
       <ActivityIndicator color={c.onShield} size="large" />
     </View>
   );

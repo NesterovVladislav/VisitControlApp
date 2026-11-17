@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useState } from 'react';
+import { controlHeight, radius, space, typeSize } from '../constants/ui-tokens';
 import { StyleSheet, Text, TextInput, TextInputProps, View } from 'react-native';
 import { makeStyles, usePalette } from '../hooks/use-palette';
 
@@ -25,8 +26,11 @@ export default function FormField({
   editable = true,
   style,
   ref,
+  onFocus,
+  onBlur,
   ...inputProps
 }: FormFieldProps) {
+  const [focused, setFocused] = useState(false);
   const c = usePalette();
   const styles = useStyles();
   return (
@@ -37,6 +41,7 @@ export default function FormField({
           ref={ref}
           style={[
             styles.input,
+            focused && editable && styles.inputFocused,
             error && styles.inputError,
             !editable && styles.inputDisabled,
             accessory ? styles.inputWithAccessory : null,
@@ -44,8 +49,16 @@ export default function FormField({
           ]}
           placeholderTextColor={c.placeholder}
           editable={editable}
+          onFocus={(event) => {
+            setFocused(true);
+            onFocus?.(event);
+          }}
+          onBlur={(event) => {
+            setFocused(false);
+            onBlur?.(event);
+          }}
           accessibilityLabel={label}
-          accessibilityHint={error}
+          accessibilityHint={error ?? hint}
           {...inputProps}
         />
         {accessory ? <View style={styles.accessory}>{accessory}</View> : null}
@@ -67,8 +80,8 @@ export default function FormField({
 export const useFormFieldStyles = makeStyles((c) =>
   StyleSheet.create({
     error: {
-      marginTop: 6,
-      fontSize: 13,
+      marginTop: space.xs,
+      fontSize: typeSize.caption,
       color: c.danger,
     },
   })
@@ -77,20 +90,21 @@ export const useFormFieldStyles = makeStyles((c) =>
 const useStyles = makeStyles((c) =>
   StyleSheet.create({
     container: {
-      marginBottom: 16,
+      marginBottom: space.lg,
     },
     label: {
-      fontSize: 14,
+      fontSize: typeSize.label,
       fontWeight: '600',
-      marginBottom: 8,
+      marginBottom: space.sm,
       color: c.text,
     },
     input: {
+      minHeight: controlHeight.field,
       borderWidth: 1,
       borderColor: c.border,
-      borderRadius: 8,
-      padding: 12,
-      fontSize: 16,
+      borderRadius: radius.control,
+      padding: space.md,
+      fontSize: typeSize.body,
       backgroundColor: c.card,
       color: c.text,
     },
@@ -104,6 +118,9 @@ const useStyles = makeStyles((c) =>
       bottom: 0,
       justifyContent: 'center',
     },
+    inputFocused: {
+      borderColor: c.actionPrimary,
+    },
     inputError: {
       borderColor: c.danger,
     },
@@ -112,13 +129,13 @@ const useStyles = makeStyles((c) =>
       color: c.textTertiary,
     },
     error: {
-      marginTop: 6,
-      fontSize: 13,
+      marginTop: space.xs,
+      fontSize: typeSize.caption,
       color: c.danger,
     },
     hint: {
-      marginTop: 6,
-      fontSize: 13,
+      marginTop: space.xs,
+      fontSize: typeSize.caption,
       color: c.textSecondary,
     },
   })

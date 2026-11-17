@@ -1,24 +1,26 @@
 import { useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
-    ActivityIndicator,
     Alert,
     KeyboardAvoidingView,
     ScrollView,
     StyleSheet,
     Text,
     TextInput,
-    TouchableOpacity,
     View,
 } from 'react-native';
 import { useAppDispatch, useAppSelector } from '../store';
 import { clearError, loginStart } from '../store/reducers/auth';
 import { LoginCredentials } from '../store/types/auth';
+import InstallHint from '../components/install-hint';
 import OrganizationLogo from '../components/organization-logo';
-import { makeStyles, usePalette } from '../hooks/use-palette';
+import { ActionButton, FormCard, FormField, PasswordField, StatusMessage } from '../components/ui';
+import { space, typeSize } from '../constants/ui-tokens';
+import { makeStyles } from '../hooks/use-palette';
+import { prefillPasswordResetEmail } from '../services/auth/password-reset-email';
+import { isValidEmail } from '../utils/email-validation';
 
 export default function AuthScreen() {
-  const c = usePalette();
   const styles = useStyles();
   const router = useRouter();
   const dispatch = useAppDispatch();
@@ -27,7 +29,7 @@ export default function AuthScreen() {
   const brand = useAppSelector((state) => state.organization.brand);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
+  const passwordRef = useRef<TextInput>(null);
 
   // Показываем Alert при ошибке
   useEffect(() => {
@@ -44,20 +46,20 @@ export default function AuthScreen() {
   }, [error, dispatch]);
 
   const handleLogin = () => {
+    if (isLoading) return;
     // Валидация полей
     if (!email.trim()) {
       Alert.alert('Ошибка', 'Пожалуйста, введите email');
       return;
     }
 
-    if (!password.trim()) {
+    if (!password) {
       Alert.alert('Ошибка', 'Пожалуйста, введите пароль');
       return;
     }
 
     // Простая валидация email
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email.trim())) {
+    if (!isValidEmail(email)) {
       Alert.alert('Ошибка', 'Пожалуйста, введите корректный email');
       return;
     }
@@ -65,19 +67,17 @@ export default function AuthScreen() {
     // Диспатчим action для авторизации
     const credentials: LoginCredentials = {
       email: email.trim(),
-      password: password.trim(),
+      password,
     };
 
     dispatch(loginStart(credentials));
   };
 
-  const isFormDisabled = isLoading;
-
   return (
     // На Android с edgeToEdgeEnabled система не сжимает окно под клавиатуру, поэтому padding нужен и там.
     <KeyboardAvoidingView style={styles.screen} behavior="padding">
       <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
-        <View style={styles.form}>
+        <FormCard>
           {brand ? (
             <View style={styles.brand}>
               <OrganizationLogo key={brand.logoUrl} name={brand.name} logoUrl={brand.logoUrl} size={72} />
@@ -86,78 +86,66 @@ export default function AuthScreen() {
               </Text>
             </View>
           ) : null}
-          <Text style={styles.title}>Авторизация</Text>
+          <Text style={styles.title} accessibilityRole="header">Авторизация</Text>
 
-          {notice ? <Text style={styles.notice}>{notice}</Text> : null}
-
-          <View style={styles.inputContainer}>
-            <Text style={styles.label}>Email</Text>
-            <TextInput
-              style={[styles.input, isFormDisabled && styles.inputDisabled]}
-              placeholder="Введите email"
-              placeholderTextColor={c.placeholder}
-              value={email}
-              onChangeText={setEmail}
-              keyboardType="email-address"
-              autoCapitalize="none"
-              autoCorrect={false}
-              editable={!isFormDisabled}
+          {notice ? (
+            <View style={styles.notice}>
+              <StatusMessage message={notice} />
+            </View>
+          ) : null}
+          <FormField
+            label="Email"
+            placeholder="Введите email"
+            value={email}
+            onChangeText={setEmail}
+            keyboardType="email-address"
+            autoCapitalize="none"
+            autoCorrect={false}
+            autoComplete="username"
+            returnKeyType="next"
+            submitBehavior="submit"
+            onSubmitEditing={() => passwordRef.current?.focus()}
+            editable={!isLoading}
+          />
+          <PasswordField
+            ref={passwordRef}
+            label="Пароль"
+            placeholder="Введите пароль"
+            value={password}
+            onChangeText={setPassword}
+            autoComplete="current-password"
+            textContentType="password"
+            returnKeyType="done"
+            onSubmitEditing={handleLogin}
+            editable={!isLoading}
+          />
+          <View style={styles.forgot}>
+            <ActionButton
+              label="Забыли пароль?"
+              variant="text"
+              role="link"
+              disabled={isLoading}
+              onPress={() => {
+                prefillPasswordResetEmail(email);
+                router.push('./password-reset');
+              }}
             />
           </View>
-
-          <View style={styles.inputContainer}>
-            <Text style={styles.label}>Пароль</Text>
-            <View style={styles.passwordContainer}>
-              <TextInput
-                style={[
-                  styles.input,
-                  styles.passwordInput,
-                  isFormDisabled && styles.inputDisabled,
-                ]}
-                placeholder="Введите пароль"
-                placeholderTextColor={c.placeholder}
-                value={password}
-                onChangeText={setPassword}
-                secureTextEntry={!showPassword}
-                autoCapitalize="none"
-                autoCorrect={false}
-                editable={!isFormDisabled}
-              />
-              <TouchableOpacity
-                style={styles.eyeButton}
-                onPress={() => setShowPassword(!showPassword)}
-                disabled={isFormDisabled}
-              >
-                <Text style={styles.eyeButtonText}>
-                  {showPassword ? 'Скрыть' : 'Показать'}
-                </Text>
-              </TouchableOpacity>
-            </View>
+          <View style={styles.actions}>
+            <ActionButton label="Войти" onPress={handleLogin} loading={isLoading} />
+            <ActionButton
+              label="Нет аккаунта? Зарегистрироваться"
+              variant="text"
+              role="link"
+              onPress={() => router.push('/register')}
+              disabled={isLoading}
+            />
           </View>
-
-          <TouchableOpacity
-            style={[styles.button, isFormDisabled && styles.buttonDisabled]}
-            onPress={handleLogin}
-            disabled={isFormDisabled}
-          >
-            {isLoading ? (
-              <ActivityIndicator color={c.onPrimary} />
-            ) : (
-              <Text style={styles.buttonText}>Войти</Text>
-            )}
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.registerLink}
-            onPress={() => router.push('/register')}
-            disabled={isFormDisabled}
-            accessibilityRole="link"
-          >
-            <Text style={styles.registerText}>
-              Нет аккаунта? <Text style={styles.registerTextAccent}>Зарегистрироваться</Text>
-            </Text>
-          </TouchableOpacity>
-        </View>
+          <InstallHint />
+        </FormCard>
+        {__DEV__ ? (
+          <ActionButton label="UI Kit" variant="text" role="link" onPress={() => router.push('/ui-kit')} />
+        ) : null}
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -173,114 +161,28 @@ const useStyles = makeStyles((c) =>
       flexGrow: 1,
       justifyContent: 'center',
       alignItems: 'center',
-      padding: 20,
-    },
-    form: {
-      width: '100%',
-      maxWidth: 400,
-      backgroundColor: c.card,
-      borderRadius: 10,
-      padding: 24,
-      shadowColor: c.shadow,
-      shadowOffset: {
-        width: 0,
-        height: 2,
-      },
-      shadowOpacity: 0.1,
-      shadowRadius: 4,
-      elevation: 3,
+      padding: space.xl,
     },
     brand: {
       alignItems: 'center',
-      marginBottom: 20,
+      marginBottom: space.xl,
     },
     brandName: {
-      marginTop: 10,
-      fontSize: 16,
+      marginTop: space.md,
+      fontSize: typeSize.body,
       fontWeight: '600',
       textAlign: 'center',
       color: c.text,
     },
     title: {
-      fontSize: 24,
+      fontSize: typeSize.title,
       fontWeight: 'bold',
-      marginBottom: 32,
+      marginBottom: space.section,
       textAlign: 'center',
       color: c.text,
     },
-    notice: {
-      color: c.inkSecondary,
-      marginBottom: 20,
-      textAlign: 'center',
-    },
-    inputContainer: {
-      marginBottom: 20,
-    },
-    label: {
-      fontSize: 14,
-      fontWeight: '600',
-      marginBottom: 8,
-      color: c.text,
-    },
-    input: {
-      borderWidth: 1,
-      borderColor: c.border,
-      borderRadius: 8,
-      padding: 12,
-      fontSize: 16,
-      backgroundColor: c.card,
-      color: c.text,
-    },
-    passwordContainer: {
-      position: 'relative',
-    },
-    passwordInput: {
-      paddingRight: 80,
-    },
-    eyeButton: {
-      position: 'absolute',
-      right: 12,
-      top: 12,
-      paddingVertical: 4,
-      paddingHorizontal: 8,
-    },
-    eyeButtonText: {
-      color: c.primary,
-      fontSize: 14,
-      fontWeight: '500',
-    },
-    inputDisabled: {
-      backgroundColor: c.fill,
-      color: c.textTertiary,
-    },
-    button: {
-      backgroundColor: c.primary,
-      borderRadius: 8,
-      padding: 16,
-      alignItems: 'center',
-      justifyContent: 'center',
-      marginTop: 8,
-      minHeight: 50,
-    },
-    buttonDisabled: {
-      backgroundColor: c.disabled,
-    },
-    buttonText: {
-      color: c.onPrimary,
-      fontSize: 16,
-      fontWeight: '600',
-    },
-    registerLink: {
-      marginTop: 20,
-      alignItems: 'center',
-    },
-    registerText: {
-      fontSize: 14,
-      color: c.textSecondary,
-    },
-    registerTextAccent: {
-      color: c.primary,
-      fontWeight: '500',
-    },
+    notice: { marginBottom: space.lg },
+    forgot: { alignItems: 'flex-end', marginTop: -space.md },
+    actions: { gap: space.sm, marginTop: space.sm },
   })
 );

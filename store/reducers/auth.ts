@@ -86,6 +86,12 @@ const authSlice = createSlice({
       state.error = null;
       state.notice = null;
     },
+    passwordResetSignIn: (state, _action: PayloadAction<{ accessToken: string }>) => {
+      if (state.phase !== 'unauthenticated') return;
+      state.isLoading = true;
+      state.error = null;
+      state.notice = null;
+    },
     loginFailure: (state, action: PayloadAction<string>) => {
       state.phase = 'unauthenticated';
       state.setupStep = null;
@@ -110,12 +116,30 @@ const authSlice = createSlice({
       state.error = null;
       state.biometricsAvailable = action.payload.biometricsAvailable;
     },
+    /** Браузер: PIN нет, после входа сразу предложение включить Face ID (docs/pwa-ios.md). */
+    biometricOfferRequired: (state) => {
+      state.phase = 'pinSetupRequired';
+      state.setupStep = 'offerBiometrics';
+      state.isLoading = false;
+      state.error = null;
+      state.notice = null;
+      state.user = null;
+      state.biometricsAvailable = true;
+      state.biometricsEnabled = false;
+      state.remainingPinAttempts = MAX_PIN_ATTEMPTS;
+      state.sessionEpoch += 1;
+    },
     submitBiometricPreference: (
       state,
       _action: PayloadAction<{ enabled: boolean }>,
     ) => {
       state.isLoading = true;
       state.error = null;
+    },
+    /** Браузер: Face ID не включился. Остаёмся на экране предложения с объяснением. */
+    biometricEnrollmentFailed: (state, action: PayloadAction<string | null>) => {
+      state.isLoading = false;
+      state.error = action.payload;
     },
     unlockWithPin: (state, _action: PayloadAction<{ pin: string }>) => {
       state.isLoading = true;
@@ -245,9 +269,12 @@ export const {
   bootstrapLocked,
   loginStart,
   loginFailure,
+  passwordResetSignIn,
   completePinSetup,
   pinSetupCompleted,
+  biometricOfferRequired,
   submitBiometricPreference,
+  biometricEnrollmentFailed,
   unlockWithPin,
   unlockWithBiometrics,
   unlockFailed,

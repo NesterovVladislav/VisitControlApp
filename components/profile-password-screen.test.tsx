@@ -1,3 +1,5 @@
+import * as ReactNative from 'react-native';
+import { palettes } from '../constants/palette';
 import { fireEvent, render } from '@testing-library/react-native';
 
 import ChangePasswordScreen from '../app/profile/password';
@@ -65,9 +67,12 @@ describe('ChangePasswordScreen', () => {
     expect(dispatch).not.toHaveBeenCalledWith(expect.objectContaining({ type: changePasswordStart.type }));
   });
 
-  it('shows the server error under the current password', async () => {
+  it.each(['light', 'dark'] as const)('renders the field error in the %s theme', async (scheme) => {
+    const colorScheme = jest.spyOn(ReactNative, 'useColorScheme').mockReturnValue(scheme);
     const screen = await renderScreen({ passwordFieldErrors: { currentPassword: 'Неверный текущий пароль' } });
-    expect(screen.getByText('Неверный текущий пароль')).toBeTruthy();
+    expect(screen.getByText('Неверный текущий пароль')).toHaveStyle({ color: palettes[scheme].danger });
+    expect(screen.getByText('Сменить пароль')).toHaveStyle({ color: palettes[scheme].onActionPrimary });
+    colorScheme.mockRestore();
   });
 
   it('hides passwords until the eye is pressed', async () => {

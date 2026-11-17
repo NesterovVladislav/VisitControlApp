@@ -19,14 +19,24 @@ describe('API environment config', () => {
     }
   });
 
-  it('uses the test stand as a local fallback', () => {
+  it('uses the public HTTPS domain by default during development', () => {
     delete process.env.EXPO_PUBLIC_API_URL;
-    expect(getBackendUrl('visitControlServer')).toBe('http://93.77.168.178/api');
+    expect(getBackendUrl('visitControlServer')).toBe('https://core.dobrovhod.ru/api');
   });
 
   it('uses and normalises the environment-specific URL', () => {
     process.env.EXPO_PUBLIC_API_URL = 'https://api.example.invalid/api/';
     expect(getBackendUrl('visitControlServer')).toBe('https://api.example.invalid/api');
+  });
+
+  it('rejects a same-origin path outside the browser', () => {
+    Object.defineProperty(global, '__DEV__', { configurable: true, value: false });
+    delete process.env.EXPO_PUBLIC_ALLOW_INSECURE_HTTP;
+    process.env.EXPO_PUBLIC_API_URL = '/api';
+
+    expect(() => getBackendUrl('visitControlServer')).toThrow(
+      'EXPO_PUBLIC_API_URL must be set to an HTTPS URL for release builds',
+    );
   });
 
   it('fails fast when a release build has no HTTPS API URL', () => {

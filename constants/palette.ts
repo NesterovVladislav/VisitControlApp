@@ -29,6 +29,9 @@ export interface Palette {
   primary: string;
   /** Текст на кнопке с заливкой primary или danger */
   onPrimary: string;
+  /** Пара для основных действий UI Kit с контрастом текста в обеих темах. */
+  actionPrimary: string;
+  onActionPrimary: string;
   /** Светлая подложка под primary: аватар в профиле */
   primarySoft: string;
   danger: string;
@@ -70,6 +73,8 @@ export const palettes: Record<ColorScheme, Palette> = {
     iconMuted: '#bbb',
     disabled: '#ccc',
     primary: '#007AFF',
+    actionPrimary: '#0063D1',
+    onActionPrimary: '#FFFFFF',
     onPrimary: '#fff',
     primarySoft: '#E3F0FF',
     danger: '#C62828',
@@ -99,6 +104,8 @@ export const palettes: Record<ColorScheme, Palette> = {
     iconMuted: '#5a5a5e',
     disabled: '#3a3a3c',
     primary: '#0A84FF',
+    actionPrimary: '#70B6FF',
+    onActionPrimary: '#101820',
     onPrimary: '#fff',
     primarySoft: '#10304f',
     danger: '#FF6961',

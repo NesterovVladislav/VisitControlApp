@@ -3,6 +3,7 @@ import {
   call,
   put,
   select,
+  type StrictEffect,
   takeEvery,
   takeLatest,
   takeLeading,
@@ -13,16 +14,23 @@ import {
   getBiometricCapability,
   promptForBiometricUnlock,
 } from '../../services/auth/biometrics';
+import {
+  BiometricEnrollmentError,
+  BiometricEnrollmentFailure,
+} from '../../services/auth/biometric-enrollment-error';
 import { ensureCurrentInstallation } from '../../services/auth/install-marker';
+import { usesPinLock } from '../../services/auth/session-policy';
 import {
   ProtectedSessionRecord,
   protectedSessionRepository,
 } from '../../services/auth/protected-session';
-import { clearAuthToken, setAuthToken } from '../../services/auth/auth-token';
+import { clearAuthToken, getAuthToken, setAuthToken, waitForTokenRotation } from '../../services/auth/auth-token';
 import { loadChildrenStart } from '../reducers/children';
 import { ApiError } from '../../services/errors/api-error';
 import { RootState } from '../reducers';
 import {
+  biometricEnrollmentFailed,
+  biometricOfferRequired,
   bootstrapLocked,
   bootstrapPinSetupRequired,
   bootstrapSession,
@@ -34,6 +42,7 @@ import {
   logoutCompleted,
   logoutRequested,
   pinSetupCompleted,
+  passwordResetSignIn,
   retryProtectedStorage,
   retrySessionValidation,
   sessionExpired,
@@ -60,7 +69,26 @@ export const AUTH_ERRORS = {
   biometricsFailed: 'Не удалось подтвердить биометрию. Используйте PIN-код',
   validationUnavailable: 'Не удалось проверить сессию. Проверьте интернет и повторите',
   expired: 'Сессия истекла. Войдите снова',
+  // Браузер: PIN-кода нет, запасной путь — вход по паролю (docs/pwa-ios.md)
+  webBiometricsUnavailable: 'Face ID сейчас недоступен. Войдите по email и паролю',
+  webBiometricsFailed: 'Не удалось подтвердить Face ID. Попробуйте ещё раз или войдите по паролю',
+  webEnrollmentConfirm: 'Нажмите «Включить» ещё раз, чтобы подтвердить Face ID',
+  webEnrollmentUnsupported: 'На этом устройстве быстрый вход недоступен. Нажмите «Не сейчас»',
+  webEnrollmentFailed: 'Не удалось включить быстрый вход. Попробуйте ещё раз или нажмите «Не сейчас»',
 } as const;
+
+function enrollmentErrorText(reason: BiometricEnrollmentFailure): string | null {
+  switch (reason) {
+    case 'cancelled':
+      return null;
+    case 'confirmationRequired':
+      return AUTH_ERRORS.webEnrollmentConfirm;
+    case 'unsupported':
+      return AUTH_ERRORS.webEnrollmentUnsupported;
+    default:
+      return AUTH_ERRORS.webEnrollmentFailed;
+  }
+}
 
 function toLoginError(error: unknown): string {
   if (!(error instanceof ApiError)) return AUTH_ERRORS.generic;
@@ -79,7 +107,7 @@ function* failProtectedStorage() {
   yield put(storageUnavailable(AUTH_ERRORS.storage));
 }
 
-function* validateProtectedRecord(record: ProtectedSessionRecord) {
+function* validateProtectedRecord(record: ProtectedSessionRecord): Generator<StrictEffect, void> {
   setAuthToken(record.token);
   const expectedEpoch: number = yield select(
     (state: RootState) => state.auth.sessionEpoch,
@@ -105,7 +133,17 @@ function* validateProtectedRecord(record: ProtectedSessionRecord) {
     if (currentEpoch !== expectedEpoch) return;
 
     if (error instanceof ApiError && error.status === 401) {
-      yield put(sessionExpired());
+      const rotation = waitForTokenRotation(record.token);
+      if (rotation) yield call(() => rotation);
+      const epoch: number = yield select((state: RootState) => state.auth.sessionEpoch);
+      if (epoch !== expectedEpoch) return;
+      const currentToken = getAuthToken();
+      if (!currentToken) return;
+      if (currentToken !== record.token) {
+        yield call(validateProtectedRecord, { ...record, token: currentToken });
+      } else {
+        yield put(sessionExpired());
+      }
       return;
     }
     if (isRetryableValidationError(error)) {
@@ -153,16 +191,40 @@ export function* loginSaga(action: PayloadAction<LoginCredentials>) {
     return;
   }
 
+  yield* beginSignedInSession(token);
+}
+
+function* completePasswordResetSignIn(action: ReturnType<typeof passwordResetSignIn>) {
+  const phase: RootState['auth']['phase'] = yield select((state: RootState) => state.auth.phase);
+  if (phase === 'unauthenticated') {
+    yield* beginSignedInSession(action.payload.accessToken);
+  }
+}
+
+function* beginSignedInSession(token: string) {
   setAuthToken(token);
+  let record: ProtectedSessionRecord;
   try {
-    yield call(
+    record = yield call(
       [protectedSessionRepository, protectedSessionRepository.beginSession],
       token,
     );
-    yield put(bootstrapPinSetupRequired());
+    if (usesPinLock) {
+      yield put(bootstrapPinSetupRequired());
+      return;
+    }
+    // Браузер: PIN нет. Face ID предлагаем, если он есть; иначе сразу в приложение
+    const capability: Awaited<ReturnType<typeof getBiometricCapability>> =
+      yield call(getBiometricCapability);
+    if (capability.available) {
+      yield put(biometricOfferRequired());
+      return;
+    }
   } catch {
     yield* failProtectedStorage();
+    return;
   }
+  yield* validateProtectedRecord(record);
 }
 
 export function* completePinSetupSaga(
@@ -190,7 +252,12 @@ export function* submitBiometricPreferenceSaga(
       action.payload.enabled,
     );
     yield* validateProtectedRecord(record);
-  } catch {
+  } catch (error) {
+    // Только в браузере: Face ID не включился, но сессия цела — можно повторить или отказаться
+    if (error instanceof BiometricEnrollmentError) {
+      yield put(biometricEnrollmentFailed(enrollmentErrorText(error.reason)));
+      return;
+    }
     yield* failProtectedStorage();
   }
 }
@@ -231,11 +298,15 @@ export function* unlockWithBiometricsSaga() {
   if (result.kind !== 'success') {
     const error = result.kind === 'cancelled'
       ? null
-      : result.kind === 'lockedOut'
-        ? AUTH_ERRORS.biometricsLockedOut
-        : result.kind === 'unavailable'
-          ? AUTH_ERRORS.biometricsUnavailable
-          : AUTH_ERRORS.biometricsFailed;
+      : !usesPinLock
+        ? (result.kind === 'unavailable'
+          ? AUTH_ERRORS.webBiometricsUnavailable
+          : AUTH_ERRORS.webBiometricsFailed)
+        : result.kind === 'lockedOut'
+          ? AUTH_ERRORS.biometricsLockedOut
+          : result.kind === 'unavailable'
+            ? AUTH_ERRORS.biometricsUnavailable
+            : AUTH_ERRORS.biometricsFailed;
     yield put(unlockFailed({ error }));
     return;
   }
@@ -275,6 +346,7 @@ let cleanupInFlight = false;
 let pendingCleanupReason: LogoutReason | null = null;
 
 function noticeFor(reason: LogoutReason): string | undefined {
+  if (reason === 'passwordChanged') return 'Пароль изменён. Войдите с новым паролем.';
   return reason === 'expired' ? AUTH_ERRORS.expired : undefined;
 }
 
@@ -325,10 +397,18 @@ export function resetAuthSagaStateForTests(): void {
   pendingCleanupReason = null;
 }
 
+function* signIn(action: ReturnType<typeof loginStart> | ReturnType<typeof passwordResetSignIn>) {
+  if (passwordResetSignIn.match(action)) {
+    yield call(completePasswordResetSignIn, action);
+  } else if (loginStart.match(action)) {
+    yield call(loginSaga, action);
+  }
+}
+
 export function* watchLogin() {
   yield takeLatest(bootstrapSession.type, bootstrapSessionSaga);
   yield takeLatest(retryProtectedStorage.type, retryProtectedStorageSaga);
-  yield takeLeading(loginStart.type, loginSaga);
+  yield takeLeading([loginStart.type, passwordResetSignIn.type], signIn);
   yield takeLatest(completePinSetup.type, completePinSetupSaga);
   yield takeLatest(submitBiometricPreference.type, submitBiometricPreferenceSaga);
   yield takeLatest(unlockWithPin.type, unlockWithPinSaga);

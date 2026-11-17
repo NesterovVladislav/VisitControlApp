@@ -150,7 +150,7 @@ describe('QR scanner of the kindergarten employee', () => {
     await scan('https://example.com');
 
     expect(mockApi.redeemHandover).not.toHaveBeenCalled();
-    expect(await screen.findByText(/Это не код Visit Control/)).toBeTruthy();
+    expect(await screen.findByText(/Это не код ДоброВхода/)).toBeTruthy();
   });
 
   it('explains an expired code and lets the employee scan again', async () => {

@@ -4,13 +4,13 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ActivityIndicator,
   FlatList,
-  RefreshControl,
   SectionList,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native';
+import { RefreshControl } from '../../../components/ui/refresh-control';
 import SegmentedControl from '../../../components/segmented-control';
 import { IconSymbol } from '../../../components/ui/icon-symbol';
 import { LoadState, PresenceSections, useVisitListStyles } from '../../../components/visit-list';

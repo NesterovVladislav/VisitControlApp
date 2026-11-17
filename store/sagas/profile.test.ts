@@ -2,9 +2,11 @@ import { AxiosError } from 'axios';
 import { runSaga } from 'redux-saga';
 
 import { visitControlApi } from '../../services/api';
+import { clearAuthToken, getAuthToken, notifyUnauthorized, setAuthToken, setUnauthorizedHandler } from '../../services/auth/auth-token';
+import { protectedSessionRepository } from '../../services/auth/protected-session';
 import { ApiError } from '../../services/errors/api-error';
 import { PASSWORD_MESSAGES } from '../../utils/password-validation';
-import authReducer, { initialAuthState, userRefreshed } from '../reducers/auth';
+import authReducer, { initialAuthState, logoutRequested, userRefreshed } from '../reducers/auth';
 import {
   changePasswordFailure,
   changePasswordStart,
@@ -33,6 +35,11 @@ jest.mock('../../services/api', () => ({
   },
 }));
 
+jest.mock('../../services/auth/protected-session', () => ({
+  protectedSessionRepository: { replaceToken: jest.fn() },
+}));
+
+const replaceToken = jest.mocked(protectedSessionRepository.replaceToken);
 const mockApi = visitControlApi as jest.Mocked<typeof visitControlApi>;
 
 const user = {
@@ -68,7 +75,14 @@ function badRequest(data: unknown) {
 describe('profile saga', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    setAuthToken('previous-session');
+    replaceToken.mockResolvedValue(true);
     jest.spyOn(console, 'warn').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    clearAuthToken();
+    setUnauthorizedHandler(() => {});
   });
 
   it('updates the signed-in user after a background refresh', async () => {
@@ -108,6 +122,53 @@ describe('profile saga', () => {
 
     expect(mockApi.changePassword).toHaveBeenCalledWith('old-password', 'new-password');
     expect(dispatched).toEqual([changePasswordSuccess()]);
+    expect(replaceToken).not.toHaveBeenCalled();
+    expect(getAuthToken()).toBe('previous-session');
+  });
+
+  it('ignores an old 401 during persistence and installs the replacement token', async () => {
+    const unauthorized = jest.fn();
+    setUnauthorizedHandler(unauthorized);
+    mockApi.changePassword.mockResolvedValue('replacement-session');
+    replaceToken.mockImplementationOnce(async () => {
+      notifyUnauthorized();
+      expect(unauthorized).not.toHaveBeenCalled();
+      return true;
+    });
+    const { done, dispatched } = run(
+      changePasswordSaga, { auth: { sessionEpoch: 1 } }, changePasswordStart(passwords),
+    );
+    await done;
+    expect(replaceToken).toHaveBeenCalledWith('previous-session', 'replacement-session');
+    expect(dispatched).toEqual([changePasswordSuccess()]);
+    expect(getAuthToken()).toBe('replacement-session');
+    expect(unauthorized).not.toHaveBeenCalled();
+  });
+
+  it('releases a deferred 401 when a legacy response does not replace the token', async () => {
+    const unauthorized = jest.fn(() => clearAuthToken());
+    setUnauthorizedHandler(unauthorized);
+    mockApi.changePassword.mockImplementationOnce(async () => {
+      notifyUnauthorized();
+      return undefined;
+    });
+    const { done, dispatched } = run(
+      changePasswordSaga, { auth: { sessionEpoch: 1 } }, changePasswordStart(passwords),
+    );
+    await done;
+    expect(unauthorized).toHaveBeenCalledTimes(1);
+    expect(dispatched).toEqual([]);
+    expect(replaceToken).not.toHaveBeenCalled();
+  });
+
+  it('asks for a new sign-in when the new token cannot be written', async () => {
+    mockApi.changePassword.mockResolvedValue('replacement-session');
+    replaceToken.mockRejectedValueOnce(new Error('write failed'));
+    const { done, dispatched } = run(
+      changePasswordSaga, { auth: { sessionEpoch: 1 } }, changePasswordStart(passwords),
+    );
+    await done;
+    expect(dispatched).toEqual([logoutRequested({ reason: 'passwordChanged' })]);
   });
 
   it('shows a wrong current password under its field', async () => {
@@ -123,14 +184,17 @@ describe('profile saga', () => {
   });
 
   it('drops a password result from a previous session', async () => {
-    let resolve: (() => void) | undefined;
-    mockApi.changePassword.mockImplementation(() => new Promise<void>((r) => { resolve = r; }));
+    let resolve: ((token: string) => void) | undefined;
+    mockApi.changePassword.mockImplementationOnce(() => new Promise((r) => { resolve = r; }));
     const state = { auth: { sessionEpoch: 1 } };
     const { dispatched, done } = run(changePasswordSaga, state, changePasswordStart(passwords));
     state.auth = { sessionEpoch: 2 };
-    resolve?.();
+    setAuthToken('other-account');
+    resolve?.('replacement-session');
     await done;
 
+    expect(replaceToken).not.toHaveBeenCalled();
+    expect(getAuthToken()).toBe('other-account');
     expect(dispatched).toEqual([]);
   });
 
