@@ -295,7 +295,7 @@ npm run build:web
 npm run serve:web     # http://localhost:8099
 ```
 
-Другой бэкенд или порт: `API_TARGET=http://localhost:8080 PORT=3000 npm run serve:web` (локальный бэкенд — без `/api` в адресе). После правок в коде — снова `build:web`.
+Для локального JAR с копией базы и SMTP см. [инструкцию по запуску стенда](local-backend-jar.md). Локальный прокси слушает только `127.0.0.1`. После правок в коде соберите PWA заново через `build:web`.
 
 Общее для обоих способов:
 
