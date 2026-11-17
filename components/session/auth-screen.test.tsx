@@ -1,3 +1,5 @@
+import * as ReactNative from 'react-native';
+import { palettes } from '../../constants/palette';
 import { render } from '@testing-library/react-native';
 
 import { useAppDispatch, useAppSelector } from '../../store';
@@ -15,7 +17,8 @@ const mockUseAppDispatch = useAppDispatch as jest.MockedFunction<typeof useAppDi
 const mockUseAppSelector = useAppSelector as jest.MockedFunction<typeof useAppSelector>;
 
 describe('AuthScreen session notice', () => {
-  it('shows why a protected session returned to full sign-in', async () => {
+  it.each(['light', 'dark'] as const)('shows the sign-in notice in the %s theme', async (scheme) => {
+    const colorScheme = jest.spyOn(ReactNative, 'useColorScheme').mockReturnValue(scheme);
     mockUseAppDispatch.mockReturnValue(jest.fn());
     mockUseAppSelector.mockImplementation((selector) => selector({
       auth: {
@@ -27,7 +30,9 @@ describe('AuthScreen session notice', () => {
     } as never));
 
     const screen = await render(<AuthScreen />);
-    expect(screen.getByText('Сессия истекла. Войдите снова')).toBeTruthy();
+    expect(screen.getByText('Сессия истекла. Войдите снова')).toHaveStyle({ color: palettes[scheme].text });
+    expect(screen.getByText('Войти')).toHaveStyle({ color: palettes[scheme].onActionPrimary });
+    colorScheme.mockRestore();
   });
 
   it('shows the garden of the last sign-in on this device', async () => {

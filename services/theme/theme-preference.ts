@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Appearance } from 'react-native';
+import { Appearance, Platform } from 'react-native';
 
 /** Тема, выбранная в профиле: как в системе, всегда светлая или всегда тёмная. */
 export type ThemePreference = 'system' | 'light' | 'dark';
@@ -19,11 +19,13 @@ function isPreference(value: string | null): value is ThemePreference {
 }
 
 /**
- * Appearance.setColorScheme меняет тему всего приложения, в том числе системных Alert, клавиатуры и статус-бара;
- * useColorScheme() во всех экранах сразу видит новую тему. null — снова как в системе.
+ * Native: меняем также системные Alert, клавиатуру и статус-бар. В React Native Web
+ * setter отсутствует; веб-интерфейс получает выбор через subscribeThemePreference.
  */
 function apply(preference: ThemePreference) {
-  Appearance.setColorScheme(preference === 'system' ? null : preference);
+  if (Platform.OS !== 'web') {
+    Appearance.setColorScheme(preference === 'system' ? null : preference);
+  }
 }
 
 export function getThemePreference(): ThemePreference {

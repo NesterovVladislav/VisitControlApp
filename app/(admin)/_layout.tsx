@@ -114,10 +114,12 @@ export default function AdminLayout() {
         }}
       />
       <Tabs.Screen
-        name="people/index"
+        name="people"
         options={{
           ...adminOnly,
           title: 'Люди',
+          // У вкладки свой стек: список → карточка
+          headerShown: false,
           tabBarIcon: ({ color }) => <IconSymbol size={26} name="person.2.fill" color={color} />,
         }}
       />

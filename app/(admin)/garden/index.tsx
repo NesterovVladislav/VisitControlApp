@@ -1,7 +1,8 @@
 import { useFocusEffect } from '@react-navigation/native';
 import { Stack, useRouter } from 'expo-router';
 import React, { useCallback, useMemo, useRef, useState } from 'react';
-import { Alert, FlatList, RefreshControl, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, FlatList, Text, TouchableOpacity, View } from 'react-native';
+import { RefreshControl } from '../../../components/ui/refresh-control';
 import { useGardenStyles } from '../../../components/garden-styles';
 import OptionSheet from '../../../components/option-sheet';
 import { IconSymbol } from '../../../components/ui/icon-symbol';

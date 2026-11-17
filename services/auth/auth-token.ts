@@ -23,5 +23,35 @@ export function setUnauthorizedHandler(handler: () => void): void {
 }
 
 export function notifyUnauthorized(): void {
+  if (rotation?.previous === token) {
+    rotation.unauthorized = true;
+    return;
+  }
   unauthorizedHandler?.();
+}
+
+type TokenRotation = {
+  previous: string;
+  unauthorized: boolean;
+  done: Promise<void>;
+};
+
+let rotation: TokenRotation | undefined;
+
+/** Дождаться PATCH и записи токена, прежде чем завершать сессию из-за старого 401. */
+export function deferUnauthorizedDuringRotation(previous: string): () => void {
+  let resolve!: () => void;
+  const done = new Promise<void>((finish) => { resolve = finish; });
+  const pending = { previous, unauthorized: false, done };
+  rotation = pending;
+  return () => {
+    resolve();
+    if (rotation !== pending) return;
+    rotation = undefined;
+    if (pending.unauthorized && token === previous) notifyUnauthorized();
+  };
+}
+
+export function waitForTokenRotation(previous: string): Promise<void> | undefined {
+  return rotation?.previous === previous ? rotation.done : undefined;
 }

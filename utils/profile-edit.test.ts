@@ -31,6 +31,7 @@ describe('profile edit form', () => {
       noPatronymic: false,
       birthDate: '14.03.1990',
       phone: '+7 (912) 345-67-89',
+      gender: 'FEMALE',
     });
     expect(formFromUser({ ...admin, patronymic: null, phone: null, birthDate: null })).toMatchObject({
       noPatronymic: true,
@@ -44,6 +45,7 @@ describe('profile edit form', () => {
     expect(isProfileChanged({ ...initial, surname: ' Иванова ' }, initial)).toBe(false);
     expect(isProfileChanged({ ...initial, surname: 'Смирнова' }, initial)).toBe(true);
     expect(isProfileChanged({ ...initial, noPatronymic: true }, initial)).toBe(true);
+    expect(isProfileChanged({ ...initial, gender: 'MALE' }, initial)).toBe(true);
   });
 
   it('validates like registration, but phone is optional', () => {
@@ -65,12 +67,19 @@ describe('profile edit form', () => {
       patronymic: null,
       birth_date: '1990-03-14',
       phone: '+79123456789',
+      gender: 'FEMALE',
     });
     expect(toProfileUpdate({ ...form, phone: '' }).phone).toBeNull();
   });
 
   it('maps server fields to form fields', () => {
     expect(serverFieldToProfileField('first_name')).toBe('firstName');
+    expect(serverFieldToProfileField('gender')).toBe('gender');
     expect(serverFieldToProfileField('email')).toBeNull();
+  });
+
+  it('requires choosing a gender when a legacy profile has none', () => {
+    const form = formFromUser({ ...admin, gender: null });
+    expect(validateProfileForm(form, now)).toEqual({ gender: 'Выберите пол' });
   });
 });

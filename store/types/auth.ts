@@ -43,7 +43,7 @@ export type AuthPhase =
   | 'storageUnavailable';
 
 export type SetupStep = 'createPin' | 'offerBiometrics' | null;
-export type LogoutReason = 'user' | 'switchAccount' | 'expired';
+export type LogoutReason = 'user' | 'switchAccount' | 'expired' | 'passwordChanged';
 
 /**
  * Режим работы. Для сотрудника или администратора, который ещё и родитель, — что сейчас на экране:
@@ -69,6 +69,25 @@ export function isStaffRole(role: string | null | undefined): boolean {
  */
 export function isAdminRole(role: string | null | undefined): boolean {
   return role === ADMIN_ROLE || role === DIRECTOR_ROLE;
+}
+
+/** Уровни ролей как в таблице role бэкенда; у остальных ролей (родитель, посетитель) — 10. */
+const ROLE_LEVELS: Record<string, number> = {
+  TECH_ADMIN: 100,
+  [DIRECTOR_ROLE]: 90,
+  [ADMIN_ROLE]: 80,
+  [EMPLOYEE_ROLE]: 50,
+};
+
+function roleLevel(role: string | null | undefined): number {
+  return (role && ROLE_LEVELS[role]) || 10;
+}
+
+/**
+ * Управляет ли пользователь людьми с этой ролью: только строго ниже своей, как Actor.outranks на бэкенде.
+ */
+export function outranks(actorRole: string | null | undefined, role: string | null | undefined): boolean {
+  return roleLevel(role) < roleLevel(actorRole);
 }
 
 /**

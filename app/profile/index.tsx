@@ -1,7 +1,8 @@
 import { useFocusEffect } from '@react-navigation/native';
 import { Stack, useRouter } from 'expo-router';
 import React, { useCallback } from 'react';
-import { Alert, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { RefreshControl } from '../../components/ui/refresh-control';
 import PhotoEditor from '@/components/photo-editor';
 import ProfileChildren from '@/components/profile-children';
 import ProfileSummary from '@/components/profile-summary';
@@ -10,8 +11,8 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useAppDispatch, useAppSelector } from '../../store';
 import { logoutRequested } from '../../store/reducers/auth';
 import { refreshProfile } from '../../store/reducers/profile';
-import { isAdminRole } from '../../store/types/auth';
 import { canAddChild } from '../../utils/child-requests';
+import { getAppVersionLabel } from '../../utils/app-version';
 import { formatBirthDate, formatPhoneForDisplay, genderLabel } from '../../utils/profile-format';
 import { makeStyles, usePalette } from '../../hooks/use-palette';
 import { useThemePreference } from '../../hooks/use-theme-preference';
@@ -55,7 +56,7 @@ function InfoCard({ title, rows }: { title: string; rows: Row[] }) {
 /**
  * Профиль: личные данные, свои дети и «Добавить ребёнка», смена пароля, тема оформления и выход.
  * См. docs/profile-screen.md.
- * Свои данные меняет сам только администратор (кнопка «Изменить»), остальные — через администратора.
+ * Все роли меняют свои данные сразу через кнопку «Изменить».
  */
 export default function ProfileScreen() {
   const c = usePalette();
@@ -84,8 +85,6 @@ export default function ProfileScreen() {
     return null;
   }
 
-  const canEdit = isAdminRole(user.role);
-
   return (
     <ScrollView
       style={styles.screen}
@@ -96,17 +95,15 @@ export default function ProfileScreen() {
     >
       <Stack.Screen
         options={{
-          headerRight: canEdit
-            ? () => (
-                <TouchableOpacity
-                  onPress={() => router.push('/profile/edit')}
-                  accessibilityRole="button"
-                  hitSlop={8}
-                >
-                  <Text style={styles.headerButton}>Изменить</Text>
-                </TouchableOpacity>
-              )
-            : undefined,
+          headerRight: () => (
+            <TouchableOpacity
+              onPress={() => router.push('/profile/edit')}
+              accessibilityRole="button"
+              hitSlop={8}
+            >
+              <Text style={styles.headerButton}>Изменить</Text>
+            </TouchableOpacity>
+          ),
         }}
       />
       {/* Свою фотографию меняет сам пользователь; у технического администратора сада и фотографии нет */}
@@ -138,13 +135,6 @@ export default function ProfileScreen() {
 
       {canAddChild(user.role) ? <ProfileChildren /> : null}
 
-      {canEdit ? null : (
-        <Text style={styles.note}>
-          Изменить личные данные может только администратор сада после проверки. Если что-то указано неверно,
-          обратитесь к нему.
-        </Text>
-      )}
-
       <View style={styles.card}>
         <TouchableOpacity
           style={styles.actionRow}
@@ -169,6 +159,7 @@ export default function ProfileScreen() {
           <Text style={styles.logout}>Выйти</Text>
         </TouchableOpacity>
       </View>
+      <Text style={styles.version} selectable>{getAppVersionLabel()}</Text>
     </ScrollView>
   );
 }
@@ -243,14 +234,6 @@ const useStyles = makeStyles((c) =>
       color: c.primary,
       fontSize: 16,
     },
-    note: {
-      fontSize: 13,
-      color: c.textSecondary,
-      lineHeight: 18,
-      marginTop: -4,
-      marginBottom: 20,
-      marginHorizontal: 4,
-    },
     actionRow: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -264,6 +247,13 @@ const useStyles = makeStyles((c) =>
     logout: {
       fontSize: 16,
       color: c.danger,
+    },
+    version: {
+      fontSize: 13,
+      lineHeight: 18,
+      color: c.textSecondary,
+      textAlign: 'center',
+      marginBottom: 4,
     },
   })
 );

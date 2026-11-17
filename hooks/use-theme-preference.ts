@@ -8,6 +8,6 @@ import {
 
 /** Выбранная тема и её смена — для переключателя в профиле. */
 export function useThemePreference(): [ThemePreference, (preference: ThemePreference) => void] {
-  const preference = useSyncExternalStore(subscribeThemePreference, getThemePreference);
+  const preference = useSyncExternalStore(subscribeThemePreference, getThemePreference, () => 'system' as const);
   return [preference, (next) => void setThemePreference(next)];
 }

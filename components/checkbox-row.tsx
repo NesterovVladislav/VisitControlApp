@@ -38,6 +38,7 @@ export default function CheckboxRow({
           hitSlop={8}
           accessibilityRole="checkbox"
           accessibilityState={{ checked, disabled }}
+          aria-checked={checked}
           accessibilityLabel={accessibilityLabel}
         >
           {checked ? <Text style={styles.checkmark}>✓</Text> : null}

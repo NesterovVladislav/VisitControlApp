@@ -21,8 +21,12 @@ function SessionNavigator({ phase }: { phase: AuthPhase }) {
     // Логотип сада в шапке; до входа сада нет — заголовок обычный
     <Stack screenOptions={{ headerTitle: brandHeaderTitle }}>
       <Stack.Screen name="index" options={{ headerShown: false }} />
+      <Stack.Protected guard={__DEV__}>
+        <Stack.Screen name="ui-kit" options={{ title: 'UI Kit' }} />
+      </Stack.Protected>
       <Stack.Protected guard={publicRoutes}>
         <Stack.Screen name="auth" options={{ headerShown: false }} />
+        <Stack.Screen name="password-reset" options={{ headerShown: false, gestureEnabled: false }} />
         <Stack.Screen
           name="register"
           options={{ title: 'Регистрация', headerBackTitle: 'Назад' }}

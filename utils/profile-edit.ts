@@ -2,7 +2,7 @@ import { User } from '@/store/types/auth';
 import { formatDate, formatPhone, parseDate, phoneToE164 } from './input-masks';
 import { validateField } from './registration-validation';
 
-export type ProfileEditField = 'surname' | 'firstName' | 'patronymic' | 'birthDate' | 'phone';
+export type ProfileEditField = 'surname' | 'firstName' | 'patronymic' | 'birthDate' | 'gender' | 'phone';
 export type ProfileEditErrors = Partial<Record<ProfileEditField, string>>;
 
 /**
@@ -14,6 +14,7 @@ export interface ProfileEditForm {
   patronymic: string;
   noPatronymic: boolean;
   birthDate: string;
+  gender: User['gender'];
   phone: string;
 }
 
@@ -23,10 +24,11 @@ export interface ProfileUpdate {
   first_name: string;
   patronymic: string | null;
   birth_date: string;
+  gender: NonNullable<User['gender']>;
   phone: string | null;
 }
 
-export const PROFILE_EDIT_FIELDS: ProfileEditField[] = ['surname', 'firstName', 'patronymic', 'birthDate', 'phone'];
+export const PROFILE_EDIT_FIELDS: ProfileEditField[] = ['surname', 'firstName', 'patronymic', 'birthDate', 'gender', 'phone'];
 
 /** Начальные значения формы из профиля. */
 export function formFromUser(user: User): ProfileEditForm {
@@ -37,19 +39,19 @@ export function formFromUser(user: User): ProfileEditForm {
     patronymic: user.patronymic ?? '',
     noPatronymic: !user.patronymic,
     birthDate: user.birthDate ? formatDate(`${day}${month}${year}`) : '',
+    gender: user.gender,
     phone: user.phone ? formatPhone(user.phone) : '',
   };
 }
 
 /**
- * Проверка поля — теми же правилами, что при регистрации. Телефон необязателен: у администратора,
- * заведённого вручную, его может не быть.
+ * Проверка поля — теми же правилами, что при регистрации. Телефон необязателен.
  */
 export function validateProfileField(field: ProfileEditField, form: ProfileEditForm, now = new Date()): string | undefined {
   if (field === 'phone' && !form.phone) {
     return undefined;
   }
-  return validateField(field, { ...form, gender: null, email: '', consent: false, role: 'PARENT', children: [] }, now);
+  return validateField(field, { ...form, email: '', consent: false, role: 'PARENT', children: [] }, now);
 }
 
 export function validateProfileForm(form: ProfileEditForm, now = new Date()): ProfileEditErrors {
@@ -71,6 +73,7 @@ export function isProfileChanged(form: ProfileEditForm, initial: ProfileEditForm
     form.firstName.trim() !== initial.firstName.trim() ||
     patronymic(form) !== patronymic(initial) ||
     form.birthDate !== initial.birthDate ||
+    form.gender !== initial.gender ||
     (phoneToE164(form.phone) ?? form.phone) !== (phoneToE164(initial.phone) ?? initial.phone)
   );
 }
@@ -78,7 +81,7 @@ export function isProfileChanged(form: ProfileEditForm, initial: ProfileEditForm
 /** Тело запроса из проверенной формы. */
 export function toProfileUpdate(form: ProfileEditForm): ProfileUpdate {
   const birthDate = parseDate(form.birthDate);
-  if (!birthDate) {
+  if (!birthDate || !form.gender) {
     throw new Error('Form must be validated before building a request');
   }
   const patronymic = form.noPatronymic ? '' : form.patronymic.trim();
@@ -87,6 +90,7 @@ export function toProfileUpdate(form: ProfileEditForm): ProfileUpdate {
     first_name: form.firstName.trim(),
     patronymic: patronymic || null,
     birth_date: birthDate.iso,
+    gender: form.gender,
     phone: form.phone ? phoneToE164(form.phone) : null,
   };
 }
@@ -98,6 +102,7 @@ export function serverFieldToProfileField(serverField: string): ProfileEditField
     first_name: 'firstName',
     patronymic: 'patronymic',
     birth_date: 'birthDate',
+    gender: 'gender',
     phone: 'phone',
   };
   return map[serverField] ?? null;

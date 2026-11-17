@@ -113,7 +113,7 @@ export function setupAuthToken(
 ): void {
   client.interceptors.request.use((config) => {
     const token = getToken();
-    if (token && config.headers) {
+    if (token && config.headers && config.headers.Authorization !== false) {
       config.headers.Authorization = `Bearer ${token}`;
     }
     return config;

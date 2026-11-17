@@ -1,10 +1,12 @@
 import { PayloadAction } from '@reduxjs/toolkit';
 import { call, put, select, takeLatest, takeLeading } from 'redux-saga/effects';
 import { visitControlApi } from '../../services/api';
+import { deferUnauthorizedDuringRotation, getAuthToken, setAuthToken } from '../../services/auth/auth-token';
+import { protectedSessionRepository } from '../../services/auth/protected-session';
 import { ApiError } from '../../services/errors/api-error';
 import { PASSWORD_MESSAGES } from '../../utils/password-validation';
 import { RootState } from '../reducers';
-import { userRefreshed } from '../reducers/auth';
+import { logoutRequested, userRefreshed } from '../reducers/auth';
 import {
   ChangePasswordFailurePayload,
   ChangePasswordPayload,
@@ -30,8 +32,8 @@ export const PASSWORD_ERRORS = {
 export const SAVE_ERRORS = {
   phoneTaken: 'Этот номер уже привязан к другому аккаунту',
   serverRejected: 'Сервер не принял значение, проверьте поле',
-  forbidden: 'Менять личные данные сам может только администратор',
-  network: 'Нет соединения с сервером. Проверьте интернет и попробуйте ещё раз',
+  forbidden: 'Не удалось сохранить данные. Обновите профиль и попробуйте ещё раз',
+  network: 'Не удалось получить ответ сервера. Изменения могли сохраниться — проверьте соединение и обновите профиль',
   generic: 'Не удалось сохранить. Попробуйте ещё раз',
 } as const;
 
@@ -126,18 +128,44 @@ export function* refreshProfileSaga() {
 
 export function* changePasswordSaga(action: PayloadAction<ChangePasswordPayload>) {
   const sessionEpoch: number = yield select(selectSessionEpoch);
+  const previous = getAuthToken();
+  if (!previous) return;
+  const finishRotation = deferUnauthorizedDuringRotation(previous);
+  let confirmed = false;
   try {
-    yield call(
+    const token: string | undefined = yield call(
       [visitControlApi, visitControlApi.changePassword],
       action.payload.currentPassword,
       action.payload.newPassword
     );
-    if (!(yield* isCurrentSession(sessionEpoch))) return;
-    yield put(changePasswordSuccess());
+    confirmed = true;
+    if (getAuthToken() !== previous) return;
+    if (token && token !== previous) {
+      const replaced: boolean = yield call(
+        [protectedSessionRepository, protectedSessionRepository.replaceToken],
+        previous, token,
+      );
+      if (getAuthToken() !== previous) return;
+      if (!replaced) {
+        yield put(logoutRequested({ reason: 'passwordChanged' }));
+        return;
+      }
+      setAuthToken(token);
+    }
+    finishRotation();
+    if (getAuthToken() === (token ?? previous) && (yield* isCurrentSession(sessionEpoch))) {
+      yield put(changePasswordSuccess());
+    }
   } catch (error) {
-    if (!(yield* isCurrentSession(sessionEpoch))) return;
-    console.warn('[Profile Saga] Password change failed', error instanceof ApiError ? error.status : 'unknown');
-    yield put(changePasswordFailure(toChangePasswordFailure(error)));
+    if (getAuthToken() !== previous) return;
+    if (confirmed) {
+      yield put(logoutRequested({ reason: 'passwordChanged' }));
+    } else if (!(error instanceof ApiError && error.status === 401) && (yield* isCurrentSession(sessionEpoch))) {
+      console.warn('[Profile Saga] Password change failed', error instanceof ApiError ? error.status : 'unknown');
+      yield put(changePasswordFailure(toChangePasswordFailure(error)));
+    }
+  } finally {
+    finishRotation();
   }
 }
 

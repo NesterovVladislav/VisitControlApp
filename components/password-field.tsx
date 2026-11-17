@@ -1,15 +1,15 @@
 import React, { useState } from 'react';
 import { StyleSheet, TouchableOpacity } from 'react-native';
+import { controlHeight, space } from '../constants/ui-tokens';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import FormField, { FormFieldProps } from './form-field';
-import { makeStyles, usePalette } from '../hooks/use-palette';
+import { usePalette } from '../hooks/use-palette';
 
 /**
  * Поле пароля с кнопкой «показать пароль». Автоисправление и автозаглавные выключены.
  */
 export default function PasswordField(props: Omit<FormFieldProps, 'secureTextEntry' | 'accessory'>) {
   const c = usePalette();
-  const styles = useStyles();
   const [visible, setVisible] = useState(false);
 
   return (
@@ -25,19 +25,20 @@ export default function PasswordField(props: Omit<FormFieldProps, 'secureTextEnt
           onPress={() => setVisible((value) => !value)}
           accessibilityRole="button"
           accessibilityLabel={visible ? 'Скрыть пароль' : 'Показать пароль'}
-          hitSlop={8}
+          disabled={props.editable === false}
+          accessibilityState={{ disabled: props.editable === false }}
         >
-          <IconSymbol name={visible ? 'eye.slash' : 'eye'} size={22} color={c.textTertiary} />
+          <IconSymbol name={visible ? 'eye.slash' : 'eye'} size={22} color={props.editable === false ? c.textTertiary : c.textSecondary} />
         </TouchableOpacity>
       }
     />
   );
 }
 
-const useStyles = makeStyles((c) =>
-  StyleSheet.create({
-    toggle: {
-      paddingHorizontal: 12,
-    },
-  })
-);
+const styles = StyleSheet.create({
+  toggle: {
+    minHeight: controlHeight.touch,
+    justifyContent: 'center',
+    paddingHorizontal: space.md,
+  },
+});

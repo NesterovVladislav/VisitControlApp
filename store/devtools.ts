@@ -1,5 +1,6 @@
 const SECRET_ACTION_TYPES = new Set([
   'auth/loginStart',
+  'auth/passwordResetSignIn',
   'auth/completePinSetup',
   'auth/unlockWithPin',
   'profile/changePasswordStart',

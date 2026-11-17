@@ -6,7 +6,6 @@ import {
   AppState,
   Modal,
   Pressable,
-  RefreshControl,
   ScrollView,
   SectionList,
   StyleSheet,
@@ -14,6 +13,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { RefreshControl } from './ui/refresh-control';
 import Avatar from './avatar';
 import CommentSheet from './comment-sheet';
 import QrScannerSheet from './qr-scanner-sheet';
