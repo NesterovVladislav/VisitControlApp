@@ -50,6 +50,7 @@ describe('ChangePasswordScreen', () => {
 
   it('sends the current and the new password', async () => {
     const screen = await renderScreen();
+    expect(screen.getByRole('button', { name: 'Сменить пароль' })).toBeDisabled();
     await fill(screen, 'old-password', 'new-password', 'new-password');
     await fireEvent.press(screen.getByRole('button', { name: 'Сменить пароль' }));
 
@@ -61,17 +62,32 @@ describe('ChangePasswordScreen', () => {
   it('does not send a form with mismatched passwords', async () => {
     const screen = await renderScreen();
     await fill(screen, 'old-password', 'new-password', 'new-passwort');
-    await fireEvent.press(screen.getByRole('button', { name: 'Сменить пароль' }));
 
+    expect(screen.getByRole('button', { name: 'Сменить пароль' })).toBeDisabled();
     expect(screen.getByText(PASSWORD_MESSAGES.mismatch)).toBeTruthy();
     expect(dispatch).not.toHaveBeenCalledWith(expect.objectContaining({ type: changePasswordStart.type }));
+  });
+
+  it('keeps the new password explanation in sync when the current password changes', async () => {
+    const screen = await renderScreen();
+    await fill(screen, 'old-password', 'new-password', 'new-password');
+    const submit = screen.getByRole('button', { name: 'Сменить пароль' });
+    expect(submit).toBeEnabled();
+
+    await fireEvent.changeText(screen.getByLabelText('Текущий пароль'), 'new-password');
+    expect(submit).toBeDisabled();
+    expect(screen.getByText(PASSWORD_MESSAGES.sameAsCurrent)).toBeVisible();
+
+    await fireEvent.changeText(screen.getByLabelText('Текущий пароль'), 'old-password');
+    expect(submit).toBeEnabled();
+    expect(screen.queryByText(PASSWORD_MESSAGES.sameAsCurrent)).toBeNull();
   });
 
   it.each(['light', 'dark'] as const)('renders the field error in the %s theme', async (scheme) => {
     const colorScheme = jest.spyOn(ReactNative, 'useColorScheme').mockReturnValue(scheme);
     const screen = await renderScreen({ passwordFieldErrors: { currentPassword: 'Неверный текущий пароль' } });
     expect(screen.getByText('Неверный текущий пароль')).toHaveStyle({ color: palettes[scheme].danger });
-    expect(screen.getByText('Сменить пароль')).toHaveStyle({ color: palettes[scheme].onActionPrimary });
+    expect(screen.getByText('Сменить пароль')).toHaveStyle({ color: palettes[scheme].textSecondary });
     colorScheme.mockRestore();
   });
 

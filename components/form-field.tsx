@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { controlHeight, radius, space, typeSize } from '../constants/ui-tokens';
-import { StyleSheet, Text, TextInput, TextInputProps, View } from 'react-native';
+import { StyleSheet, Text, TextInput, TextInputProps, View, type StyleProp, type ViewStyle } from 'react-native';
 import { makeStyles, usePalette } from '../hooks/use-palette';
 
 export interface FormFieldProps extends TextInputProps {
@@ -11,6 +11,7 @@ export interface FormFieldProps extends TextInputProps {
   errorAction?: React.ReactNode;
   /** Элемент справа внутри поля, например кнопка «показать пароль». */
   accessory?: React.ReactNode;
+  containerStyle?: StyleProp<ViewStyle>;
   ref?: React.Ref<TextInput>;
 }
 
@@ -23,6 +24,7 @@ export default function FormField({
   hint,
   errorAction,
   accessory,
+  containerStyle,
   editable = true,
   style,
   ref,
@@ -34,7 +36,7 @@ export default function FormField({
   const c = usePalette();
   const styles = useStyles();
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, containerStyle]}>
       <Text style={styles.label}>{label}</Text>
       <View>
         <TextInput

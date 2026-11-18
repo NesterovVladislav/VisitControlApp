@@ -6,6 +6,7 @@ import { makeStyles, usePalette } from '../../hooks/use-palette';
 
 type Props = {
   label: string;
+  accessibilityLabel?: string;
   onPress: () => void;
   disabled?: boolean;
   loading?: boolean;
@@ -14,7 +15,7 @@ type Props = {
 };
 
 export function ActionButton({
-  label, onPress, disabled = false, loading = false, variant = 'primary', role = 'button',
+  label, accessibilityLabel = label, onPress, disabled = false, loading = false, variant = 'primary', role = 'button',
 }: Props) {
   const styles = useStyles();
   const colors = usePalette();
@@ -25,7 +26,7 @@ export function ActionButton({
   return (
     <Pressable
       accessibilityRole={role}
-      accessibilityLabel={label}
+      accessibilityLabel={accessibilityLabel}
       accessibilityState={{ disabled: blocked, busy: loading }}
       aria-busy={loading || undefined}
       disabled={blocked}

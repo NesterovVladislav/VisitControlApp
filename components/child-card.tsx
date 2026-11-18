@@ -26,6 +26,7 @@ interface ChildCardProps {
   /** Показать группу ребёнка: кто в ней и кто сейчас в саду */
   onShowGroup?: () => void;
   onRetryStatus: () => void;
+  absenceActions?: React.ReactNode;
 }
 
 /** Подпись поля комментария к отметке: зависит от того, приход отмечают или уход. */
@@ -81,6 +82,7 @@ export default function ChildCard({
   onShowQr,
   onShowGroup,
   onRetryStatus,
+  absenceActions,
 }: ChildCardProps) {
   const c = usePalette();
   const styles = useStyles();
@@ -161,6 +163,7 @@ export default function ChildCard({
           <Text style={styles.qrButtonText}>Показать QR-код сотруднику</Text>
         </TouchableOpacity>
       ) : null}
+      {absenceActions}
       {onShowGroup ? (
         <TouchableOpacity
           style={styles.qrButton}

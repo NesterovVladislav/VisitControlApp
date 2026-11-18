@@ -1,13 +1,14 @@
+import { getDefaultHeaderHeight } from '@react-navigation/elements';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  BackHandler, KeyboardAvoidingView, ScrollView, StyleSheet, Text, TextInput, View,
+  BackHandler, KeyboardAvoidingView, ScrollView, StyleSheet, Text, TextInput, useWindowDimensions, View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ActionButton, CodeField, FormCard, FormField, PasswordField, StatusMessage } from '../components/ui';
 import { IconSymbol } from '../components/ui/icon-symbol';
-import { space, typeSize } from '../constants/ui-tokens';
+import { controlHeight, space, typeSize } from '../constants/ui-tokens';
 import { makeStyles, usePalette } from '../hooks/use-palette';
 import { formatCountdown, usePasswordReset } from '../hooks/use-password-reset';
 import { useAppDispatch, useAppSelector } from '../store';
@@ -28,6 +29,8 @@ type Reset = ReturnType<typeof usePasswordReset>;
 export default function PasswordResetScreen() {
   const reset = usePasswordReset();
   const styles = useStyles();
+  const dimensions = useWindowDimensions();
+  const headerHeight = Math.max(controlHeight.touch, getDefaultHeaderHeight(dimensions, false, 0));
   const router = useRouter();
   const dispatch = useAppDispatch();
   const signingIn = useAppSelector((state) => state.auth.isLoading);
@@ -53,7 +56,7 @@ export default function PasswordResetScreen() {
   return (
     <SafeAreaView style={styles.screen} edges={['top', 'bottom', 'left', 'right']}>
       {!success ? (
-        <View style={styles.header}>
+        <View style={[styles.header, { minHeight: headerHeight }]}>
           <View style={styles.back}>
             <ActionButton
               label="Назад"
@@ -252,7 +255,7 @@ function NewPasswordStep({ reset }: { reset: Reset }) {
             {password && !passwordError ? '✓ ' : ''}Не короче 8 символов
           </Text>
           <Text style={confirmation && !matchError ? styles.met : styles.caption}>
-            {confirmation && !matchError ? '✓ ' : ''}Пароли совпадают
+            {confirmation && !matchError ? '✓ Пароли совпадают' : 'Пароли должны совпадать'}
           </Text>
         </View>
         {reset.message && <StatusMessage message={reset.message} tone="error" />}
@@ -309,7 +312,6 @@ const useStyles = makeStyles((c) =>
     screen: { flex: 1, backgroundColor: c.background },
     flex: { flex: 1 },
     header: {
-      minHeight: 56,
       backgroundColor: c.card,
       borderBottomWidth: StyleSheet.hairlineWidth,
       borderColor: c.separator,
@@ -320,7 +322,7 @@ const useStyles = makeStyles((c) =>
     back: { flexShrink: 0 },
     headerTitle: {
       color: c.text,
-      fontSize: typeSize.body,
+      fontSize: typeSize.navigationTitle,
       fontWeight: '700',
       flex: 1,
       textAlign: 'center',

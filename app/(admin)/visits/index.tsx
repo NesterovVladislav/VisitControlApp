@@ -10,6 +10,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { AbsenceDayEntry, useAbsenceDayEntry } from '../../../components/absence-day-entry';
 import { RefreshControl } from '../../../components/ui/refresh-control';
 import SegmentedControl from '../../../components/segmented-control';
 import { IconSymbol } from '../../../components/ui/icon-symbol';
@@ -78,13 +79,20 @@ export default function VisitsScreen() {
   );
   // Подтверждение выключили, пока очередь была на экране
   const shown: Mode = mode === 'queue' && !queueEnabled ? 'present' : mode;
+  const { day, reload: reloadAbsences } = useAbsenceDayEntry(shown === 'present');
+
+  const reloadPresent = (refresh: boolean) => {
+    dispatch(loadPresentStart({ refresh }));
+    reloadAbsences();
+  };
 
   return (
     <View style={styles.screen}>
       <View style={styles.switcher}>
         <SegmentedControl options={options} value={shown} onChange={setMode} />
       </View>
-      {shown === 'queue' ? <VisitQueue /> : shown === 'present' ? <PresentList /> : <Journal />}
+      {shown === 'present' && <AbsenceDayEntry day={day} />}
+      {shown === 'queue' ? <VisitQueue /> : shown === 'present' ? <PresentList onReload={reloadPresent} /> : <Journal />}
     </View>
   );
 }
@@ -93,15 +101,14 @@ function childrenCount(count: number): string {
   return `${count} ${plural(count, ['ребёнок', 'ребёнка', 'детей'])}`;
 }
 
-function PresentList() {
-  const dispatch = useAppDispatch();
+function PresentList({ onReload }: { onReload: (refresh: boolean) => void }) {
   const { data, status, refreshing } = useAppSelector((state) => state.visits.present);
-  const reload = () => dispatch(loadPresentStart({ refresh: true }));
+  const reload = () => onReload(true);
   const onlyBranch = useMemo(() => singleBranchId(data), [data]);
   const openGroup = useOpenGroupMembers();
 
   if (status !== 'loaded') {
-    return <LoadState status={status} onRetry={() => dispatch(loadPresentStart())} />;
+    return <LoadState status={status} onRetry={() => onReload(false)} />;
   }
 
   // Бэкенд без разбивки по группам — один общий список без заголовка

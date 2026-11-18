@@ -86,7 +86,13 @@ const useStyles = makeStyles((c) =>
     focused: { borderColor: c.actionPrimary, borderWidth: 2 },
     invalid: { borderColor: c.danger },
     digit: { color: c.text, fontSize: typeSize.body, fontWeight: '600' },
-    input: { ...StyleSheet.absoluteFillObject, color: 'transparent', fontSize: typeSize.body, outlineWidth: 0 },
+    input: {
+      ...StyleSheet.absoluteFillObject,
+      color: 'transparent',
+      fontSize: typeSize.body,
+      // Chromium draws its automatic focus outline even at zero width. The cells show focus.
+      ...Platform.select({ web: { outlineStyle: 'solid', outlineWidth: 0 } as const }),
+    },
     error: { color: c.danger, fontSize: typeSize.caption, marginTop: space.xs },
   }),
 );
