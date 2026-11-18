@@ -1,4 +1,5 @@
 import { fireEvent, render } from '@testing-library/react-native';
+import { ActionButton } from './ui';
 
 import ChildCard, { commentLabel, decidedLabel, rejectedLabel } from './child-card';
 import { ChildStatus, ChildVisit } from '../store/types/children';
@@ -15,7 +16,7 @@ const idle: ChildVisit = { status: 'OUT', decidedBy: null, decidedAt: null, pend
 
 async function renderCard(
   visit: ChildVisit,
-  handlers: { onMark?: () => void; onCancel?: () => void; onShowQr?: () => void } = {},
+  handlers: { onMark?: () => void; onCancel?: () => void; onShowQr?: () => void; showAbsence?: boolean } = {},
 ) {
   return render(
     <ChildCard
@@ -26,6 +27,7 @@ async function renderCard(
       onMark={handlers.onMark ?? jest.fn()}
       onCancel={handlers.onCancel ?? jest.fn()}
       onShowQr={handlers.onShowQr}
+      absenceActions={handlers.showAbsence ? <ActionButton variant="text" label="Не придёт" onPress={jest.fn()} /> : undefined}
       onRetryStatus={jest.fn()}
     />,
   );
@@ -88,6 +90,15 @@ describe('child card and kindergarten confirmation', () => {
     expect(rejectedLabel({ status: 'OUT', reason: null })).toBe('Сад не подтвердил уход');
     expect(commentLabel(false)).toBe('Если ребёнка привели не лично Вы, укажите данные представителя');
     expect(commentLabel(true)).toBe('Если ребёнка забрали не лично Вы, укажите данные представителя');
+  });
+
+  it('keeps the arrival and QR actions together before absence tools', async () => {
+    const screen = await renderCard(idle, { onShowQr: jest.fn(), showAbsence: true });
+    expect(screen.getAllByRole('button').map((button) => button.props.accessibilityLabel)).toEqual([
+      'Привела в сад: Мария Иванова',
+      'Показать QR-код: Мария Иванова',
+      'Не придёт',
+    ]);
   });
 
   it('offers the QR code only where the kindergarten confirms visits and nothing is waiting', async () => {

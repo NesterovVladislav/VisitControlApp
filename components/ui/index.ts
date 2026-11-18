@@ -1,4 +1,5 @@
 export { ActionButton } from './action-button';
+export { BottomSheet } from './bottom-sheet';
 export { CodeField } from './code-field';
 export { FormCard } from './form-card';
 export { default as FormField } from '../form-field';

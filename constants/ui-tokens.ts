@@ -11,6 +11,6 @@ export const space = {
 
 export const radius = { control: 8, card: 10 } as const;
 
-export const typeSize = { caption: 13, label: 14, body: 16, title: 24 } as const;
+export const typeSize = { caption: 13, label: 14, body: 16, navigationTitle: 18, sheetTitle: 20, title: 24 } as const;
 
 export const controlHeight = { field: 46, action: 50, touch: 44 } as const;

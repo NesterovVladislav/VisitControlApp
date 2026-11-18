@@ -14,6 +14,7 @@ import {
 import { RefreshControl } from '../components/ui/refresh-control';
 import ChildCard, { commentLabel, markActionLabel } from '../components/child-card';
 import CommentSheet from '../components/comment-sheet';
+import ChildAbsence from '../components/child-absence';
 import ChildGroupSheet from '../components/child-group-sheet';
 import VisitQrSheet from '../components/visit-qr-sheet';
 import { useAppDispatch, useAppSelector } from '../store';
@@ -42,6 +43,12 @@ export default function ChildrenScreen() {
   const { items, listStatus, refreshing, statusById, markingIds, markError, qrAvailable } = useAppSelector(
     (state) => state.children
   );
+
+  const [absenceRefresh, setAbsenceRefresh] = useState(0);
+  function refreshChildren() {
+    setAbsenceRefresh((value) => value + 1);
+    dispatch(loadChildrenStart({ refresh: true }));
+  }
 
   const listStatusRef = useRef(listStatus);
   listStatusRef.current = listStatus;
@@ -253,12 +260,14 @@ export default function ChildrenScreen() {
             onShowQr={qrAvailable ? () => setQrChildId(item.id) : undefined}
             onShowGroup={() => setGroupChildId(item.id)}
             onRetryStatus={() => dispatch(loadStatusStart(item.id))}
+            absenceActions={<ChildAbsence child={item}
+              refresh={`${absenceRefresh}:${statusById[item.id]?.visit?.pending?.id ?? statusById[item.id]?.visit?.decidedAt ?? statusById[item.id]?.value ?? ''}`} />}
           />
         )}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
-            onRefresh={() => dispatch(loadChildrenStart({ refresh: true }))}
+            onRefresh={refreshChildren}
           />
         }
         ListEmptyComponent={
