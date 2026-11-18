@@ -14,7 +14,11 @@ import { ActionButton, StatusMessage } from './ui';
 type SheetTarget = { mode: 'create' } | { mode: 'list'; entry: AbsenceNotice };
 type SavedNotice = { message: string; entry?: AbsenceNotice };
 
-export default function ChildAbsence({ child, refresh }: { child: Child; refresh: string }) {
+export default function ChildAbsence({ child, refresh, onChanged }: {
+  child: Child;
+  refresh: string;
+  onChanged?: () => void;
+}) {
   const styles = useStyles();
   const [rules, setRules] = useState<AbsenceRules | null>(null);
   const [target, setTarget] = useState<SheetTarget | null>(null);
@@ -55,6 +59,11 @@ export default function ChildAbsence({ child, refresh }: { child: Child; refresh
     return () => clearTimeout(timer);
   }, [success]);
 
+  function refreshCard() {
+    setRevision((value) => value + 1);
+    onChanged?.();
+  }
+
   function saved(entry: AbsenceNotice, text: string, keepOpen?: boolean) {
     if (!keepOpen) setTarget(null);
     setSuccess({ message: text, entry: entry.status === 'ACTIVE' ? entry : undefined });
@@ -66,7 +75,7 @@ export default function ChildAbsence({ child, refresh }: { child: Child; refresh
           ? null
           : previous.current,
     }));
-    setRevision((value) => value + 1);
+    refreshCard();
   }
 
   if (!rules) return null;
@@ -111,7 +120,7 @@ export default function ChildAbsence({ child, refresh }: { child: Child; refresh
       {target && (
         <AbsenceSheet child={child} initialRules={rules} initialMode={target.mode}
           initialEntry={target.mode === 'list' ? target.entry : undefined}
-          onClose={() => setTarget(null)} onSaved={saved} onReload={() => setRevision(value => value + 1)} />
+          onClose={() => setTarget(null)} onSaved={saved} onReload={refreshCard} />
       )}
     </View>
   );

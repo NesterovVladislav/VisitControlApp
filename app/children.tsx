@@ -15,6 +15,8 @@ import { RefreshControl } from '../components/ui/refresh-control';
 import ChildCard, { commentLabel, markActionLabel } from '../components/child-card';
 import CommentSheet from '../components/comment-sheet';
 import ChildAbsence from '../components/child-absence';
+import { AttendanceEntry } from '../components/attendance-overview';
+import { hasAttendanceAccess, useAttendanceToday, useOwnAttendance } from '../hooks/use-own-attendance';
 import ChildGroupSheet from '../components/child-group-sheet';
 import VisitQrSheet from '../components/visit-qr-sheet';
 import { useAppDispatch, useAppSelector } from '../store';
@@ -30,6 +32,7 @@ import {
 import { isAdminRole, isStaffRole } from '../store/types/auth';
 import { Child, isInKindergarten, VISIT_COMMENT_MAX_LENGTH, VisitStatus } from '../store/types/children';
 import { makeStyles, usePalette } from '../hooks/use-palette';
+import { calendarMonth } from '../utils/calendar-month';
 
 /** Как часто перечитывать статусы, пока отметка ждёт подтверждения сада */
 const PENDING_POLL_MS = 12_000;
@@ -45,6 +48,19 @@ export default function ChildrenScreen() {
   );
 
   const [absenceRefresh, setAbsenceRefresh] = useState(0);
+  const [attendanceRefresh, setAttendanceRefresh] = useState(0);
+  const refreshAttendance = () => setAttendanceRefresh((value) => value + 1);
+  const attendanceChildren = items.filter(hasAttendanceAccess);
+  const visitRevision = attendanceChildren.map(({ id }) => {
+    const visit = statusById[id]?.visit;
+    return [id, visit?.status, visit?.decidedAt, visit?.pending?.id, visit?.rejected?.status];
+  });
+  const clock = useAttendanceToday(listStatus === 'loaded' && attendanceChildren.length > 0);
+  const month = clock?.value ? calendarMonth(clock.value) : null;
+  const attendance = useOwnAttendance(month?.from, month?.to, {
+    today: clock?.value, revision: JSON.stringify([absenceRefresh, attendanceRefresh, visitRevision]),
+  });
+  const summaries = new Map(attendance?.value?.map((row) => [row.id, row.summary]));
   function refreshChildren() {
     setAbsenceRefresh((value) => value + 1);
     dispatch(loadChildrenStart({ refresh: true }));
@@ -260,8 +276,12 @@ export default function ChildrenScreen() {
             onShowQr={qrAvailable ? () => setQrChildId(item.id) : undefined}
             onShowGroup={() => setGroupChildId(item.id)}
             onRetryStatus={() => dispatch(loadStatusStart(item.id))}
-            absenceActions={<ChildAbsence child={item}
+            absenceActions={<ChildAbsence child={item} onChanged={refreshAttendance}
               refresh={`${absenceRefresh}:${statusById[item.id]?.visit?.pending?.id ?? statusById[item.id]?.visit?.decidedAt ?? statusById[item.id]?.value ?? ''}`} />}
+            attendanceActions={hasAttendanceAccess(item) && (
+              <AttendanceEntry childName={`${item.firstName} ${item.surname}`.trim()} summary={summaries.get(item.id)}
+                onOpen={() => router.push({ pathname: '/child-attendance', params: { child: item.id } })} />
+            )}
           />
         )}
         refreshControl={

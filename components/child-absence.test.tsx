@@ -64,4 +64,17 @@ describe('parent absence card', () => {
       }
     },
   );
+  it('refreshes the month summary after checking an absence whose write response was lost', async () => {
+    const onChanged = jest.fn();
+    jest.mocked(AbsenceSheet).mockImplementation(({ onReload }) => (
+      <Pressable accessibilityRole="button" onPress={onReload}>
+        <Text>Проверить список отсутствий</Text>
+      </Pressable>
+    ));
+    const screen = await render(<ChildAbsence child={child} refresh="initial" onChanged={onChanged} />);
+    await fireEvent.press(screen.getByRole('button', { name: /Изменить 17\.11\.2026/ }));
+    await fireEvent.press(screen.getByRole('button', { name: 'Проверить список отсутствий' }));
+    expect(onChanged).toHaveBeenCalledTimes(1);
+  });
+
 });

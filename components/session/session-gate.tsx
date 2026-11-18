@@ -43,6 +43,10 @@ function SessionNavigator({ phase }: { phase: AuthPhase }) {
           }}
         />
         <Stack.Screen
+          name="child-attendance"
+          options={{ title: 'Посещения', headerBackTitle: 'Мои дети' }}
+        />
+        <Stack.Screen
           name="profile/index"
           options={{ title: 'Профиль', headerBackTitle: 'Назад' }}
         />
