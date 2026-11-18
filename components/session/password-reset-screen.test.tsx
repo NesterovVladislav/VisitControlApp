@@ -55,7 +55,10 @@ describe('PasswordResetScreen', () => {
     await fireEvent.changeText(screen.getByLabelText('Новый пароль'), ' new-password ');
     await fireEvent.changeText(screen.getByLabelText('Повторите пароль'), 'different');
     expect(screen.getByRole('button', { name: 'Сохранить и войти' })).toBeDisabled();
+    expect(screen.getByText('Пароли должны совпадать')).toBeVisible();
+    expect(screen.queryByText('Пароли совпадают')).toBeNull();
     await fireEvent.changeText(screen.getByLabelText('Повторите пароль'), ' new-password ');
+    expect(screen.getByText('✓ Пароли совпадают')).toBeVisible();
     await fireEvent.press(screen.getByRole('button', { name: 'Сохранить и войти' }));
     expect(api.confirmPasswordReset).toHaveBeenCalledWith('synthetic-reset', ' new-password ', expect.anything());
     expect(screen.getByText('Пароль изменён')).toBeVisible();

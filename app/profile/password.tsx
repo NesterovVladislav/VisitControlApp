@@ -19,8 +19,8 @@ import {
   clearPasswordFieldError,
   resetPasswordChange,
 } from '../../store/reducers/profile';
-import { PasswordField as Field, PasswordFieldErrors, PasswordForm } from '../../store/types/profile';
-import { validatePasswordField, validatePasswordForm } from '../../utils/password-validation';
+import { PasswordField as Field, PasswordForm } from '../../store/types/profile';
+import { validatePasswordForm } from '../../utils/password-validation';
 import { makeStyles } from '../../hooks/use-palette';
 
 const EMPTY_FORM: PasswordForm = {
@@ -40,11 +40,12 @@ export default function ChangePasswordScreen() {
   const { passwordStatus, passwordFieldErrors, passwordError } = useAppSelector((state) => state.profile);
 
   const [form, setForm] = useState<PasswordForm>(EMPTY_FORM);
-  const [clientErrors, setClientErrors] = useState<PasswordFieldErrors>({});
   const newPasswordRef = useRef<TextInput>(null);
   const confirmPasswordRef = useRef<TextInput>(null);
 
   const isSubmitting = passwordStatus === 'submitting';
+  const validation = validatePasswordForm(form);
+  const ready = Object.keys(validation).length === 0;
 
   // Каждое открытие — с чистого листа; ошибки прошлой попытки не нужны и после ухода с экрана
   useEffect(() => {
@@ -64,50 +65,22 @@ export default function ChangePasswordScreen() {
   }, [passwordStatus, router]);
 
   function errorFor(field: Field): string | undefined {
-    return clientErrors[field] ?? passwordFieldErrors[field];
+    const clientError = form[field] ? validation[field] : undefined;
+    return clientError ?? passwordFieldErrors[field];
   }
 
   function setField(field: Field, value: string) {
-    const next = { ...form, [field]: value };
-    setForm(next);
-    setClientErrors((prev) => {
-      const errors = { ...prev };
-      delete errors[field];
-      // Подтверждение сверяется с новым паролем: при его изменении проверяем заново
-      if (field === 'newPassword' && prev.confirmPassword) {
-        const confirmError = validatePasswordField('confirmPassword', next);
-        if (confirmError) {
-          errors.confirmPassword = confirmError;
-        } else {
-          delete errors.confirmPassword;
-        }
-      }
-      return errors;
-    });
+    setForm(previous => ({ ...previous, [field]: value }));
     if (passwordFieldErrors[field]) {
       dispatch(clearPasswordFieldError(field));
     }
   }
 
-  function validateOnBlur(field: Field) {
-    // Пустое поле не ругаем при переходе дальше — только при отправке
-    if (!form[field]) {
-      return;
-    }
-    const error = validatePasswordField(field, form);
-    setClientErrors((prev) => ({ ...prev, [field]: error }));
-  }
-
   function submit() {
-    if (isSubmitting) {
+    if (isSubmitting || !ready) {
       return;
     }
     Keyboard.dismiss();
-    const errors = validatePasswordForm(form);
-    setClientErrors(errors);
-    if (Object.keys(errors).length > 0) {
-      return;
-    }
     dispatch(changePasswordStart({ currentPassword: form.currentPassword, newPassword: form.newPassword }));
   }
 
@@ -124,7 +97,6 @@ export default function ChangePasswordScreen() {
             label="Текущий пароль"
             value={form.currentPassword}
             onChangeText={(value) => setField('currentPassword', value)}
-            onBlur={() => validateOnBlur('currentPassword')}
             error={errorFor('currentPassword')}
             autoComplete="current-password"
             textContentType="password"
@@ -138,7 +110,6 @@ export default function ChangePasswordScreen() {
             label="Новый пароль"
             value={form.newPassword}
             onChangeText={(value) => setField('newPassword', value)}
-            onBlur={() => validateOnBlur('newPassword')}
             error={errorFor('newPassword')}
             hint="Не меньше 8 символов"
             autoComplete="new-password"
@@ -153,7 +124,6 @@ export default function ChangePasswordScreen() {
             label="Повторите новый пароль"
             value={form.confirmPassword}
             onChangeText={(value) => setField('confirmPassword', value)}
-            onBlur={() => validateOnBlur('confirmPassword')}
             error={errorFor('confirmPassword')}
             autoComplete="new-password"
             textContentType="newPassword"
@@ -168,7 +138,7 @@ export default function ChangePasswordScreen() {
             </View>
           ) : null}
 
-          <ActionButton label="Сменить пароль" onPress={submit} loading={isSubmitting} />
+          <ActionButton label="Сменить пароль" onPress={submit} disabled={!ready} loading={isSubmitting} />
           <Text style={styles.footer}>После смены вход на этом устройстве сохранится</Text>
         </FormCard>
       </ScrollView>

@@ -7,7 +7,9 @@ import PhotoEditor from '@/components/photo-editor';
 import ProfileChildren from '@/components/profile-children';
 import ProfileSummary from '@/components/profile-summary';
 import SegmentedControl from '@/components/segmented-control';
+import { ActionButton } from '@/components/ui';
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { space } from '../../constants/ui-tokens';
 import { useAppDispatch, useAppSelector } from '../../store';
 import { logoutRequested } from '../../store/reducers/auth';
 import { refreshProfile } from '../../store/reducers/profile';
@@ -96,13 +98,9 @@ export default function ProfileScreen() {
       <Stack.Screen
         options={{
           headerRight: () => (
-            <TouchableOpacity
-              onPress={() => router.push('/profile/edit')}
-              accessibilityRole="button"
-              hitSlop={8}
-            >
-              <Text style={styles.headerButton}>Изменить</Text>
-            </TouchableOpacity>
+            <View style={styles.headerAction}>
+              <ActionButton label="Изменить" variant="text" onPress={() => router.push('/profile/edit')} />
+            </View>
           ),
         }}
       />
@@ -230,10 +228,7 @@ const useStyles = makeStyles((c) =>
       color: c.text,
       textAlign: 'right',
     },
-    headerButton: {
-      color: c.primary,
-      fontSize: 16,
-    },
+    headerAction: { marginEnd: space.xxs },
     actionRow: {
       flexDirection: 'row',
       alignItems: 'center',
