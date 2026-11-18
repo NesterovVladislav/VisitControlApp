@@ -38,6 +38,7 @@ export interface Palette {
   /** Подложка баннера с ошибкой */
   dangerSoft: string;
   success: string;
+  successSoft: string;
   warning: string;
   shadow: string;
   /** Затемнение под шторкой */
@@ -80,6 +81,7 @@ export const palettes: Record<ColorScheme, Palette> = {
     danger: '#C62828',
     dangerSoft: '#FDECEA',
     success: '#2E7D32',
+    successSoft: '#EAF4EB',
     warning: '#B26A00',
     shadow: '#000',
     overlay: 'rgba(0,0,0,0.3)',
@@ -111,6 +113,7 @@ export const palettes: Record<ColorScheme, Palette> = {
     danger: '#FF6961',
     dangerSoft: '#3a1d1d',
     success: '#30D158',
+    successSoft: '#1C3526',
     warning: '#FFB340',
     shadow: '#000',
     overlay: 'rgba(0,0,0,0.6)',

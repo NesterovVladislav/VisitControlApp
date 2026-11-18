@@ -27,6 +27,7 @@ interface ChildCardProps {
   onShowGroup?: () => void;
   onRetryStatus: () => void;
   absenceActions?: React.ReactNode;
+  attendanceActions?: React.ReactNode;
 }
 
 /** Подпись поля комментария к отметке: зависит от того, приход отмечают или уход. */
@@ -83,6 +84,7 @@ export default function ChildCard({
   onShowGroup,
   onRetryStatus,
   absenceActions,
+  attendanceActions,
 }: ChildCardProps) {
   const c = usePalette();
   const styles = useStyles();
@@ -164,6 +166,7 @@ export default function ChildCard({
         </TouchableOpacity>
       ) : null}
       {absenceActions}
+      {attendanceActions}
       {onShowGroup ? (
         <TouchableOpacity
           style={styles.qrButton}
