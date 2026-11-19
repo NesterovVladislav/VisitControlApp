@@ -1,10 +1,14 @@
 import { fireEvent, render } from '@testing-library/react-native';
 
+import ParentAccount from './parent-account';
+import ProfileDetails from '../app/profile/details';
 import ProfileScreen from '../app/profile';
 import { useAppDispatch, useAppSelector } from '../store';
+import { switchMode } from '../store/reducers/auth';
 import { User } from '../store/types/auth';
 
 const mockPush = jest.fn();
+const mockReplace = jest.fn();
 let mockHeaderRight: (() => React.ReactNode) | undefined;
 
 jest.mock('../store', () => ({
@@ -15,7 +19,7 @@ jest.mock('@/components/ui/icon-symbol', () => ({ IconSymbol: () => null }));
 jest.mock('../utils/app-version', () => ({ getAppVersionLabel: () => 'Версия 1.0.2 · сборка 3' }));
 jest.mock('@react-navigation/native', () => ({ useFocusEffect: jest.fn() }));
 jest.mock('expo-router', () => ({
-  useRouter: () => ({ push: mockPush }),
+  useRouter: () => ({ push: mockPush, replace: mockReplace }),
   Stack: {
     Screen: ({ options }: { options: { headerRight?: () => React.ReactNode } }) => {
       mockHeaderRight = options.headerRight;
@@ -136,5 +140,42 @@ describe('own children in the profile', () => {
     expect(screen.getByText('Сад не добавил ребёнка')).toBeTruthy();
     // Отозвать можно только заявку, которая ещё ждёт
     expect(screen.getAllByText('Отозвать')).toHaveLength(1);
+  });
+});
+
+describe('parent account navigation', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockUseAppDispatch.mockReturnValue(jest.fn());
+  });
+
+  it('keeps contact details off the tab and opens them before editing', async () => {
+    const screen = await renderProfile('PARENT');
+    await screen.rerender(<ParentAccount />);
+    expect(screen.queryByText(user.email)).toBeNull();
+    await fireEvent.press(screen.getByText('Личные данные'));
+    expect(mockPush).toHaveBeenCalledWith('/profile/details');
+    await screen.rerender(<ProfileDetails />);
+    expect(screen.getByText(user.email)).toBeTruthy();
+    expect(screen.getByText('14.03.1990')).toBeTruthy();
+    await fireEvent.press(screen.getByText('Редактировать'));
+    expect(mockPush).toHaveBeenCalledWith('/profile/edit');
+  });
+
+  it('keeps settings and staff mode reachable from the tab', async () => {
+    const dispatch = jest.fn();
+    mockUseAppDispatch.mockReturnValue(dispatch);
+    const screen = await renderProfile('EMPLOYEE');
+    await screen.rerender(<ParentAccount />);
+    await fireEvent.press(screen.getByText('Сменить пароль'));
+    expect(mockPush).toHaveBeenCalledWith('/profile/password');
+    expect(screen.getByText('Системная')).toBeTruthy();
+    await fireEvent.press(screen.getByText('Тема'));
+    expect(mockPush).toHaveBeenCalledWith('/profile/theme');
+    await fireEvent.press(screen.getByRole('button', { name: 'Добавить ребёнка' }));
+    expect(mockPush).toHaveBeenCalledWith('/profile/add-child');
+    await fireEvent.press(screen.getByText('Режим сотрудника'));
+    expect(dispatch).toHaveBeenCalledWith(switchMode('admin'));
+    expect(mockReplace).toHaveBeenCalledWith('/visits');
   });
 });

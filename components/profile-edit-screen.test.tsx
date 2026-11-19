@@ -28,7 +28,7 @@ describe('own profile form', () => {
     jest.clearAllMocks();
     profile = { saveStatus: 'idle', saveFieldErrors: {}, saveError: null };
     (useAppDispatch as jest.Mock).mockReturnValue(dispatch);
-    (useAppSelector as jest.Mock).mockImplementation((selector) => selector({ auth: { user }, profile }));
+    (useAppSelector as jest.Mock).mockImplementation((selector) => selector({ auth: { user }, profile, photos: { own: [], busyUserIds: [], cancellingIds: [], error: null } }));
   });
 
   it('saves gender immediately with only allowed personal fields', async () => {

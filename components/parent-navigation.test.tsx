@@ -33,3 +33,11 @@ it('keeps the group accessible when calendar access is unavailable', async () =>
   await fireEvent.press(screen.getByRole('tab', { name: 'Группа' }));
   expect(onSelect).toHaveBeenCalledWith('group');
 });
+
+it('opens the parent account even without linked children', async () => {
+  const onSelect = jest.fn();
+  const screen = await render(<ParentSectionBar selected="home" showCalendar={false} showGroup={false} onSelect={onSelect} />);
+  expect(screen.queryByText('Группа')).toBeNull();
+  await fireEvent.press(screen.getByRole('tab', { name: 'Профиль' }));
+  expect(onSelect).toHaveBeenCalledWith('profile');
+});

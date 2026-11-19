@@ -14,6 +14,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import PhotoEditor from '../../components/photo-editor';
 import CheckboxRow from '../../components/checkbox-row';
 import FormField from '../../components/form-field';
 import SegmentedControl from '../../components/segmented-control';
@@ -119,6 +120,8 @@ export default function ProfileEditScreen() {
       keyboardVerticalOffset={headerHeight}
     >
       <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
+        {user.organization && <PhotoEditor userId={user.id} firstName={user.firstName} surname={user.surname}
+          photoUrl={user.photoUrl} canEdit />}
         <FormField
           label="Фамилия"
           value={form.surname}

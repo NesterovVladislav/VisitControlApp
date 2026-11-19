@@ -34,13 +34,13 @@ describe('group of own child', () => {
     });
     const screen = await render(<ChildGroupSheet child={petya} onClose={jest.fn()} />);
 
-    await waitFor(() => expect(screen.getByText('Группа «Ромашка»')).toBeTruthy());
+    await waitFor(() => expect(screen.getByText('Ромашка')).toBeTruthy());
     expect(getChildGroup).toHaveBeenCalledWith('c1');
-    expect(screen.getByText('В саду 1 из 2')).toBeTruthy();
+    expect(screen.getByText('1/2')).toBeTruthy();
     expect(screen.getByText('Борисова Анна')).toBeTruthy();
     expect(screen.getByText('Яковлев Петя')).toBeTruthy();
-    expect(screen.getAllByLabelText('В саду')).toHaveLength(1);
-    expect(screen.getAllByLabelText('Не в саду')).toHaveLength(1);
+    expect(screen.getAllByLabelText('Яковлев Петя, В саду')).toHaveLength(1);
+    expect(screen.getAllByLabelText('Борисова Анна, Не в саду')).toHaveLength(1);
   });
 
   it('keeps only the selected child’s group when an earlier response arrives later', async () => {
@@ -50,10 +50,10 @@ describe('group of own child', () => {
     const screen = await render(<ChildGroupPanel child={petya} />);
     await screen.rerender(<ChildGroupPanel child={{ ...petya, id: 'c2' }} />);
 
-    await waitFor(() => expect(screen.getByText('Группа «Лучики»')).toBeVisible());
+    await waitFor(() => expect(screen.getByText('Лучики')).toBeVisible());
     await act(async () => resolvePrevious({ name: 'Ромашка', children: [] }));
-    expect(screen.queryByText('Группа «Ромашка»')).toBeNull();
-    expect(screen.getByText('Группа «Лучики»')).toBeVisible();
+    expect(screen.queryByText('Ромашка')).toBeNull();
+    expect(screen.getByText('Лучики')).toBeVisible();
   });
 
   it('reloads on return from the profile and hides the previous roster until the response', async () => {
@@ -61,16 +61,16 @@ describe('group of own child', () => {
     let resolveNew!: (value: ChildGroup) => void;
     getChildGroup.mockImplementationOnce(() => new Promise(resolve => { resolveNew = resolve; }));
     const screen = await render(<ChildGroupPanel child={petya} />);
-    await screen.findByText('Группа «Ромашка»');
+    await screen.findByText('Ромашка');
 
     mockFocused = false;
     await screen.rerender(<ChildGroupPanel child={petya} />);
     mockFocused = true;
     await screen.rerender(<ChildGroupPanel child={petya} />);
     expect(getChildGroup).toHaveBeenCalledTimes(2);
-    expect(screen.queryByText('Группа «Ромашка»')).toBeNull();
+    expect(screen.queryByText('Ромашка')).toBeNull();
     await act(async () => resolveNew({ name: 'Лучики', children: [] }));
-    expect(screen.getByText('Группа «Лучики»')).toBeVisible();
+    expect(screen.getByText('Лучики')).toBeVisible();
   });
 
   it('says so when the child is not in any group yet', async () => {

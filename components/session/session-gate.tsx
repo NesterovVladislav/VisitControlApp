@@ -50,9 +50,11 @@ function SessionNavigator({ phase }: { phase: AuthPhase }) {
           name="profile/index"
           options={{ title: 'Профиль', headerBackTitle: 'Назад' }}
         />
+        <Stack.Screen name="profile/details" options={{ title: 'Личные данные', headerBackTitle: 'Профиль' }} />
+        <Stack.Screen name="profile/theme" options={{ title: 'Тема', headerBackTitle: 'Профиль' }} />
         <Stack.Screen
           name="profile/edit"
-          options={{ presentation: 'modal', title: 'Личные данные' }}
+          options={{ title: 'Редактирование', headerBackTitle: 'Назад' }}
         />
         <Stack.Screen
           name="profile/password"

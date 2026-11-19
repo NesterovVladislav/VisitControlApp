@@ -122,7 +122,7 @@ export default function ChildCard({
     <View style={styles.card}>
       {!hideIdentity && <View style={styles.header}>
         <Avatar firstName={child.firstName} surname={child.surname} photoUrl={child.photoUrl} size={48} />
-        <Text style={[styles.name, styles.headerName]}>{name}</Text>
+        <Text style={[styles.name, styles.headerName]}>{child.firstName}</Text>
       </View>}
       {(!hideIdentity || !known) && <View style={styles.status}>{statusView}</View>}
       {pending ? <Text style={styles.detail}>отмечено в {timeOfDay(pending.datetime)}</Text> : null}

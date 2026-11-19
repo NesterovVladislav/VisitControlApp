@@ -1,5 +1,5 @@
 import { useFocusEffect } from '@react-navigation/native';
-import { Stack, useRouter } from 'expo-router';
+import { Stack } from 'expo-router';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -12,6 +12,8 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import ParentAccount from '../components/parent-account';
 import { RefreshControl } from '../components/ui/refresh-control';
 import ChildCard from '../components/child-card';
 import ChildAbsence from '../components/child-absence';
@@ -21,7 +23,6 @@ import ParentVisitFlow from '../components/parent-visit-flow';
 import { ParentChildSelector, ParentSection, ParentSectionBar } from '../components/parent-navigation';
 import { hasAttendanceAccess } from '../hooks/use-own-attendance';
 import { useAppDispatch, useAppSelector } from '../store';
-import { logoutRequested, switchMode } from '../store/reducers/auth';
 import {
   cancelMarkStart,
   clearMarkError,
@@ -30,7 +31,6 @@ import {
   markVisitStart,
   refreshStatuses,
 } from '../store/reducers/children';
-import { isAdminRole, isStaffRole } from '../store/types/auth';
 import { Child, VisitStatus } from '../store/types/children';
 import { makeStyles, usePalette } from '../hooks/use-palette';
 import { space } from '../constants/ui-tokens';
@@ -41,7 +41,6 @@ const PENDING_POLL_MS = 12_000;
 export default function ChildrenScreen() {
   const c = usePalette();
   const styles = useStyles();
-  const router = useRouter();
   const dispatch = useAppDispatch();
   const { user } = useAppSelector((state) => state.auth);
   const { items, listStatus, refreshing, statusById, markingIds, markError, qrAvailable } = useAppSelector(
@@ -54,7 +53,7 @@ export default function ChildrenScreen() {
   const [calendarCursor, setCalendarCursor] = useState<string | null>(null);
   const selected = items.find(child => child.id === selectedId) ?? items[0];
   const showCalendar = Boolean(selected && hasAttendanceAccess(selected));
-  const currentSection = section === 'calendar' && !showCalendar ? 'home' : section;
+  const currentSection = (section === 'calendar' && !showCalendar) || (section === 'group' && !selected) ? 'home' : section;
   function selectChild(child: Child) {
     setSelectedId(child.id);
     if (section === 'calendar' && !hasAttendanceAccess(child)) setSection('home');
@@ -150,83 +149,41 @@ export default function ChildrenScreen() {
   const qrNext = qrCandidates.length > 1 ? qrCandidates[(qrIndex + 1) % qrCandidates.length] : null;
   const pollQrStatus = useCallback((id: string) => dispatch(loadStatusStart(id)), [dispatch]);
 
-  function confirmLogout() {
-    Alert.alert('Выйти из аккаунта?', undefined, [
-      { text: 'Отмена', style: 'cancel' },
-      {
-        text: 'Выйти',
-        style: 'destructive',
-        onPress: () => dispatch(logoutRequested({ reason: 'user' })),
-      },
-    ]);
-  }
-
-  const isStaff = isStaffRole(user?.role);
-
-  // Android показывает в Alert не больше трёх кнопок. Персонал выходит из профиля или из «Ещё»,
-  // поэтому у него вместо «Выйти» — возврат в рабочий режим.
-  function openMenu() {
-    Alert.alert(`${user?.firstName ?? ''} ${user?.surname ?? ''}`.trim(), undefined, [
-      { text: 'Профиль', onPress: () => router.push('/profile') },
-      isStaff
-        ? {
-            text: isAdminRole(user?.role) ? 'Режим администратора' : 'Режим сотрудника',
-            onPress: () => {
-              dispatch(switchMode('admin'));
-              router.replace('/visits');
-            },
-          }
-        : { text: 'Выйти', style: 'destructive', onPress: confirmLogout },
-      { text: 'Отмена', style: 'cancel' },
-    ]);
-  }
-
   const header = (
-    <Stack.Screen
-      options={{
-        title: currentSection === 'calendar' ? 'Календарь' : currentSection === 'group' ? 'Группа' : items.length === 1 ? 'Главная' : 'Мои дети',
-        headerRight: () => (
-          <TouchableOpacity
-            onPress={openMenu}
-            accessibilityRole="button"
-            accessibilityLabel="Меню"
-            hitSlop={8}
-          >
-            <Text style={styles.headerMenu}>⋯</Text>
-          </TouchableOpacity>
-        ),
-      }}
-    />
+    <Stack.Screen options={{
+      headerShown: currentSection !== 'profile',
+      title: currentSection === 'calendar' ? 'Календарь' : currentSection === 'group' ? 'Группа' : 'Главная',
+    }} />
+  );
+  const navigation = <ParentSectionBar selected={currentSection} showCalendar={showCalendar}
+    showGroup={Boolean(selected)} onSelect={setSection} />;
+
+  if (currentSection === 'profile') return (
+    <SafeAreaView edges={['top']} style={styles.screen}>
+      {header}
+      <ParentAccount />
+      {navigation}
+    </SafeAreaView>
   );
 
-  if (listStatus === 'idle' || listStatus === 'loading') {
-    return (
-      <View style={styles.center}>
-        {header}
-        <ActivityIndicator size="large" color={c.primary} />
-      </View>
-    );
-  }
-
-  if (listStatus === 'failed') {
-    return (
-      <View style={styles.center}>
-        {header}
-        <Text style={styles.message}>Не удалось загрузить данные</Text>
-        <TouchableOpacity style={styles.secondaryButton} onPress={() => dispatch(loadChildrenStart())}>
-          <Text style={styles.secondaryButtonText}>Повторить</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  }
-
-  if (!selected) return (
-    <View style={styles.center}>
+  if (!selected || listStatus !== 'loaded') return (
+    <View style={styles.screen}>
       {header}
-      <Text style={styles.message}>К вашему аккаунту пока не привязаны дети. Администратор сада добавит их после проверки заявки</Text>
-      <TouchableOpacity style={styles.secondaryButton} accessibilityRole="button" onPress={refreshChildren}>
-        <Text style={styles.secondaryButtonText}>Обновить</Text>
-      </TouchableOpacity>
+      <View style={styles.center}>
+        {listStatus === 'loading' || listStatus === 'idle' ? <ActivityIndicator size="large" color={c.primary} /> :
+          listStatus === 'failed' ? <>
+            <Text style={styles.message}>Не удалось загрузить данные</Text>
+            <TouchableOpacity style={styles.secondaryButton} onPress={() => dispatch(loadChildrenStart())}>
+              <Text style={styles.secondaryButtonText}>Повторить</Text>
+            </TouchableOpacity>
+          </> : <>
+            <Text style={styles.message}>К вашему аккаунту пока не привязаны дети. Администратор сада добавит их после проверки заявки</Text>
+            <TouchableOpacity style={styles.secondaryButton} accessibilityRole="button" onPress={refreshChildren}>
+              <Text style={styles.secondaryButtonText}>Обновить</Text>
+            </TouchableOpacity>
+          </>}
+      </View>
+      {navigation}
     </View>
   );
 
@@ -235,7 +192,7 @@ export default function ChildrenScreen() {
     <View style={styles.screen}>
       {header}
       <ParentChildSelector items={items} statuses={statusById} selected={selected} onSelect={selectChild} />
-      {items.length === 1 && currentSection !== 'home' && (
+      {items.length === 1 && currentSection === 'calendar' && (
         <Text style={styles.contextName}>{selected.firstName} {selected.surname}</Text>
       )}
       {currentSection === 'calendar' ? (
@@ -254,7 +211,7 @@ export default function ChildrenScreen() {
           />
         </ScrollView>
       )}
-      <ParentSectionBar selected={currentSection} showCalendar={showCalendar} onSelect={setSection} />
+      {navigation}
       {marking && markedChild && (
         <ParentVisitFlow key={markedChild.id} child={markedChild} seenStatus={marking.seenStatus}
           continueQr={marking.continueQr} status={statusById[markedChild.id]} qrAvailable={qrAvailable} next={qrNext} onPoll={pollQrStatus}
@@ -301,12 +258,6 @@ const useStyles = makeStyles((c) =>
       color: c.primary,
       fontSize: 16,
       fontWeight: '600',
-    },
-    headerMenu: {
-      color: c.primary,
-      fontSize: 24,
-      fontWeight: '700',
-      paddingHorizontal: 4,
     },
   })
 );

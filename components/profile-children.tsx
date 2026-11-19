@@ -20,7 +20,7 @@ import { childRequestName, ownChangeLabel, ownRequestStatusLabel } from '../util
  * «Мои дети» в профиле: дети, привязанные к пользователю (по нажатию — данные ребёнка и их правка),
  * его заявки на добавление ребёнка и кнопка «Добавить ребёнка». Есть у всех, кто состоит в саду: администратор и директор тоже бывают родителями.
  */
-export default function ProfileChildren() {
+export default function ProfileChildren({ compact = false }: { compact?: boolean }) {
   const c = usePalette();
   const styles = useStyles();
   const router = useRouter();
@@ -55,15 +55,21 @@ export default function ProfileChildren() {
 
   return (
     <>
-      <Text style={styles.sectionTitle}>МОИ ДЕТИ</Text>
-      <View style={styles.card}>
+      {compact ? <View style={styles.heading}>
+        <Text style={styles.headingText}>Мои дети</Text>
+        <TouchableOpacity accessibilityRole="button" accessibilityLabel="Добавить ребёнка" style={styles.plus}
+          onPress={() => router.push('/profile/add-child')}>
+          <IconSymbol name="plus" size={24} color={c.actionPrimary} />
+        </TouchableOpacity>
+      </View> : <Text style={styles.sectionTitle}>МОИ ДЕТИ</Text>}
+      <View style={compact ? undefined : styles.card}>
         {ownChildren
           ? ownChildren.map((child) => {
               const changeLabel = child.change ? ownChangeLabel(child.change) : null;
               return (
                 <TouchableOpacity
                   key={child.id}
-                  style={[styles.row, styles.rowBorder]}
+                  style={[styles.row, compact && styles.compactRow, styles.rowBorder]}
                   onPress={() => router.push({ pathname: '/profile/child/[id]', params: { id: child.id } })}
                   accessibilityRole="button"
                   accessibilityLabel={`Данные ребёнка: ${childRequestName(child)}`}
@@ -72,7 +78,7 @@ export default function ProfileChildren() {
                     <Avatar firstName={child.firstName} surname={child.surname} photoUrl={child.photoUrl} size={36} />
                   </View>
                   <View style={styles.rowText}>
-                    <Text style={styles.name}>{childRequestName(child)}</Text>
+                    <Text style={styles.name}>{compact ? child.firstName : childRequestName(child)}</Text>
                     {changeLabel ? (
                       <Text
                         style={[styles.status, child.change?.status === 'REJECTED' && styles.statusRejected]}
@@ -88,14 +94,14 @@ export default function ProfileChildren() {
             })
           : // Бэкенд без карточек детей: только имена, без правки
             children.map((child) => (
-              <View key={child.id} style={[styles.row, styles.rowBorder]}>
+              <View key={child.id} style={[styles.row, compact && styles.compactRow, styles.rowBorder]}>
                 <Text style={styles.name}>{`${child.surname} ${child.firstName}`.trim()}</Text>
               </View>
             ))}
         {own.map((request) => {
           const cancelling = cancellingIds.includes(request.id);
           return (
-            <View key={request.id} style={[styles.row, styles.rowBorder]}>
+            <View key={request.id} style={[styles.row, compact && styles.compactRow, styles.rowBorder]}>
               <View style={styles.rowText}>
                 <Text style={styles.name}>{childRequestName(request)}</Text>
                 <Text style={[styles.status, request.status === 'REJECTED' && styles.statusRejected]}>
@@ -117,14 +123,14 @@ export default function ProfileChildren() {
             </View>
           );
         })}
-        <TouchableOpacity
+        {!compact && <TouchableOpacity
           style={styles.row}
           onPress={() => router.push('/profile/add-child')}
           accessibilityRole="button"
         >
           <Text style={styles.action}>Добавить ребёнка</Text>
           <IconSymbol name="chevron.right" size={22} color={c.textTertiary} />
-        </TouchableOpacity>
+        </TouchableOpacity>}
       </View>
     </>
   );
@@ -132,6 +138,10 @@ export default function ProfileChildren() {
 
 const useStyles = makeStyles((c) =>
   StyleSheet.create({
+    compactRow: { paddingHorizontal: 0, paddingVertical: 8, minHeight: 50 },
+    heading: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 24 },
+    headingText: { fontSize: 18, fontWeight: '600', color: c.text },
+    plus: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
     sectionTitle: {
       fontSize: 12,
       fontWeight: '700',

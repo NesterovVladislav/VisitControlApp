@@ -1,3 +1,4 @@
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -10,9 +11,10 @@ import { BottomSheet } from './ui';
 import { IconSymbol } from './ui/icon-symbol';
 
 const sections = [
-  { id: 'home', label: 'Главная' },
-  { id: 'calendar', label: 'Календарь' },
-  { id: 'group', label: 'Группа' },
+  { id: 'home', label: 'Главная', icon: 'home-outline' },
+  { id: 'calendar', label: 'Календарь', icon: 'calendar-outline' },
+  { id: 'group', label: 'Группа', icon: 'people-outline' },
+  { id: 'profile', label: 'Профиль', icon: 'person-outline' },
 ] as const;
 export type ParentSection = typeof sections[number]['id'];
 
@@ -65,18 +67,21 @@ export function ParentChildSelector({ items, selected, statuses, onSelect }: {
   );
 }
 
-export function ParentSectionBar({ selected, showCalendar, onSelect }: {
+export function ParentSectionBar({ selected, showCalendar, showGroup = true, onSelect }: {
   selected: ParentSection;
   showCalendar: boolean;
+  showGroup?: boolean;
   onSelect: (section: ParentSection) => void;
 }) {
   const styles = useStyles();
   const { bottom } = useSafeAreaInsets();
   return (
     <View style={[styles.bar, { paddingBottom: Math.max(bottom, space.xxs) }]} accessibilityRole="tablist">
-      {sections.filter(tab => tab.id !== 'calendar' || showCalendar).map(tab => (
+      {sections.filter(tab => (tab.id !== 'calendar' || showCalendar) && (tab.id !== 'group' || showGroup)).map(tab => (
         <Pressable key={tab.id} accessibilityRole="tab" accessibilityState={{ selected: selected === tab.id }}
-          style={[styles.tab, selected === tab.id && styles.selected]} onPress={() => onSelect(tab.id)}>
+          accessibilityLabel={tab.label}
+          style={styles.tab} onPress={() => onSelect(tab.id)}>
+          <Ionicons name={tab.icon} size={22} color={selected === tab.id ? styles.activeText.color : styles.tabText.color} />
           <Text style={[styles.tabText, selected === tab.id && styles.activeText]}>{tab.label}</Text>
         </Pressable>
       ))}
@@ -96,7 +101,7 @@ const useStyles = makeStyles(c => StyleSheet.create({
   picker: { flex: 1, flexDirection: 'row', alignItems: 'center', paddingVertical: space.sm, minHeight: controlHeight.touch },
   grow: { flex: 1 },
   bar: { flexDirection: 'row', backgroundColor: c.card, borderTopWidth: StyleSheet.hairlineWidth, borderColor: c.separator },
-  tab: { flex: 1, minHeight: controlHeight.action, borderTopWidth: 2, borderColor: 'transparent',
+  tab: { flex: 1, minHeight: controlHeight.action, gap: space.xxs,
     padding: space.xs, justifyContent: 'center', alignItems: 'center' },
   tabText: { fontSize: typeSize.label, color: c.textSecondary, textAlign: 'center' },
   activeText: { color: c.actionPrimary, fontWeight: '700' },

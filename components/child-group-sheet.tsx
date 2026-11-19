@@ -1,6 +1,6 @@
 import { useFocusEffect } from '@react-navigation/native';
 import React, { useCallback, useRef, useState } from 'react';
-import { ActivityIndicator, AppState, Modal, SectionList, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, AppState, Modal, FlatList, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ActionButton, StatusMessage } from './ui';
@@ -63,36 +63,30 @@ function GroupContents({ child, onClose }: PanelProps) {
   }, [load, invalidateRequest]));
 
   const group = state.status === 'loaded' ? state.group : undefined;
-  const present = group?.children.filter((member) => member.present) ?? [];
-  const away = group?.children.filter((member) => !member.present) ?? [];
+  const present = group?.children.filter(member => member.present).length ?? 0;
   const header = (
     <View style={styles.header}>
-      <View style={styles.headerText}>
-        <Text style={styles.title} accessibilityRole="header">{group?.name ? `Группа «${group.name}»` : 'Группа'}</Text>
-        {onClose && group && group.children.length > 0 &&
-          <Text style={styles.subtitle}>В саду {present.length} из {group.children.length}</Text>}
-      </View>
+      <Text style={styles.title} accessibilityRole="header">{group?.name || 'Группа'}</Text>
+      {group?.name && (
+        <Text style={styles.count} accessibilityLabel={`В саду ${present} из ${group.children.length}`}>
+          {`${present}/${group.children.length}`}
+        </Text>
+      )}
       {onClose && <ActionButton variant="text" label="Закрыть" onPress={onClose} />}
     </View>
   );
 
   return (
-    <SectionList
+    <FlatList
       style={styles.screen}
-      sections={group?.children.length ? [
-        { title: 'В саду', data: present }, { title: 'Сейчас нет', data: away },
-      ] : []}
+      data={group?.children ?? []}
       contentContainerStyle={styles.content}
-      stickySectionHeadersEnabled={false}
       ListHeaderComponent={header}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void load(true)} />}
       keyExtractor={(item, index) => `${item.surname}-${item.firstName}-${index}`}
-      renderSectionHeader={({ section }) => (
-        <Text style={styles.sectionTitle} accessibilityRole="header">{section.title} · {section.data.length}</Text>
-      )}
       renderItem={({ item }) => (
-        <View style={styles.row}>
-          <View accessibilityLabel={item.present ? 'В саду' : 'Не в саду'}
+        <View style={styles.row} accessible accessibilityLabel={`${item.surname} ${item.firstName}, ${item.present ? 'В саду' : 'Не в саду'}`}>
+          <View
             style={[styles.dot, { backgroundColor: item.present ? c.success : c.textTertiary }]} />
           <Text style={[styles.member, item.own && styles.own]}>{`${item.surname} ${item.firstName}`.trim()}</Text>
         </View>
@@ -121,15 +115,12 @@ export default function ChildGroupSheet({ child, onClose }: { child: Child | nul
 }
 
 const useStyles = makeStyles((c) => StyleSheet.create({
-  screen: { flex: 1, backgroundColor: c.background },
+  screen: { flex: 1, backgroundColor: c.card },
   content: { paddingHorizontal: space.xl, paddingTop: space.xxl, paddingBottom: space.section,
     width: '100%', maxWidth: 440, alignSelf: 'center' },
   header: { flexDirection: 'row', alignItems: 'center', gap: space.md, marginBottom: space.lg },
-  headerText: { flex: 1, gap: space.xxs },
-  title: { fontSize: typeSize.sheetTitle, fontWeight: '700', color: c.text },
-  subtitle: { fontSize: typeSize.label, color: c.textSecondary },
-  sectionTitle: { marginTop: space.lg, marginBottom: space.sm, fontSize: typeSize.label,
-    fontWeight: '600', color: c.textSecondary },
+  title: { flex: 1, fontSize: typeSize.sheetTitle, fontWeight: '700', color: c.text },
+  count: { fontSize: typeSize.body, fontWeight: '700', color: c.text, fontVariant: ['tabular-nums'] },
   row: { flexDirection: 'row', alignItems: 'center', gap: space.md, paddingVertical: space.md,
     borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: c.separator },
   dot: { width: space.sm, height: space.sm, borderRadius: space.sm },
