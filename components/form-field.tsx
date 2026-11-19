@@ -5,6 +5,8 @@ import { makeStyles, usePalette } from '../hooks/use-palette';
 
 export interface FormFieldProps extends TextInputProps {
   label: string;
+  /** Строка раскрытия уже содержит видимую подпись поля. */
+  hideVisualLabel?: boolean;
   error?: string;
   hint?: string;
   /** Дополнительный элемент под ошибкой, например ссылка «Войти». */
@@ -20,6 +22,7 @@ export interface FormFieldProps extends TextInputProps {
  */
 export default function FormField({
   label,
+  hideVisualLabel = false,
   error,
   hint,
   errorAction,
@@ -37,7 +40,7 @@ export default function FormField({
   const styles = useStyles();
   return (
     <View style={[styles.container, containerStyle]}>
-      <Text style={styles.label}>{label}</Text>
+      {!hideVisualLabel && <Text style={styles.label}>{label}</Text>}
       <View>
         <TextInput
           ref={ref}

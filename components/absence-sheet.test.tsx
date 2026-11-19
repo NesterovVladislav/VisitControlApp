@@ -243,3 +243,24 @@ describe('absence write safety', () => {
     expect(screen.getByRole('button', { name: 'Проверить список отсутствий' })).toBeVisible();
   });
 });
+
+it('preserves the optional comment across disclosure and dismissal confirmation', async () => {
+  const onClose = jest.fn();
+  const screen = await render(
+    <AbsenceSheet child={{ id: 'child', firstName: 'Анна', surname: 'Примерова', linkRole: 'PARENT' }}
+      initialRules={freeRules} initialMode="create" onClose={onClose} onSaved={jest.fn()} />
+  );
+  const press = (name: string) => fireEvent.press(screen.getByRole('button', { name }));
+  await press('Комментарий');
+  await fireEvent.changeText(screen.getByLabelText('Комментарий (необязательно)'), 'Уезжаем за город');
+  await press('Комментарий');
+  expect(screen.queryByLabelText('Комментарий (необязательно)')).toBeNull();
+  await press('Закрыть');
+  expect(onClose).not.toHaveBeenCalled();
+  await press('Продолжить редактирование');
+  await press('Комментарий');
+  expect(screen.getByLabelText('Комментарий (необязательно)')).toHaveProp('value', 'Уезжаем за город');
+  await press('Закрыть');
+  await press('Выйти без сохранения');
+  expect(onClose).toHaveBeenCalledTimes(1);
+});

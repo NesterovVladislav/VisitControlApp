@@ -1,7 +1,7 @@
 import { act, fireEvent, render } from '@testing-library/react-native';
 
 import QrScannerSheet from './qr-scanner-sheet';
-import VisitQrSheet from './visit-qr-sheet';
+import ParentVisitFlow from './parent-visit-flow';
 import { visitControlApi } from '../services/api';
 import { ApiError } from '../services/errors/api-error';
 
@@ -12,6 +12,10 @@ let mockOnScanned: ((event: { data: string }) => void) | undefined;
 jest.mock('../services/api', () => ({
   visitControlApi: { issueHandover: jest.fn(), redeemHandover: jest.fn() },
 }));
+jest.mock('react-native-safe-area-context', () => ({
+  useSafeAreaInsets: () => ({ top: 0, right: 0, bottom: 0, left: 0 }),
+}));
+jest.mock('./ui/icon-symbol', () => ({ IconSymbol: () => null }));
 jest.mock('expo-camera', () => ({
   CameraView: (props: { onBarcodeScanned?: (event: { data: string }) => void }) => {
     mockOnScanned = props.onBarcodeScanned;
@@ -43,11 +47,15 @@ describe('child QR code for the kindergarten employee', () => {
     jest.clearAllMocks();
   });
 
-  function sheet(status: 'IN' | 'OUT', handlers: { onNext?: jest.Mock; onClose?: jest.Mock } = {}) {
+  function sheet(status: 'IN' | 'OUT', handlers: { onNext?: jest.Mock; onClose?: jest.Mock; onConfirm?: jest.Mock; seenStatus?: 'IN' | 'OUT'; qrAvailable?: boolean; continueQr?: boolean; child?: typeof maria } = {}) {
     return (
-      <VisitQrSheet
-        child={maria}
-        status={status}
+      <ParentVisitFlow
+        child={handlers.child ?? maria}
+        continueQr={handlers.continueQr}
+        status={{ value: status, visit: null, error: false, loading: false, notice: null }}
+        seenStatus={handlers.seenStatus ?? status}
+        qrAvailable={handlers.qrAvailable ?? true}
+        onConfirm={handlers.onConfirm ?? jest.fn()}
         next={petr}
         onPoll={jest.fn()}
         onNext={handlers.onNext ?? jest.fn()}
@@ -60,24 +68,47 @@ describe('child QR code for the kindergarten employee', () => {
     mockApi.issueHandover.mockResolvedValue({ token: 'vc1:abc', expiresIn: 90 });
     const screen = await render(sheet('OUT'));
 
-    expect(screen.getByText('Мария Иванова')).toBeTruthy();
-    expect(screen.getByText('Привожу в сад')).toBeTruthy();
-    expect(screen.getByText('Если ребёнка привели не лично Вы, укажите данные представителя')).toBeTruthy();
+    expect(screen.getByText('Приход · Мария Иванова')).toBeTruthy();
+    await fireEvent.press(screen.getByRole('button', { name: 'Кто привёл ребёнка?' }));
 
     await fireEvent.changeText(screen.getByPlaceholderText('Необязательно'), 'Привела бабушка');
+    expect(screen.getByText(`${'Привела бабушка'.length} / 256`)).toBeVisible();
     await fireEvent.press(screen.getByText('Показать QR-код'));
 
     expect(mockApi.issueHandover).toHaveBeenCalledWith('c1', 'IN', 'Привела бабушка');
     expect(await screen.findByText('QR:vc1:abc')).toBeTruthy();
     expect(screen.getByText('Код обновится через 1:30')).toBeTruthy();
+    expect(screen.getByText('Приход · Мария Иванова')).toBeVisible();
     expect(screen.getByText('Следующий: Пётр ›')).toBeTruthy();
+  });
+
+  it('returns from QR to the same draft and sends it with the regular mark', async () => {
+    const onConfirm = jest.fn();
+    mockApi.issueHandover.mockResolvedValue({ token: 'vc1:abc', expiresIn: 90 });
+    const screen = await render(sheet('OUT', { onConfirm }));
+    await fireEvent.press(screen.getByText('Кто привёл ребёнка?'));
+    await fireEvent.changeText(screen.getByPlaceholderText('Необязательно'), 'Привёл дедушка');
+    await fireEvent.press(screen.getByText('Показать QR-код'));
+    await screen.findByText('QR:vc1:abc');
+    await fireEvent.press(screen.getByText('Назад'));
+    expect(screen.getByDisplayValue('Привёл дедушка')).toBeTruthy();
+    await fireEvent.press(screen.getByText('Отправить отметку'));
+    expect(onConfirm).toHaveBeenCalledWith('Привёл дедушка');
+  });
+
+  it('offers only the regular mark when QR is disabled', async () => {
+    const onConfirm = jest.fn();
+    const screen = await render(sheet('IN', { onConfirm, qrAvailable: false }));
+    expect(screen.queryByText('Показать QR-код')).toBeNull();
+    await fireEvent.press(screen.getByText('Отметить уход'));
+    expect(onConfirm).toHaveBeenCalledWith('');
   });
 
   it('asks for a pick-up code when the child is in the kindergarten', async () => {
     mockApi.issueHandover.mockResolvedValue({ token: 'vc1:out', expiresIn: 90 });
     const screen = await render(sheet('IN'));
 
-    expect(screen.getByText('Забираю из сада')).toBeTruthy();
+    expect(screen.getByText('Уход · Мария Иванова')).toBeTruthy();
     await fireEvent.press(screen.getByText('Показать QR-код'));
 
     expect(mockApi.issueHandover).toHaveBeenCalledWith('c1', 'OUT', '');
@@ -91,17 +122,27 @@ describe('child QR code for the kindergarten employee', () => {
     await screen.findByText('QR:vc1:abc');
 
     // Сотрудник отсканировал: статус ребёнка в сторе сменился
-    await screen.rerender(sheet('IN', { onNext }));
+    await screen.rerender(sheet('IN', { onNext, seenStatus: 'OUT' }));
 
     expect(await screen.findByText('Сад принял ребёнка')).toBeTruthy();
     expect(screen.queryByText('QR:vc1:abc')).toBeNull();
     await fireEvent.press(screen.getByText('Следующий: Пётр ›'));
     expect(onNext).toHaveBeenCalledWith(petr);
+    await screen.rerender(sheet('IN', { child: petr, continueQr: true }));
+    expect(mockApi.issueHandover).toHaveBeenCalledTimes(1);
+    expect(screen.queryByText('Отправить отметку')).toBeNull();
+    await fireEvent.press(screen.getByRole('button', { name: 'Кто забрал ребёнка?' }));
+    expect(screen.getByText('0 / 256')).toBeVisible();
+    await fireEvent.press(screen.getByRole('button', { name: 'Показать QR-код' }));
+    await screen.findByText('QR:vc1:abc');
+    expect(mockApi.issueHandover).toHaveBeenLastCalledWith('c2', 'OUT', '');
+    expect(screen.getByText('Уход · Пётр Иванов')).toBeVisible();
   });
 
   it('explains why the code was not issued and keeps the comment', async () => {
     mockApi.issueHandover.mockRejectedValue(new ApiError('conflict', 409, '', { code: 'VISIT_ALREADY_PENDING' }));
     const screen = await render(sheet('OUT'));
+    await fireEvent.press(screen.getByRole('button', { name: 'Кто привёл ребёнка?' }));
     await fireEvent.changeText(screen.getByPlaceholderText('Необязательно'), 'Привела бабушка');
     await fireEvent.press(screen.getByText('Показать QR-код'));
 

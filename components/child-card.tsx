@@ -1,5 +1,5 @@
 import React from 'react';
-import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import {
   Child,
   ChildStatus,
@@ -11,6 +11,8 @@ import {
 import Avatar from './avatar';
 import { User } from '../store/types/auth';
 import { makeStyles, usePalette } from '../hooks/use-palette';
+import { ActionButton } from './ui';
+import { space, typeSize } from '../constants/ui-tokens';
 import { timeOfDay } from '../utils/visit-dates';
 
 interface ChildCardProps {
@@ -21,20 +23,9 @@ interface ChildCardProps {
   onMark: () => void;
   /** Отменить отметку, которая ждёт подтверждения сада */
   onCancel: () => void;
-  /** Показать QR-код ребёнка сотруднику сада; нет — в саду не включено подтверждение посещений */
-  onShowQr?: () => void;
-  /** Показать группу ребёнка: кто в ней и кто сейчас в саду */
-  onShowGroup?: () => void;
+  hideIdentity?: boolean;
   onRetryStatus: () => void;
   absenceActions?: React.ReactNode;
-  attendanceActions?: React.ReactNode;
-}
-
-/** Подпись поля комментария к отметке: зависит от того, приход отмечают или уход. */
-export function commentLabel(inKindergarten: boolean): string {
-  return inKindergarten
-    ? 'Если ребёнка забрали не лично Вы, укажите данные представителя'
-    : 'Если ребёнка привели не лично Вы, укажите данные представителя';
 }
 
 /** «Ждёт приёма в саду» / «В саду, ждёт выдачи» — пока сотрудник не подтвердил отметку. */
@@ -80,11 +71,9 @@ export default function ChildCard({
   marking,
   onMark,
   onCancel,
-  onShowQr,
-  onShowGroup,
+  hideIdentity = false,
   onRetryStatus,
   absenceActions,
-  attendanceActions,
 }: ChildCardProps) {
   const c = usePalette();
   const styles = useStyles();
@@ -131,69 +120,26 @@ export default function ChildCard({
 
   return (
     <View style={styles.card}>
-      <View style={styles.header}>
+      {!hideIdentity && <View style={styles.header}>
         <Avatar firstName={child.firstName} surname={child.surname} photoUrl={child.photoUrl} size={48} />
         <Text style={[styles.name, styles.headerName]}>{name}</Text>
-      </View>
-      <View style={styles.status}>{statusView}</View>
+      </View>}
+      {(!hideIdentity || !known) && <View style={styles.status}>{statusView}</View>}
       {pending ? <Text style={styles.detail}>отмечено в {timeOfDay(pending.datetime)}</Text> : null}
       {decided ? <Text style={styles.detail}>{decided}</Text> : null}
       {visit?.rejected && !pending ? <Text style={styles.notice}>{rejectedLabel(visit.rejected)}</Text> : null}
       {status?.notice ? <Text style={styles.notice}>{status.notice}</Text> : null}
-      <TouchableOpacity
-        style={[styles.button, pending && styles.buttonSecondary, disabled && styles.buttonDisabled]}
-        onPress={pending ? onCancel : onMark}
-        disabled={disabled}
-        accessibilityRole="button"
-        accessibilityLabel={`${actionLabel}: ${name}`}
-        accessibilityState={{ disabled, busy: marking }}
-      >
-        {marking ? (
-          <ActivityIndicator color={pending ? c.primary : c.onPrimary} />
-        ) : (
-          <Text style={[styles.buttonText, pending && !disabled && styles.buttonSecondaryText]}>{actionLabel}</Text>
-        )}
-      </TouchableOpacity>
-      {onShowQr && known && !pending ? (
-        <TouchableOpacity
-          style={styles.qrButton}
-          onPress={onShowQr}
-          disabled={marking}
-          accessibilityRole="button"
-          accessibilityLabel={`Показать QR-код: ${name}`}
-        >
-          <Text style={styles.qrButtonText}>Показать QR-код сотруднику</Text>
-        </TouchableOpacity>
-      ) : null}
+      <ActionButton label={actionLabel} accessibilityLabel={`${actionLabel}: ${name}`}
+        variant={pending ? 'text' : 'primary'} onPress={pending ? onCancel : onMark}
+        disabled={disabled} loading={marking} />
       {absenceActions}
-      {attendanceActions}
-      {onShowGroup ? (
-        <TouchableOpacity
-          style={styles.qrButton}
-          onPress={onShowGroup}
-          accessibilityRole="button"
-          accessibilityLabel={`Группа: ${name}`}
-        >
-          <Text style={styles.qrButtonText}>Кто в группе</Text>
-        </TouchableOpacity>
-      ) : null}
     </View>
   );
 }
 
 const useStyles = makeStyles((c) =>
   StyleSheet.create({
-    card: {
-      backgroundColor: c.card,
-      borderRadius: 10,
-      padding: 20,
-      marginBottom: 16,
-      shadowColor: c.shadow,
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.1,
-      shadowRadius: 4,
-      elevation: 3,
-    },
+    card: { gap: space.md, paddingVertical: space.sm },
     header: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -203,7 +149,7 @@ const useStyles = makeStyles((c) =>
       marginLeft: 12,
     },
     name: {
-      fontSize: 18,
+      fontSize: typeSize.title,
       fontWeight: '600',
       color: c.text,
     },
@@ -260,40 +206,6 @@ const useStyles = makeStyles((c) =>
     link: {
       color: c.primary,
       fontWeight: '500',
-    },
-    button: {
-      backgroundColor: c.primary,
-      borderRadius: 8,
-      padding: 14,
-      alignItems: 'center',
-      justifyContent: 'center',
-      marginTop: 16,
-      minHeight: 48,
-    },
-    buttonSecondary: {
-      backgroundColor: c.fill,
-    },
-    qrButton: {
-      alignItems: 'center',
-      justifyContent: 'center',
-      minHeight: 44,
-      marginTop: 8,
-    },
-    qrButtonText: {
-      color: c.primary,
-      fontSize: 15,
-      fontWeight: '500',
-    },
-    buttonSecondaryText: {
-      color: c.primary,
-    },
-    buttonDisabled: {
-      backgroundColor: c.disabled,
-    },
-    buttonText: {
-      color: c.onPrimary,
-      fontSize: 16,
-      fontWeight: '600',
     },
   })
 );

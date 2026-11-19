@@ -9,7 +9,7 @@ import AbsenceSheet from './absence-sheet';
 jest.mock('@react-navigation/native', () => ({
   useFocusEffect: (callback: () => void) => jest.requireActual('react').useEffect(callback, [callback]),
 }));
-jest.mock('../services/api/absence', () => ({ getAbsenceRules: jest.fn() }));
+jest.mock('../services/api/absence', () => ({ ...jest.requireActual('../services/api/absence'), getAbsenceRules: jest.fn() }));
 jest.mock('./absence-sheet', () => ({ __esModule: true, default: jest.fn() }));
 
 const child = { id: 'child', firstName: 'Мария', surname: 'Алексеева', linkRole: 'PARENT' };
@@ -24,7 +24,7 @@ const submitted: AbsenceNotice = {
 const rules: AbsenceRules = {
   today_date: '2026-11-17', earliest_from: '2026-11-17', max_days: 31,
   can_report: true, deadline_enabled: true, deadline: '20:00', time_zone: 'Asia/Novosibirsk',
-  today: null, tomorrow: null, period: null, current: earlier, reasons: [],
+  today: null, tomorrow: null, period: null, current: earlier, reasons: [{ code: 'ILLNESS', name: 'По болезни', comment_required: false }],
 };
 
 describe('parent absence card', () => {
@@ -44,6 +44,7 @@ describe('parent absence card', () => {
       try {
         const screen = await render(<ChildAbsence child={child} refresh="initial" />);
         expect(screen.getByText('17.11.2026')).toBeVisible();
+        expect(screen.getByRole('button', { name: /Изменить 17\.11\.2026\. По болезни/ })).toBeVisible();
         expect(screen.queryByRole('button', { name: /Сообщить о другом периоде/ })).toBeNull();
         await fireEvent.press(screen.getByRole('button', { name: /Изменить 17\.11\.2026/ }));
         await fireEvent.press(screen.getByRole('button', { name: 'Сохранить уведомление' }));

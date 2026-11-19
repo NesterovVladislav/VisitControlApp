@@ -5,20 +5,21 @@ import {
   ActivityIndicator,
   Alert,
   AppState,
-  FlatList,
+  BackHandler,
+  ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native';
 import { RefreshControl } from '../components/ui/refresh-control';
-import ChildCard, { commentLabel, markActionLabel } from '../components/child-card';
-import CommentSheet from '../components/comment-sheet';
+import ChildCard from '../components/child-card';
 import ChildAbsence from '../components/child-absence';
-import { AttendanceEntry } from '../components/attendance-overview';
-import { hasAttendanceAccess, useAttendanceToday, useOwnAttendance } from '../hooks/use-own-attendance';
-import ChildGroupSheet from '../components/child-group-sheet';
-import VisitQrSheet from '../components/visit-qr-sheet';
+import { ChildGroupPanel } from '../components/child-group-sheet';
+import { ChildAttendancePanel } from '../components/child-attendance-panel';
+import ParentVisitFlow from '../components/parent-visit-flow';
+import { ParentChildSelector, ParentSection, ParentSectionBar } from '../components/parent-navigation';
+import { hasAttendanceAccess } from '../hooks/use-own-attendance';
 import { useAppDispatch, useAppSelector } from '../store';
 import { logoutRequested, switchMode } from '../store/reducers/auth';
 import {
@@ -30,9 +31,9 @@ import {
   refreshStatuses,
 } from '../store/reducers/children';
 import { isAdminRole, isStaffRole } from '../store/types/auth';
-import { Child, isInKindergarten, VISIT_COMMENT_MAX_LENGTH, VisitStatus } from '../store/types/children';
+import { Child, VisitStatus } from '../store/types/children';
 import { makeStyles, usePalette } from '../hooks/use-palette';
-import { calendarMonth } from '../utils/calendar-month';
+import { space } from '../constants/ui-tokens';
 
 /** Как часто перечитывать статусы, пока отметка ждёт подтверждения сада */
 const PENDING_POLL_MS = 12_000;
@@ -48,19 +49,30 @@ export default function ChildrenScreen() {
   );
 
   const [absenceRefresh, setAbsenceRefresh] = useState(0);
-  const [attendanceRefresh, setAttendanceRefresh] = useState(0);
-  const refreshAttendance = () => setAttendanceRefresh((value) => value + 1);
-  const attendanceChildren = items.filter(hasAttendanceAccess);
-  const visitRevision = attendanceChildren.map(({ id }) => {
-    const visit = statusById[id]?.visit;
-    return [id, visit?.status, visit?.decidedAt, visit?.pending?.id, visit?.rejected?.status];
-  });
-  const clock = useAttendanceToday(listStatus === 'loaded' && attendanceChildren.length > 0);
-  const month = clock?.value ? calendarMonth(clock.value) : null;
-  const attendance = useOwnAttendance(month?.from, month?.to, {
-    today: clock?.value, revision: JSON.stringify([absenceRefresh, attendanceRefresh, visitRevision]),
-  });
-  const summaries = new Map(attendance?.value?.map((row) => [row.id, row.summary]));
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [section, setSection] = useState<ParentSection>('home');
+  const [calendarCursor, setCalendarCursor] = useState<string | null>(null);
+  const selected = items.find(child => child.id === selectedId) ?? items[0];
+  const showCalendar = Boolean(selected && hasAttendanceAccess(selected));
+  const currentSection = section === 'calendar' && !showCalendar ? 'home' : section;
+  function selectChild(child: Child) {
+    setSelectedId(child.id);
+    if (section === 'calendar' && !hasAttendanceAccess(child)) setSection('home');
+  }
+
+  useFocusEffect(useCallback(() => {
+    if (currentSection === 'home') return;
+    const back = BackHandler.addEventListener('hardwareBackPress', () => {
+      setSection('home');
+      return true;
+    });
+    return () => back.remove();
+  }, [currentSection]));
+  const attendanceUnavailable = useCallback(() => {
+    setSection('home');
+    dispatch(loadChildrenStart({ refresh: true }));
+  }, [dispatch]);
+
   function refreshChildren() {
     setAbsenceRefresh((value) => value + 1);
     dispatch(loadChildrenStart({ refresh: true }));
@@ -97,7 +109,7 @@ export default function ChildrenScreen() {
   );
 
   // Ребёнок, по которому открыто окно подтверждения отметки, и статус, который видел пользователь
-  const [marking, setMarking] = useState<{ child: Child; seenStatus: VisitStatus } | null>(null);
+  const [marking, setMarking] = useState<{ child: Child; seenStatus: VisitStatus; continueQr: boolean } | null>(null);
 
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (state) => {
@@ -116,13 +128,13 @@ export default function ChildrenScreen() {
     }
   }, [markError, dispatch]);
 
-  function confirmMark(child: Child) {
+  function confirmMark(child: Child, continueQr = false) {
     const seenStatus = statusById[child.id]?.value;
     if (!seenStatus) {
       return;
     }
     // Вместо Alert — шторка: в ней есть поле для комментария
-    setMarking({ child, seenStatus });
+    setMarking({ child, seenStatus, continueQr });
   }
 
   function confirmCancel(child: Child) {
@@ -132,58 +144,11 @@ export default function ChildrenScreen() {
     ]);
   }
 
-  // Ребёнок, чья группа сейчас открыта
-  const [groupChildId, setGroupChildId] = useState<string | null>(null);
-  const groupSheet = (
-    <ChildGroupSheet
-      child={items.find((child) => child.id === groupChildId) ?? null}
-      onClose={() => setGroupChildId(null)}
-    />
-  );
-
-  // Ребёнок, чей QR-код сейчас на экране. Следующий — тот, кому код тоже можно показать: у каждого ребёнка свой
-  const [qrChildId, setQrChildId] = useState<string | null>(null);
-  const qrChild = items.find((child) => child.id === qrChildId) ?? null;
-  const qrCandidates = items.filter(
-    (child) => statusById[child.id]?.value != null && !statusById[child.id]?.visit?.pending
-  );
-  const qrIndex = qrCandidates.findIndex((child) => child.id === qrChildId);
-  const qrNext =
-    qrCandidates.length > 1 && qrChildId
-      ? qrCandidates[(qrIndex + 1) % qrCandidates.length] ?? null
-      : null;
-  const pollQrStatus = useCallback((childId: string) => dispatch(loadStatusStart(childId)), [dispatch]);
-  const qrSheet = (
-    <VisitQrSheet
-      child={qrChild}
-      status={qrChild ? statusById[qrChild.id]?.value ?? null : null}
-      next={qrNext && qrNext.id !== qrChildId ? qrNext : null}
-      onPoll={pollQrStatus}
-      onNext={(child) => setQrChildId(child.id)}
-      onClose={() => setQrChildId(null)}
-    />
-  );
-
-  const markingInKindergarten = marking ? isInKindergarten(marking.seenStatus) : false;
-  const markSheet = (
-    <CommentSheet
-      visible={marking !== null}
-      title={marking ? `${marking.child.firstName} ${marking.child.surname}`.trim() : ''}
-      // Пол ребёнка сервер не отдаёт, поэтому вопрос без согласования по роду
-      message={markingInKindergarten ? 'Отметить уход из сада?' : 'Отметить приход в сад?'}
-      label={commentLabel(markingInKindergarten)}
-      placeholder="Необязательно"
-      maxLength={VISIT_COMMENT_MAX_LENGTH}
-      confirmLabel={markActionLabel(markingInKindergarten, user?.gender ?? null)}
-      onClose={() => setMarking(null)}
-      onConfirm={(comment) => {
-        if (marking) {
-          dispatch(markVisitStart({ childId: marking.child.id, seenStatus: marking.seenStatus, comment }));
-        }
-        setMarking(null);
-      }}
-    />
-  );
+  const markedChild = items.find(child => child.id === marking?.child.id);
+  const qrCandidates = items.filter(child => statusById[child.id]?.value != null && !statusById[child.id]?.visit?.pending);
+  const qrIndex = qrCandidates.findIndex(child => child.id === markedChild?.id);
+  const qrNext = qrCandidates.length > 1 ? qrCandidates[(qrIndex + 1) % qrCandidates.length] : null;
+  const pollQrStatus = useCallback((id: string) => dispatch(loadStatusStart(id)), [dispatch]);
 
   function confirmLogout() {
     Alert.alert('Выйти из аккаунта?', undefined, [
@@ -219,6 +184,7 @@ export default function ChildrenScreen() {
   const header = (
     <Stack.Screen
       options={{
+        title: currentSection === 'calendar' ? 'Календарь' : currentSection === 'group' ? 'Группа' : items.length === 1 ? 'Главная' : 'Мои дети',
         headerRight: () => (
           <TouchableOpacity
             onPress={openMenu}
@@ -254,78 +220,62 @@ export default function ChildrenScreen() {
     );
   }
 
-  return (
-    <>
+  if (!selected) return (
+    <View style={styles.center}>
       {header}
-      {markSheet}
-      {qrSheet}
-      {groupSheet}
-      <FlatList
-        style={styles.list}
-        contentContainerStyle={items.length === 0 ? styles.emptyContainer : styles.container}
-        data={items}
-        keyExtractor={(child) => child.id}
-        renderItem={({ item }) => (
-          <ChildCard
-            child={item}
-            status={statusById[item.id]}
-            gender={user?.gender ?? null}
-            marking={markingIds.includes(item.id)}
-            onMark={() => confirmMark(item)}
-            onCancel={() => confirmCancel(item)}
-            onShowQr={qrAvailable ? () => setQrChildId(item.id) : undefined}
-            onShowGroup={() => setGroupChildId(item.id)}
-            onRetryStatus={() => dispatch(loadStatusStart(item.id))}
-            absenceActions={<ChildAbsence child={item} onChanged={refreshAttendance}
-              refresh={`${absenceRefresh}:${statusById[item.id]?.visit?.pending?.id ?? statusById[item.id]?.visit?.decidedAt ?? statusById[item.id]?.value ?? ''}`} />}
-            attendanceActions={hasAttendanceAccess(item) && (
-              <AttendanceEntry childName={`${item.firstName} ${item.surname}`.trim()} summary={summaries.get(item.id)}
-                onOpen={() => router.push({ pathname: '/child-attendance', params: { child: item.id } })} />
-            )}
+      <Text style={styles.message}>К вашему аккаунту пока не привязаны дети. Администратор сада добавит их после проверки заявки</Text>
+      <TouchableOpacity style={styles.secondaryButton} accessibilityRole="button" onPress={refreshChildren}>
+        <Text style={styles.secondaryButtonText}>Обновить</Text>
+      </TouchableOpacity>
+    </View>
+  );
+
+  const status = statusById[selected.id];
+  return (
+    <View style={styles.screen}>
+      {header}
+      <ParentChildSelector items={items} statuses={statusById} selected={selected} onSelect={selectChild} />
+      {items.length === 1 && currentSection !== 'home' && (
+        <Text style={styles.contextName}>{selected.firstName} {selected.surname}</Text>
+      )}
+      {currentSection === 'calendar' ? (
+        <ChildAttendancePanel childId={selected.id} cursor={calendarCursor} onCursorChange={setCalendarCursor} onUnavailable={attendanceUnavailable} />
+      ) : currentSection === 'group' ? (
+        <ChildGroupPanel key={selected.id} child={selected} />
+      ) : (
+        <ScrollView contentContainerStyle={styles.container}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refreshChildren} />}>
+          <ChildCard key={selected.id} child={selected} status={status} hideIdentity={items.length > 1}
+            gender={user?.gender ?? null} marking={markingIds.includes(selected.id)}
+            onMark={() => confirmMark(selected)} onCancel={() => confirmCancel(selected)}
+            onRetryStatus={() => dispatch(loadStatusStart(selected.id))}
+            absenceActions={<ChildAbsence child={selected}
+              refresh={`${absenceRefresh}:${status?.visit?.pending?.id ?? status?.visit?.decidedAt ?? status?.value ?? ''}`} />}
           />
-        )}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={refreshChildren}
-          />
-        }
-        ListEmptyComponent={
-          <View style={styles.empty}>
-            <Text style={styles.message}>
-              К вашему аккаунту пока не привязаны дети. Администратор сада добавит их после проверки
-              заявки
-            </Text>
-            <TouchableOpacity
-              style={styles.secondaryButton}
-              onPress={() => dispatch(loadChildrenStart({ refresh: true }))}
-            >
-              <Text style={styles.secondaryButtonText}>Обновить</Text>
-            </TouchableOpacity>
-          </View>
-        }
-      />
-    </>
+        </ScrollView>
+      )}
+      <ParentSectionBar selected={currentSection} showCalendar={showCalendar} onSelect={setSection} />
+      {marking && markedChild && (
+        <ParentVisitFlow key={markedChild.id} child={markedChild} seenStatus={marking.seenStatus}
+          continueQr={marking.continueQr} status={statusById[markedChild.id]} qrAvailable={qrAvailable} next={qrNext} onPoll={pollQrStatus}
+          onNext={child => { selectChild(child); confirmMark(child, true); }}
+          onConfirm={comment => {
+            dispatch(markVisitStart({ childId: markedChild.id, seenStatus: marking.seenStatus, comment }));
+            setMarking(null);
+          }}
+          onClose={() => setMarking(null)}
+        />
+      )}
+    </View>
   );
 }
 
 const useStyles = makeStyles((c) =>
   StyleSheet.create({
-    list: {
-      flex: 1,
-      backgroundColor: c.background,
-    },
-    container: {
-      padding: 20,
-      width: '100%',
-      maxWidth: 440,
-      alignSelf: 'center',
-    },
-    emptyContainer: {
-      flexGrow: 1,
-      justifyContent: 'center',
-      padding: 20,
-    },
+    screen: { flex: 1, backgroundColor: c.card },
+    contextName: { alignSelf: 'center', width: '100%', maxWidth: 480, paddingHorizontal: space.lg,
+      paddingTop: space.md, fontSize: 16, fontWeight: '600', color: c.text },
+    container: { padding: space.lg, width: '100%', maxWidth: 480, alignSelf: 'center' },
     center: {
       flex: 1,
       justifyContent: 'center',

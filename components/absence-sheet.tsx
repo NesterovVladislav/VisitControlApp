@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { controlHeight, radius, space, typeSize } from '../constants/ui-tokens';
-import { makeStyles } from '../hooks/use-palette';
+import { makeStyles, usePalette } from '../hooks/use-palette';
 import {
   AbsenceNotice, AbsenceOption, AbsenceRules, absenceDayDistance, absencePaidDates, shiftAbsenceDay,
   cancelAbsence, createAbsence, getAbsenceRules, getChildAbsences, updateAbsence,
@@ -12,6 +12,7 @@ import { Child } from '../store/types/children';
 import AbsenceCalendar, { absenceDateText, absenceRangeText } from './absence-calendar';
 import AbsencePeriodPicker from './absence-period-picker';
 import { ActionButton, BottomSheet, FormField, StatusMessage } from './ui';
+import { IconSymbol } from './ui/icon-symbol';
 
 type Mode = 'list' | 'create' | 'edit';
 type Choice = 'today' | 'tomorrow' | 'period';
@@ -69,6 +70,7 @@ export default function AbsenceSheet({ child, initialRules, initialMode, initial
   onSaved: (entry: AbsenceNotice, message: string, keepOpen?: boolean) => void;
 }) {
   const styles = useStyles();
+  const colors = usePalette();
   const [rules, setRules] = useState(initialRules);
   const [mode, setMode] = useState<Mode>(initialEntry ? 'edit' : initialMode);
   const [entryLoading, setEntryLoading] = useState(Boolean(initialEntry));
@@ -81,6 +83,7 @@ export default function AbsenceSheet({ child, initialRules, initialMode, initial
   const [reason, setReason] = useState(initialEntry?.reason ?? '');
   const [comment, setComment] = useState(initialEntry?.comment ?? '');
   const [commentOpen, setCommentOpen] = useState(Boolean(initialEntry?.comment));
+  const [confirmDiscard, setConfirmDiscard] = useState(false);
   const [reasonOpen, setReasonOpen] = useState(false);
   const [pickerStart, setPickerStart] = useState<Period>();
   const periodOpen = Boolean(pickerStart);
@@ -528,18 +531,30 @@ export default function AbsenceSheet({ child, initialRules, initialMode, initial
 
   const readOnly = mode === 'edit' && (entryLoading || entryFailed || !editing?.editable);
   const showSubmit = mode !== 'list' && (mode === 'create' || dirty) && !confirmCancel && returnDay === null && !reasonOpen && !readOnly && !uncertain;
-  const title = returnDay !== null ? 'Когда ' + child.firstName + ' вернётся?'
+  const title = confirmDiscard ? 'Выйти без сохранения?' : returnDay !== null ? 'Когда ' + child.firstName + ' вернётся?'
     : confirmCancel ? 'Отменить отсутствие?'
       : reasonOpen ? 'Причина отсутствия'
         : mode === 'create' ? child.firstName + ' не придёт'
           : mode === 'edit' ? 'Отсутствие · ' + child.firstName : 'Все периоды';
   const close = () => {
     if (guard.current || uncertain) return;
-    if (reasonOpen) setReasonOpen(false);
+    if (confirmDiscard) setConfirmDiscard(false);
+    else if (reasonOpen) setReasonOpen(false);
     else if (confirmCancel) setConfirmCancel(false);
     else if (returnDay !== null) setReturnDay(null);
+    else if (draft || (mode === 'edit' && dirty) || (mode === 'create'
+      && (reason || comment.trim() || fromDate || toDate || choice !== preferredChoice(rules)))) setConfirmDiscard(true);
     else onClose();
   };
+
+  if (confirmDiscard) {
+    return (
+      <BottomSheet title={title} closeLabel="Назад" onClose={close}>
+        <ActionButton label="Продолжить редактирование" onPress={() => setConfirmDiscard(false)} />
+        <ActionButton label="Выйти без сохранения" variant="text" onPress={onClose} />
+      </BottomSheet>
+    );
+  }
 
   if (pickerStart) {
     const candidatePreview = preview?.key === candidateKey ? preview : undefined;
@@ -686,19 +701,31 @@ export default function AbsenceSheet({ child, initialRules, initialMode, initial
             <Pressable style={styles.row} accessibilityRole="button" disabled={busy || readOnly || uncertain}
               accessibilityLabel={'Причина: ' + reasonLabel} onPress={() => setReasonOpen(true)}>
               <Text style={styles.body}>Причина</Text>
-              <Text style={styles.hint}>{reasonLabel}{readOnly ? '' : ' ›'}</Text>
+              <View style={styles.rowValue}>
+                <Text style={styles.valueText}>{reasonLabel}</Text>
+                {!readOnly && <IconSymbol name="chevron.right" size={18} color={colors.textSecondary} />}
+              </View>
             </Pressable>
             {readOnly ? (comment ? <Text style={styles.hint}>{comment}</Text> : null) : (
-              commentOpen || selectedReason?.comment_required ? (
-                <FormField label={selectedReason?.comment_required ? 'Комментарий (обязательно)' : 'Комментарий (необязательно)'}
-                  placeholder="Не указывайте диагноз — достаточно причины" multiline value={comment} maxLength={500}
-                  containerStyle={styles.commentField}
-                  editable={!busy && !uncertain} onChangeText={value => { clearAlerts(); setComment(value); }} />
-              ) : (
-                <Pressable accessibilityRole="button" accessibilityState={{ expanded: false }}
-                  disabled={busy || uncertain} onPress={() => setCommentOpen(true)}
-                  style={styles.inlineAction}><Text style={styles.link}>Добавить комментарий ⌄</Text></Pressable>
-              )
+              <View>
+                {!selectedReason?.comment_required && (
+                  <Pressable accessibilityRole="button" accessibilityLabel="Комментарий"
+                    accessibilityState={{ expanded: commentOpen, disabled: busy || uncertain }}
+                    disabled={busy || uncertain} onPress={() => setCommentOpen(open => !open)}
+                    style={styles.commentToggle}>
+                    <Text style={styles.body}>Комментарий</Text>
+                    <IconSymbol name="chevron.down" size={20} color={colors.textSecondary}
+                      style={commentOpen && styles.chevronOpen} />
+                  </Pressable>
+                )}
+                {(commentOpen || selectedReason?.comment_required) && (
+                  <FormField label={selectedReason?.comment_required ? 'Комментарий (обязательно)' : 'Комментарий (необязательно)'}
+                    hideVisualLabel={!selectedReason?.comment_required}
+                    placeholder="Не указывайте диагноз — достаточно причины" multiline value={comment} maxLength={500}
+                    containerStyle={styles.commentField} style={styles.commentInput}
+                    editable={!busy && !uncertain} onChangeText={value => { clearAlerts(); setComment(value); }} />
+                )}
+              </View>
             )}
           </View>
           {!entryLoading && !entryFailed && editing?.cancellable && (editing.cancel_effect?.kind === 'SHORTEN' ? (
@@ -735,7 +762,12 @@ export default function AbsenceSheet({ child, initialRules, initialMode, initial
 }
 
 const useStyles = makeStyles((c) => StyleSheet.create({
-  section: { gap: space.sm },
+  section: { gap: space.md },
+  commentToggle: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', minHeight: controlHeight.touch },
+  chevronOpen: { transform: [{ rotate: '180deg' }] },
+  commentInput: { minHeight: controlHeight.field + space.xl, textAlignVertical: 'top' },
+  rowValue: { flex: 1, flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', gap: space.xxs },
+  valueText: { flexShrink: 1, textAlign: 'right', fontSize: typeSize.label, color: c.textSecondary },
   commentField: { marginBottom: 0 },
   list: { gap: space.xxs },
   body: { fontSize: typeSize.body, color: c.text },
