@@ -4,7 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { space, typeSize } from '../../constants/ui-tokens';
 import { makeStyles } from '../../hooks/use-palette';
-import { ActionButton } from './action-button';
+import { SheetControl } from './sheet-control';
 
 type Props = {
   title: string;
@@ -40,8 +40,9 @@ export function BottomSheet({ title, onClose, closeLabel = 'Закрыть', clo
           onResponderRelease={onClose} />
         <Animated.View style={[styles.sheet, { transform: [{ translateY: offset }] }]} accessibilityViewIsModal>
           <View style={styles.header}>
+            {closeLabel === 'Назад' && <SheetControl back disabled={closeDisabled} onPress={onClose} />}
             <Text style={styles.title} accessibilityRole="header">{title}</Text>
-            <ActionButton label={closeLabel} variant="text" disabled={closeDisabled} onPress={onClose} />
+            {closeLabel !== 'Назад' && <SheetControl disabled={closeDisabled} onPress={onClose} />}
           </View>
           <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={[
             styles.content, { paddingBottom: footer ? space.lg : bottomPadding },

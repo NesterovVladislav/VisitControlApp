@@ -45,7 +45,7 @@ function dayMark(day: AttendanceDay): Mark {
   return { tone: 'plain', symbol: '·', label: 'Нет отметки' };
 }
 
-function AttendanceDayDetails({ day, onClose }: { day: AttendanceDay; onClose: () => void }) {
+function AttendanceDayDetails({ day, onClose, onOpenPeriod }: { day: AttendanceDay; onClose: () => void; onOpenPeriod?: () => void }) {
   const styles = useStyles();
   const { absencePeriod } = day;
   return (
@@ -53,7 +53,7 @@ function AttendanceDayDetails({ day, onClose }: { day: AttendanceDay; onClose: (
       <View style={styles.sheetContent}>
         <Text style={styles.sheetText}>{dayMark(day).label}</Text>
         {day.holiday && <Text style={styles.sheetText}>{day.holiday}</Text>}
-        {absencePeriod && (
+        {absencePeriod && onOpenPeriod ? <ActionButton label={'Период отсутствия: ' + formatBirthDate(absencePeriod.from) + ' — ' + formatBirthDate(absencePeriod.to)} variant="text" onPress={onOpenPeriod} /> : absencePeriod && (
           <Text style={styles.sheetText}>
             {formatBirthDate(absencePeriod.from)} — {formatBirthDate(absencePeriod.to)}
           </Text>
@@ -80,14 +80,16 @@ export function AttendanceMonthHeader({ label, onPrevious, onNext, canNext }: {
   );
 }
 
-export function AttendanceCalendar({ month, days, today }: {
+export function AttendanceCalendar({ month, days, today, showLegend, onCloseLegend, onOpenPeriod, compact, initialOpenDate, onDayClosed }: {
+  initialOpenDate?: string; onDayClosed?: () => void;
+  showLegend?: boolean; onCloseLegend?: () => void; onOpenPeriod?: (day: AttendanceDay) => void; compact?: boolean;
   month: ReturnType<typeof calendarMonth>;
   days: AttendanceDay[];
   today: string;
 }) {
   const styles = useStyles();
   const [legend, setLegend] = useState(false);
-  const [openDate, setOpenDate] = useState<string>();
+  const [openDate, setOpenDate] = useState(initialOpenDate);
   const [tabDate, setTabDate] = useState<string>();
   const [focusedDate, setFocusedDate] = useState<string>();
   const dateButtons = useRef(new Map<string, ElementRef<typeof Pressable>>());
@@ -142,7 +144,7 @@ export function AttendanceCalendar({ month, days, today }: {
                 <Pressable key={day.date} style={styles.cell} accessibilityLabel={label} accessibilityRole="button"
                   onPress={() => setOpenDate(day.date)} {...webProps}>
                   {({ pressed }) => (
-                    <View style={[styles.day, styles[mark.tone], isToday && styles.today,
+                    <View style={[styles.day, compact && styles.compactDay, styles[mark.tone], isToday && styles.today,
                       pressed && styles.pressed, focusedDate === day.date && styles.focused]}>
                       <Text style={[styles.dayNumber, mark.tone === 'inactive' && styles.secondary]}>
                         {Number(day.date.slice(-2))}
@@ -160,11 +162,11 @@ export function AttendanceCalendar({ month, days, today }: {
         ))}
       </View>
 
-      <View style={styles.legendAction}>
+      {showLegend === undefined && <View style={styles.legendAction}>
         <ActionButton variant="text" label="Обозначения" onPress={() => setLegend(true)} />
-      </View>
-      {legend && (
-        <BottomSheet title="Обозначения" onClose={() => setLegend(false)}>
+      </View>}
+      {(showLegend ?? legend) && (
+        <BottomSheet title="Обозначения" onClose={onCloseLegend ?? (() => setLegend(false))}>
           <View style={styles.sheetContent}>
             <Text style={styles.sheetText}>✓ Полный день</Text>
             <Text style={styles.sheetText}>◩ Первая половина дня</Text>
@@ -181,7 +183,11 @@ export function AttendanceCalendar({ month, days, today }: {
           </View>
         </BottomSheet>
       )}
-      {selectedDay && <AttendanceDayDetails day={selectedDay} onClose={() => setOpenDate(undefined)} />}
+      {selectedDay && <AttendanceDayDetails day={selectedDay} onClose={() => { setOpenDate(undefined); onDayClosed?.(); }}
+        onOpenPeriod={onOpenPeriod && selectedDay.absencePeriod && selectedDay.absencePeriod.to >= today ? () => {
+          setOpenDate(undefined);
+          onOpenPeriod(selectedDay);
+        } : undefined} />}
     </>
   );
 }
@@ -196,6 +202,7 @@ const useStyles = makeStyles((c) => StyleSheet.create({
     minHeight: controlHeight.touch, alignItems: 'center', flexGrow: 1, margin: 2,
     borderWidth: 2, borderColor: 'transparent', borderRadius: radius.control, paddingVertical: 2,
   },
+  compactDay: { minHeight: 38, margin: 1, paddingVertical: 0 },
   dayNumber: { color: c.text, fontSize: typeSize.label, fontWeight: '600', lineHeight: 18, includeFontPadding: false },
   secondary: { color: c.textSecondary },
   visit: { backgroundColor: c.successSoft },

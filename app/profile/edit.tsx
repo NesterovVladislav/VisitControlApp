@@ -1,3 +1,4 @@
+import { useProfileLayout } from '../../components/profile-layout';
 import { useHeaderHeight } from '@react-navigation/elements';
 import { useNavigation, usePreventRemove } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
@@ -37,6 +38,7 @@ import { makeStyles, usePalette } from '../../hooks/use-palette';
  * Непосредственное изменение своих личных данных для всех ролей. Email остаётся логином.
  */
 export default function ProfileEditScreen() {
+  const layout = useProfileLayout();
   const c = usePalette();
   const styles = useStyles();
   const router = useRouter();
@@ -119,109 +121,116 @@ export default function ProfileEditScreen() {
       behavior="padding"
       keyboardVerticalOffset={headerHeight}
     >
-      <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
-        {user.organization && <PhotoEditor userId={user.id} firstName={user.firstName} surname={user.surname}
-          photoUrl={user.photoUrl} canEdit />}
-        <FormField
-          label="Фамилия"
-          value={form.surname}
-          onChangeText={(value) => update({ surname: value }, 'surname')}
-          onBlur={() => validateOnBlur('surname')}
-          error={errorFor('surname')}
-          autoCapitalize="words"
-          autoComplete="name-family"
-          textContentType="familyName"
-          returnKeyType="next"
-          submitBehavior="submit"
-          onSubmitEditing={() => firstNameRef.current?.focus()}
-          editable={!saving}
-        />
-        <FormField
-          ref={firstNameRef}
-          label="Имя"
-          value={form.firstName}
-          onChangeText={(value) => update({ firstName: value }, 'firstName')}
-          onBlur={() => validateOnBlur('firstName')}
-          error={errorFor('firstName')}
-          autoCapitalize="words"
-          autoComplete="name-given"
-          textContentType="givenName"
-          returnKeyType="next"
-          submitBehavior="submit"
-          onSubmitEditing={() => (form.noPatronymic ? birthDateRef : patronymicRef).current?.focus()}
-          editable={!saving}
-        />
-        <FormField
-          ref={patronymicRef}
-          label="Отчество"
-          value={form.noPatronymic ? '' : form.patronymic}
-          onChangeText={(value) => update({ patronymic: value }, 'patronymic')}
-          onBlur={() => validateOnBlur('patronymic')}
-          error={errorFor('patronymic')}
-          autoCapitalize="words"
-          autoComplete="name-middle"
-          textContentType="middleName"
-          returnKeyType="next"
-          submitBehavior="submit"
-          onSubmitEditing={() => birthDateRef.current?.focus()}
-          editable={!saving && !form.noPatronymic}
-        />
-        <View style={styles.checkbox}>
-          <CheckboxRow
-            checked={form.noPatronymic}
-            accessibilityLabel="Нет отчества"
-            onChange={(checked) => update({ noPatronymic: checked }, 'patronymic')}
+      <ScrollView contentContainerStyle={layout.content} keyboardShouldPersistTaps="handled">
+        {user.organization && (
+          <View style={layout.block}>
+            <PhotoEditor userId={user.id} firstName={user.firstName} surname={user.surname}
+              photoUrl={user.photoUrl} canEdit />
+          </View>
+        )}
+        <View style={layout.block}>
+          <FormField
+            label="Фамилия"
+            value={form.surname}
+            onChangeText={(value) => update({ surname: value }, 'surname')}
+            onBlur={() => validateOnBlur('surname')}
+            error={errorFor('surname')}
+            autoCapitalize="words"
+            autoComplete="name-family"
+            textContentType="familyName"
+            returnKeyType="next"
+            submitBehavior="submit"
+            onSubmitEditing={() => firstNameRef.current?.focus()}
+            editable={!saving}
+          />
+          <FormField
+            ref={firstNameRef}
+            label="Имя"
+            value={form.firstName}
+            onChangeText={(value) => update({ firstName: value }, 'firstName')}
+            onBlur={() => validateOnBlur('firstName')}
+            error={errorFor('firstName')}
+            autoCapitalize="words"
+            autoComplete="name-given"
+            textContentType="givenName"
+            returnKeyType="next"
+            submitBehavior="submit"
+            onSubmitEditing={() => (form.noPatronymic ? birthDateRef : patronymicRef).current?.focus()}
+            editable={!saving}
+          />
+          <FormField
+            ref={patronymicRef}
+            label="Отчество"
+            value={form.noPatronymic ? '' : form.patronymic}
+            onChangeText={(value) => update({ patronymic: value }, 'patronymic')}
+            onBlur={() => validateOnBlur('patronymic')}
+            error={errorFor('patronymic')}
+            autoCapitalize="words"
+            autoComplete="name-middle"
+            textContentType="middleName"
+            returnKeyType="next"
+            submitBehavior="submit"
+            onSubmitEditing={() => birthDateRef.current?.focus()}
+            editable={!saving && !form.noPatronymic}
+          />
+          <View style={styles.checkbox}>
+            <CheckboxRow
+              checked={form.noPatronymic}
+              accessibilityLabel="Нет отчества"
+              onChange={(checked) => update({ noPatronymic: checked }, 'patronymic')}
+              disabled={saving}
+            >
+              <Text style={styles.checkboxText}>Нет отчества</Text>
+            </CheckboxRow>
+          </View>
+          <FormField
+            ref={birthDateRef}
+            label="Дата рождения"
+            value={form.birthDate}
+            onChangeText={(value) => update({ birthDate: formatDate(value) }, 'birthDate')}
+            onBlur={() => validateOnBlur('birthDate')}
+            error={errorFor('birthDate')}
+            placeholder="ДД.ММ.ГГГГ"
+            keyboardType="number-pad"
+            maxLength={10}
+            returnKeyType="next"
+            submitBehavior="submit"
+            onSubmitEditing={() => phoneRef.current?.focus()}
+            editable={!saving}
+          />
+          <SegmentedControl
+            label="Пол"
+            options={[{ value: 'FEMALE' as const, label: 'Женский' }, { value: 'MALE' as const, label: 'Мужской' }]}
+            value={form.gender}
+            onChange={(gender) => update({ gender }, 'gender')}
+            error={errorFor('gender')}
             disabled={saving}
-          >
-            <Text style={styles.checkboxText}>Нет отчества</Text>
-          </CheckboxRow>
+          />
         </View>
-        <FormField
-          ref={birthDateRef}
-          label="Дата рождения"
-          value={form.birthDate}
-          onChangeText={(value) => update({ birthDate: formatDate(value) }, 'birthDate')}
-          onBlur={() => validateOnBlur('birthDate')}
-          error={errorFor('birthDate')}
-          placeholder="ДД.ММ.ГГГГ"
-          keyboardType="number-pad"
-          maxLength={10}
-          returnKeyType="next"
-          submitBehavior="submit"
-          onSubmitEditing={() => phoneRef.current?.focus()}
-          editable={!saving}
-        />
-        <SegmentedControl
-          label="Пол"
-          options={[{ value: 'FEMALE' as const, label: 'Женский' }, { value: 'MALE' as const, label: 'Мужской' }]}
-          value={form.gender}
-          onChange={(gender) => update({ gender }, 'gender')}
-          error={errorFor('gender')}
-          disabled={saving}
-        />
-        <FormField
-          ref={phoneRef}
-          label="Телефон"
-          value={form.phone}
-          onChangeText={(value) => update({ phone: formatPhone(value) }, 'phone')}
-          onBlur={() => validateOnBlur('phone')}
-          error={errorFor('phone')}
-          placeholder="+7 (___) ___-__-__"
-          keyboardType="phone-pad"
-          autoComplete="tel"
-          textContentType="telephoneNumber"
-          maxLength={18}
-          returnKeyType="done"
-          onSubmitEditing={save}
-          editable={!saving}
-        />
-        <FormField
-          label="Email"
-          value={user.email}
-          editable={false}
-          hint="Email — логин для входа, здесь он не меняется"
-        />
-
+        <View style={layout.block}>
+          <FormField
+            ref={phoneRef}
+            label="Телефон"
+            value={form.phone}
+            onChangeText={(value) => update({ phone: formatPhone(value) }, 'phone')}
+            onBlur={() => validateOnBlur('phone')}
+            error={errorFor('phone')}
+            placeholder="+7 (___) ___-__-__"
+            keyboardType="phone-pad"
+            autoComplete="tel"
+            textContentType="telephoneNumber"
+            maxLength={18}
+            returnKeyType="done"
+            onSubmitEditing={save}
+            editable={!saving}
+          />
+          <FormField
+            label="Email"
+            value={user.email}
+            editable={false}
+            hint="Email — логин для входа, здесь он не меняется"
+          />
+        </View>
         {saveError ? (
           <View style={styles.banner} accessibilityLiveRegion="polite">
             <Text style={styles.bannerText}>{saveError}</Text>
@@ -248,12 +257,6 @@ const useStyles = makeStyles((c) =>
     screen: {
       flex: 1,
       backgroundColor: c.background,
-    },
-    container: {
-      padding: 20,
-      width: '100%',
-      maxWidth: 440,
-      alignSelf: 'center',
     },
     checkbox: {
       marginTop: -8,

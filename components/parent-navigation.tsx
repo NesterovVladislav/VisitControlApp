@@ -81,8 +81,9 @@ export function ParentSectionBar({ selected, showCalendar, showGroup = true, onS
         <Pressable key={tab.id} accessibilityRole="tab" accessibilityState={{ selected: selected === tab.id }}
           accessibilityLabel={tab.label}
           style={styles.tab} onPress={() => onSelect(tab.id)}>
-          <Ionicons name={tab.icon} size={22} color={selected === tab.id ? styles.activeText.color : styles.tabText.color} />
-          <Text style={[styles.tabText, selected === tab.id && styles.activeText]}>{tab.label}</Text>
+          <View style={[styles.tabIcon, selected === tab.id && styles.selectedIcon]}>
+            <Ionicons name={tab.icon} size={22} color={selected === tab.id ? styles.selectedIcon.color : styles.tabIcon.color} />
+          </View>
         </Pressable>
       ))}
     </View>
@@ -101,8 +102,7 @@ const useStyles = makeStyles(c => StyleSheet.create({
   picker: { flex: 1, flexDirection: 'row', alignItems: 'center', paddingVertical: space.sm, minHeight: controlHeight.touch },
   grow: { flex: 1 },
   bar: { flexDirection: 'row', backgroundColor: c.card, borderTopWidth: StyleSheet.hairlineWidth, borderColor: c.separator },
-  tab: { flex: 1, minHeight: controlHeight.action, gap: space.xxs,
-    padding: space.xs, justifyContent: 'center', alignItems: 'center' },
-  tabText: { fontSize: typeSize.label, color: c.textSecondary, textAlign: 'center' },
-  activeText: { color: c.actionPrimary, fontWeight: '700' },
+  tab: { flex: 1, minHeight: 48, justifyContent: 'center', alignItems: 'center' },
+  tabIcon: { alignItems: 'center', justifyContent: 'center', width: 46, height: 32, borderRadius: space.md, color: c.textSecondary },
+  selectedIcon: { backgroundColor: c.primarySoft, color: c.actionPrimary },
 }));

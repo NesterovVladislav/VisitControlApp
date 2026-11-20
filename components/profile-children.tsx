@@ -13,6 +13,7 @@ import {
   loadOwnChildren,
   loadOwnChildRequests,
 } from '../store/reducers/child-requests';
+import { hasAttendanceAccess, useAttendanceToday, useOwnAttendance } from '../hooks/use-own-attendance';
 import { loadChildrenStart } from '../store/reducers/children';
 import { ChildRequest } from '../store/types/child-requests';
 import { childRequestName, ownChangeLabel, ownRequestStatusLabel } from '../utils/child-requests';
@@ -29,6 +30,13 @@ export default function ProfileChildren({ compact = false }: { compact?: boolean
   const children = useAppSelector((state) => state.children.items);
   const listStatus = useAppSelector((state) => state.children.listStatus);
   const { own, ownChildren, cancellingIds, error } = useAppSelector((state) => state.childRequests);
+
+  const today = useAttendanceToday(compact && children.some(hasAttendanceAccess))?.value;
+  const attendance = useOwnAttendance(today, today, { today })?.value;
+  const groupLabels = new Map(attendance?.map(row => {
+    const group = row.groups.find(item => today && item.from <= today && (!item.to || item.to >= today));
+    return [row.id, group ? [group.name, group.branch].filter(Boolean).join(' · ') : ''];
+  }));
 
   // Администратор мог подтвердить заявку, пока профиль был закрыт
   useFocusEffect(
@@ -80,6 +88,7 @@ export default function ProfileChildren({ compact = false }: { compact?: boolean
                   </View>
                   <View style={styles.rowText}>
                     <Text style={styles.name}>{compact ? personName(child) : childRequestName(child)}</Text>
+                    {compact && groupLabels.get(child.id) ? <Text style={styles.group}>{groupLabels.get(child.id)}</Text> : null}
                     {changeLabel ? (
                       <Text
                         style={[styles.status, child.change?.status === 'REJECTED' && styles.statusRejected]}
@@ -140,9 +149,10 @@ export default function ProfileChildren({ compact = false }: { compact?: boolean
 const useStyles = makeStyles((c) =>
   StyleSheet.create({
     compactRow: { paddingHorizontal: 0, paddingVertical: 8, minHeight: 50 },
-    heading: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 24 },
+    heading: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
     headingText: { fontSize: 18, fontWeight: '600', color: c.text },
     plus: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
+    group: { fontSize: 14, color: c.textSecondary, marginTop: 2 },
     sectionTitle: {
       fontSize: 12,
       fontWeight: '700',

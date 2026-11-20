@@ -1,11 +1,12 @@
 import { useFocusEffect } from '@react-navigation/native';
 import React, { useCallback, useRef, useState } from 'react';
-import { ActivityIndicator, AppState, Modal, FlatList, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, AppState, Modal, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ActionButton, StatusMessage } from './ui';
+import { IconSymbol } from './ui/icon-symbol';
 import { RefreshControl } from './ui/refresh-control';
-import { space, typeSize } from '../constants/ui-tokens';
+import { controlHeight, radius, space, typeSize } from '../constants/ui-tokens';
 import { makeStyles, usePalette } from '../hooks/use-palette';
 import { visitControlApi } from '../services/api';
 import { ApiError } from '../services/errors/api-error';
@@ -72,7 +73,9 @@ function GroupContents({ child, onClose }: PanelProps) {
           {`${present}/${group.children.length}`}
         </Text>
       )}
-      {onClose && <ActionButton variant="text" label="Закрыть" onPress={onClose} />}
+      {onClose && <Pressable accessibilityRole="button" accessibilityLabel="Закрыть" onPress={onClose} style={styles.close}>
+        <IconSymbol name="xmark" size={22} color={c.textSecondary} />
+      </Pressable>}
     </View>
   );
 
@@ -84,22 +87,22 @@ function GroupContents({ child, onClose }: PanelProps) {
       ListHeaderComponent={header}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void load(true)} />}
       keyExtractor={(item, index) => `${item.surname}-${item.firstName}-${index}`}
-      renderItem={({ item }) => (
-        <View style={styles.row} accessible accessibilityLabel={`${item.surname} ${item.firstName}, ${item.present ? 'В саду' : 'Не в саду'}`}>
+      renderItem={({ item, index }) => (
+        <View style={[styles.row, index === (group?.children.length ?? 0) - 1 && styles.last]} accessible accessibilityLabel={`${item.surname} ${item.firstName}, ${item.present ? 'В саду' : 'Не в саду'}`}>
           <View
             style={[styles.dot, { backgroundColor: item.present ? c.success : c.textTertiary }]} />
           <Text style={[styles.member, item.own && styles.own]}>{`${item.surname} ${item.firstName}`.trim()}</Text>
         </View>
       )}
-      ListEmptyComponent={
+      ListEmptyComponent={<View style={[styles.empty, styles.last]}>{
         state.status === 'loading' ? <ActivityIndicator accessibilityLabel="Загружаем группу" color={c.actionPrimary} /> :
           state.status === 'failed' ? (
-            <View style={styles.empty}>
+            <>
               <StatusMessage message="Не удалось загрузить группу" tone="error" />
               <ActionButton variant="text" label="Повторить" onPress={() => void load()} />
-            </View>
+            </>
           ) : <StatusMessage message={group?.name ? 'В группе пока нет детей' : 'Сад ещё не определил ребёнка в группу'} />
-      }
+      }</View>}
     />
   );
 }
@@ -115,16 +118,19 @@ export default function ChildGroupSheet({ child, onClose }: { child: Child | nul
 }
 
 const useStyles = makeStyles((c) => StyleSheet.create({
-  screen: { flex: 1, backgroundColor: c.card },
-  content: { paddingHorizontal: space.xl, paddingTop: space.xxl, paddingBottom: space.section,
+  screen: { flex: 1, backgroundColor: c.background },
+  content: { padding: space.md, paddingBottom: space.section,
     width: '100%', maxWidth: 440, alignSelf: 'center' },
-  header: { flexDirection: 'row', alignItems: 'center', gap: space.md, marginBottom: space.lg },
+  header: { flexDirection: 'row', alignItems: 'center', gap: space.md, padding: space.lg, backgroundColor: c.card,
+    borderTopLeftRadius: radius.card, borderTopRightRadius: radius.card },
+  last: { borderBottomLeftRadius: radius.card, borderBottomRightRadius: radius.card },
+  close: { alignItems: 'center', justifyContent: 'center', width: controlHeight.touch, height: controlHeight.touch },
   title: { flex: 1, fontSize: typeSize.sheetTitle, fontWeight: '700', color: c.text },
   count: { fontSize: typeSize.body, fontWeight: '700', color: c.text, fontVariant: ['tabular-nums'] },
-  row: { flexDirection: 'row', alignItems: 'center', gap: space.md, paddingVertical: space.md,
-    borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: c.separator },
+  row: { flexDirection: 'row', alignItems: 'center', gap: space.md, paddingVertical: space.md, paddingHorizontal: space.lg, minHeight: controlHeight.field,
+    backgroundColor: c.card, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: c.separator },
   dot: { width: space.sm, height: space.sm, borderRadius: space.sm },
   member: { flex: 1, fontSize: typeSize.body, color: c.text },
   own: { fontWeight: '700' },
-  empty: { gap: space.md },
+  empty: { gap: space.md, padding: space.lg, backgroundColor: c.card },
 }));

@@ -1,3 +1,4 @@
+import { SheetControl } from './ui/sheet-control';
 import { useEffect, useRef, useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -85,7 +86,7 @@ export default function AbsencePeriodPicker({
       <View style={[styles.screen, { paddingTop: insets.top, paddingBottom: insets.bottom }]} accessibilityViewIsModal>
         <View style={styles.header}>
           <View style={styles.headerContent}>
-            <ActionButton label="Назад" variant="text" onPress={onClose} />
+            <SheetControl back onPress={onClose} />
             <Text accessibilityRole="header" style={styles.title}>Даты отсутствия</Text>
           </View>
         </View>

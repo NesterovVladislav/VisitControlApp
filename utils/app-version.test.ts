@@ -2,7 +2,7 @@ import * as Application from 'expo-application';
 import Constants, { ExecutionEnvironment } from 'expo-constants';
 import { Platform } from 'react-native';
 
-import { getAppVersionLabel } from './app-version';
+import { getAppVersion } from './app-version';
 
 jest.mock('expo-application', () => ({
   __esModule: true,
@@ -29,35 +29,35 @@ describe('version shown in the profile', () => {
 
   it.each(['android', 'ios'])('shows the installed %s binary even when the JS config is newer', (os) => {
     Object.defineProperty(Platform, 'OS', { value: os });
-    expect(getAppVersionLabel()).toBe('Версия 1.0.2 · сборка 3');
+    expect(getAppVersion()).toEqual({ version: '1.0.2', build: '3' });
   });
 
   it('shows the loaded PWA version without a native build number', () => {
     Object.defineProperty(Platform, 'OS', { value: 'web' });
-    expect(getAppVersionLabel()).toBe('Версия 9.0.0');
+    expect(getAppVersion()).toEqual({ version: '9.0.0', build: null });
   });
 
   it('shows the project version in Expo Go instead of the host application version', () => {
     Object.defineProperty(Platform, 'OS', { value: 'ios' });
     Constants.executionEnvironment = ExecutionEnvironment.StoreClient;
-    expect(getAppVersionLabel()).toBe('Версия 9.0.0');
+    expect(getAppVersion()).toEqual({ version: '9.0.0', build: null });
   });
 
   it('omits the build suffix when the installed version has no build metadata', () => {
     Object.defineProperty(Platform, 'OS', { value: 'android' });
     Object.assign(Application, { nativeBuildVersion: null });
-    expect(getAppVersionLabel()).toBe('Версия 1.0.2');
+    expect(getAppVersion()).toEqual({ version: '1.0.2', build: null });
   });
 
   it('does not claim that missing native metadata is the newer JS version', () => {
     Object.defineProperty(Platform, 'OS', { value: 'android' });
     Object.assign(Application, { nativeApplicationVersion: null });
-    expect(getAppVersionLabel()).toBe('Версия недоступна');
+    expect(getAppVersion().version).toBeFalsy();
   });
 
   it('handles a PWA bundle without version metadata', () => {
     Object.defineProperty(Platform, 'OS', { value: 'web' });
     Object.assign(Constants, { expoConfig: null });
-    expect(getAppVersionLabel()).toBe('Версия недоступна');
+    expect(getAppVersion().version).toBeFalsy();
   });
 });

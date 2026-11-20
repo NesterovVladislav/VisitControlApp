@@ -1,3 +1,4 @@
+import { SheetControl } from './ui/sheet-control';
 import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -116,15 +117,11 @@ export default function LinkChildSheet({ showBranch }: { showBranch: boolean }) 
       <View style={styles.sheet}>
         <View style={styles.sheetHeader}>
           {child ? (
-            <TouchableOpacity onPress={() => setChild(null)} accessibilityRole="button" hitSlop={8}>
-              <Text style={styles.link}>Назад</Text>
-            </TouchableOpacity>
+            <SheetControl back onPress={() => setChild(null)} />
           ) : (
             <View />
           )}
-          <TouchableOpacity onPress={close} accessibilityRole="button" hitSlop={8}>
-            <Text style={styles.link}>Отмена</Text>
-          </TouchableOpacity>
+          <SheetControl onPress={close} />
         </View>
         <Text style={styles.title}>Привязать ребёнка</Text>
         <Text style={styles.subtitle}>к {personName(adult)}</Text>

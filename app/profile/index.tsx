@@ -14,7 +14,6 @@ import { useAppDispatch, useAppSelector } from '../../store';
 import { logoutRequested } from '../../store/reducers/auth';
 import { refreshProfile } from '../../store/reducers/profile';
 import { canAddChild } from '../../utils/child-requests';
-import { getAppVersionLabel } from '../../utils/app-version';
 import { formatBirthDate, formatPhoneForDisplay, genderLabel } from '../../utils/profile-format';
 import { makeStyles, usePalette } from '../../hooks/use-palette';
 import { useThemePreference } from '../../hooks/use-theme-preference';
@@ -153,11 +152,14 @@ export default function ProfileScreen() {
       </View>
 
       <View style={styles.card}>
-        <TouchableOpacity style={styles.actionRow} onPress={confirmLogout} accessibilityRole="button">
+        <TouchableOpacity style={styles.actionRow} onPress={() => router.push('/profile/about')} accessibilityRole="button">
+          <Text style={styles.action}>О приложении</Text>
+          <IconSymbol name="chevron.right" size={22} color={c.textTertiary} />
+        </TouchableOpacity>
+        <TouchableOpacity style={[styles.actionRow, styles.rowBorder]} onPress={confirmLogout} accessibilityRole="button">
           <Text style={styles.logout}>Выйти</Text>
         </TouchableOpacity>
       </View>
-      <Text style={styles.version} selectable>{getAppVersionLabel()}</Text>
     </ScrollView>
   );
 }
@@ -242,13 +244,6 @@ const useStyles = makeStyles((c) =>
     logout: {
       fontSize: 16,
       color: c.danger,
-    },
-    version: {
-      fontSize: 13,
-      lineHeight: 18,
-      color: c.textSecondary,
-      textAlign: 'center',
-      marginBottom: 4,
     },
   })
 );

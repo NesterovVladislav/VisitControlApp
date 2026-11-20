@@ -1,5 +1,4 @@
 import { fireEvent, render } from '@testing-library/react-native';
-import { ActionButton } from './ui';
 
 import ChildCard, { decidedLabel, rejectedLabel } from './child-card';
 import { ChildStatus, ChildVisit } from '../store/types/children';
@@ -16,7 +15,7 @@ const idle: ChildVisit = { status: 'OUT', decidedBy: null, decidedAt: null, pend
 
 async function renderCard(
   visit: ChildVisit,
-  handlers: { onMark?: () => void; onCancel?: () => void; hideIdentity?: boolean; showAbsence?: boolean } = {},
+  handlers: { onMark?: () => void; onCancel?: () => void; hideIdentity?: boolean } = {},
 ) {
   return render(
     <ChildCard
@@ -27,7 +26,6 @@ async function renderCard(
       onMark={handlers.onMark ?? jest.fn()}
       onCancel={handlers.onCancel ?? jest.fn()}
       hideIdentity={handlers.hideIdentity}
-      absenceActions={handlers.showAbsence ? <ActionButton variant="text" label="Не придёт" onPress={jest.fn()} /> : undefined}
       onRetryStatus={jest.fn()}
     />,
   );
@@ -92,12 +90,11 @@ describe('child card and kindergarten confirmation', () => {
   });
 
   it('keeps just one visit action on the selected child home', async () => {
-    const screen = await renderCard(idle, { hideIdentity: true, showAbsence: true });
+    const screen = await renderCard(idle, { hideIdentity: true });
     expect(screen.queryByText('Иванова Мария')).toBeNull();
     expect(screen.queryByText('Не в саду')).toBeNull();
     expect(screen.getAllByRole('button').map((button) => button.props.accessibilityLabel)).toEqual([
       'Привела в сад: Иванова Мария',
-      'Не придёт',
     ]);
   });
 });

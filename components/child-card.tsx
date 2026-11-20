@@ -13,7 +13,7 @@ import Avatar from './avatar';
 import { User } from '../store/types/auth';
 import { makeStyles, usePalette } from '../hooks/use-palette';
 import { ActionButton } from './ui';
-import { space, typeSize } from '../constants/ui-tokens';
+import { radius, space, typeSize } from '../constants/ui-tokens';
 import { timeOfDay } from '../utils/visit-dates';
 
 interface ChildCardProps {
@@ -26,7 +26,6 @@ interface ChildCardProps {
   onCancel: () => void;
   hideIdentity?: boolean;
   onRetryStatus: () => void;
-  absenceActions?: React.ReactNode;
 }
 
 /** «Ждёт приёма в саду» / «В саду, ждёт выдачи» — пока сотрудник не подтвердил отметку. */
@@ -74,7 +73,6 @@ export default function ChildCard({
   onCancel,
   hideIdentity = false,
   onRetryStatus,
-  absenceActions,
 }: ChildCardProps) {
   const c = usePalette();
   const styles = useStyles();
@@ -133,14 +131,13 @@ export default function ChildCard({
       <ActionButton label={actionLabel} accessibilityLabel={`${actionLabel}: ${name}`}
         variant={pending ? 'text' : 'primary'} onPress={pending ? onCancel : onMark}
         disabled={disabled} loading={marking} />
-      {absenceActions}
     </View>
   );
 }
 
 const useStyles = makeStyles((c) =>
   StyleSheet.create({
-    card: { gap: space.md, paddingVertical: space.sm },
+    card: { gap: space.md, padding: space.lg, backgroundColor: c.card, borderRadius: radius.card },
     header: {
       flexDirection: 'row',
       alignItems: 'center',

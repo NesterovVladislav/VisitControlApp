@@ -1,3 +1,4 @@
+import { SheetControl } from './ui/sheet-control';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as Haptics from 'expo-haptics';
 import React, { useEffect, useRef, useState } from 'react';
@@ -137,9 +138,7 @@ export default function QrScannerSheet({ visible, onScanned, onClose }: QrScanne
       <View style={styles.screen}>
         <View style={styles.header}>
           <Text style={styles.headerTitle}>Сканировать QR</Text>
-          <TouchableOpacity onPress={onClose} accessibilityRole="button" hitSlop={8}>
-            <Text style={styles.close}>Закрыть</Text>
-          </TouchableOpacity>
+          <SheetControl onPress={onClose} />
         </View>
         <View style={styles.body}>{body}</View>
       </View>

@@ -29,7 +29,7 @@ it('announces the selected child in the chooser and lets the parent select the t
 it('keeps the group accessible when calendar access is unavailable', async () => {
   const onSelect = jest.fn();
   const screen = await render(<ParentSectionBar selected="home" showCalendar={false} onSelect={onSelect} />);
-  expect(screen.queryByText('Календарь')).toBeNull();
+  expect(screen.queryByRole('tab', { name: 'Календарь' })).toBeNull();
   await fireEvent.press(screen.getByRole('tab', { name: 'Группа' }));
   expect(onSelect).toHaveBeenCalledWith('group');
 });
@@ -37,7 +37,15 @@ it('keeps the group accessible when calendar access is unavailable', async () =>
 it('opens the parent account even without linked children', async () => {
   const onSelect = jest.fn();
   const screen = await render(<ParentSectionBar selected="home" showCalendar={false} showGroup={false} onSelect={onSelect} />);
-  expect(screen.queryByText('Группа')).toBeNull();
+  expect(screen.queryByRole('tab', { name: 'Группа' })).toBeNull();
   await fireEvent.press(screen.getByRole('tab', { name: 'Профиль' }));
   expect(onSelect).toHaveBeenCalledWith('profile');
+});
+
+it('labels all four icon-only tabs and announces the selected tab', async () => {
+  const screen = await render(<ParentSectionBar selected="calendar" showCalendar onSelect={jest.fn()} />);
+  for (const name of ['Главная', 'Календарь', 'Группа', 'Профиль']) {
+    expect(screen.getByRole('tab', { name, selected: name === 'Календарь' })).toBeVisible();
+    expect(screen.queryByText(name)).toBeNull();
+  }
 });

@@ -108,9 +108,10 @@ function VisitSession({ child, seenStatus, status, qrAvailable, continueQr = fal
     }
   }
 
-  const title = phase === 'done' ? name : `${arriving ? 'Приход' : 'Уход'} · ${name}`;
+  const title = phase === 'done' ? 'Готово' : phase === 'code' ? 'QR-код' : arriving ? 'Приход' : 'Уход';
   return (
     <BottomSheet title={title} onClose={back} closeLabel={inQr ? 'Назад' : 'Закрыть'}>
+      <Text style={styles.instruction}>{name}</Text>
       {phase === 'done' ? (
         <>
           <StatusMessage tone="success" message={arriving ? 'Сад принял ребёнка' : 'Сад отдал ребёнка'} />

@@ -1,5 +1,6 @@
 module.exports = {
   preset: 'jest-expo',
+  moduleNameMapper: { '^expo-asset$': require.resolve('expo-asset', { paths: [require.resolve('expo/package.json')] }) },
   setupFilesAfterEnv: ['<rootDir>/jest.setup.ts'],
   testPathIgnorePatterns: ['/node_modules/'],
   transformIgnorePatterns: [

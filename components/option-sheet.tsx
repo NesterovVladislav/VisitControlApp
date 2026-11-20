@@ -1,3 +1,4 @@
+import { SheetControl } from './ui/sheet-control';
 import React, { useRef } from 'react';
 import { Modal, Platform, Pressable, SectionList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { IconSymbol } from './ui/icon-symbol';
@@ -65,9 +66,7 @@ export default function OptionSheet({
           <Text style={styles.title} numberOfLines={1}>
             {title}
           </Text>
-          <TouchableOpacity onPress={onClose} accessibilityRole="button" hitSlop={8}>
-            <Text style={styles.close}>Отмена</Text>
-          </TouchableOpacity>
+          <SheetControl onPress={onClose} />
         </View>
         <SectionList
           sections={sections}

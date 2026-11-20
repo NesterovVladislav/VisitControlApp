@@ -1,3 +1,4 @@
+import { useProfileLayout } from '../../../components/profile-layout';
 import { useFocusEffect } from '@react-navigation/native';
 import { useHeaderHeight } from '@react-navigation/elements';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -38,6 +39,7 @@ const FIELDS: Field[] = ['surname', 'firstName', 'patronymic', 'birthDate'];
  * изменение на подтверждение администратору сада. Пол не меняется, как и у взрослых.
  */
 export default function ChildProfileScreen() {
+  const layout = useProfileLayout();
   const c = usePalette();
   const styles = useStyles();
   const router = useRouter();
@@ -199,16 +201,18 @@ export default function ChildProfileScreen() {
       behavior="padding"
       keyboardVerticalOffset={headerHeight}
     >
-      <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
+      <ScrollView contentContainerStyle={layout.content} keyboardShouldPersistTaps="handled">
         {/* Фотографию ребёнка меняет только родитель; родственник и знакомый её видят */}
-        <PhotoEditor
-          userId={child.id}
-          childId={child.id}
-          firstName={child.firstName}
-          surname={child.surname}
-          photoUrl={child.photoUrl}
-          canEdit={child.canEditPhoto === true}
-        />
+        <View style={layout.block}>
+          <PhotoEditor
+            userId={child.id}
+            childId={child.id}
+            firstName={child.firstName}
+            surname={child.surname}
+            photoUrl={child.photoUrl}
+            canEdit={child.canEditPhoto === true}
+          />
+        </View>
         {pending ? (
           <View style={styles.banner}>
             <Text style={styles.bannerTitle}>Изменение ждёт подтверждения сада</Text>
@@ -237,52 +241,54 @@ export default function ChildProfileScreen() {
             {rejected.reason ? <Text style={styles.bannerText}>Причина: {rejected.reason}</Text> : null}
           </View>
         ) : null}
-        <Text style={styles.hint}>{hint}</Text>
-        <FormField
-          label="Фамилия"
-          value={form.surname}
-          onChangeText={(value) => setField('surname', value)}
-          onBlur={() => validateOnBlur('surname')}
-          error={errors.surname}
-          editable={!locked}
-          autoCapitalize="words"
-          autoCorrect={false}
-        />
-        <FormField
-          label="Имя"
-          value={form.firstName}
-          onChangeText={(value) => setField('firstName', value)}
-          onBlur={() => validateOnBlur('firstName')}
-          error={errors.firstName}
-          editable={!locked}
-          autoCapitalize="words"
-          autoCorrect={false}
-        />
-        <FormField
-          label="Отчество"
-          hint="Если есть"
-          value={form.patronymic}
-          onChangeText={(value) => setField('patronymic', value)}
-          onBlur={() => validateOnBlur('patronymic')}
-          error={errors.patronymic}
-          editable={!locked}
-          autoCapitalize="words"
-          autoCorrect={false}
-        />
-        <FormField
-          label="Дата рождения"
-          placeholder="ДД.ММ.ГГГГ"
-          value={form.birthDate}
-          onChangeText={(value) => setField('birthDate', formatDate(value))}
-          onBlur={() => validateOnBlur('birthDate')}
-          error={errors.birthDate}
-          editable={!locked}
-          keyboardType="number-pad"
-          maxLength={10}
-        />
-        {genderLabel(child.gender) ? (
-          <Text style={styles.gender}>Пол: {genderLabel(child.gender)} · изменить нельзя</Text>
-        ) : null}
+        <View style={layout.block}>
+          <Text style={styles.hint}>{hint}</Text>
+          <FormField
+            label="Фамилия"
+            value={form.surname}
+            onChangeText={(value) => setField('surname', value)}
+            onBlur={() => validateOnBlur('surname')}
+            error={errors.surname}
+            editable={!locked}
+            autoCapitalize="words"
+            autoCorrect={false}
+          />
+          <FormField
+            label="Имя"
+            value={form.firstName}
+            onChangeText={(value) => setField('firstName', value)}
+            onBlur={() => validateOnBlur('firstName')}
+            error={errors.firstName}
+            editable={!locked}
+            autoCapitalize="words"
+            autoCorrect={false}
+          />
+          <FormField
+            label="Отчество"
+            hint="Если есть"
+            value={form.patronymic}
+            onChangeText={(value) => setField('patronymic', value)}
+            onBlur={() => validateOnBlur('patronymic')}
+            error={errors.patronymic}
+            editable={!locked}
+            autoCapitalize="words"
+            autoCorrect={false}
+          />
+          <FormField
+            label="Дата рождения"
+            placeholder="ДД.ММ.ГГГГ"
+            value={form.birthDate}
+            onChangeText={(value) => setField('birthDate', formatDate(value))}
+            onBlur={() => validateOnBlur('birthDate')}
+            error={errors.birthDate}
+            editable={!locked}
+            keyboardType="number-pad"
+            maxLength={10}
+          />
+          {genderLabel(child.gender) ? (
+            <Text style={styles.gender}>Пол: {genderLabel(child.gender)} · изменить нельзя</Text>
+          ) : null}
+        </View>
         {child.canEdit && !pending ? (
           <TouchableOpacity
             style={[styles.button, changeSubmitting && styles.buttonDisabled]}
@@ -308,12 +314,6 @@ const useStyles = makeStyles((c) =>
     screen: {
       flex: 1,
       backgroundColor: c.background,
-    },
-    container: {
-      padding: 20,
-      width: '100%',
-      maxWidth: 440,
-      alignSelf: 'center',
     },
     center: {
       flex: 1,

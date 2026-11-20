@@ -51,13 +51,14 @@ export default function ChildrenScreen() {
   const [absenceRefresh, setAbsenceRefresh] = useState(0);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [section, setSection] = useState<ParentSection>('home');
+  const [unavailableCalendar, setUnavailableCalendar] = useState<string | null>(null);
   const [calendarCursor, setCalendarCursor] = useState<string | null>(null);
   const selected = items.find(child => child.id === selectedId) ?? items[0];
-  const showCalendar = Boolean(selected && hasAttendanceAccess(selected));
+  const showCalendar = Boolean(selected && hasAttendanceAccess(selected) && selected.id !== unavailableCalendar);
   const currentSection = (section === 'calendar' && !showCalendar) || (section === 'group' && !selected) ? 'home' : section;
   function selectChild(child: Child) {
     setSelectedId(child.id);
-    if (section === 'calendar' && !hasAttendanceAccess(child)) setSection('home');
+    if (section === 'calendar' && (!hasAttendanceAccess(child) || child.id === unavailableCalendar)) setSection('home');
   }
 
   useFocusEffect(useCallback(() => {
@@ -69,11 +70,13 @@ export default function ChildrenScreen() {
     return () => back.remove();
   }, [currentSection]));
   const attendanceUnavailable = useCallback(() => {
+    setUnavailableCalendar(selected?.id ?? null);
     setSection('home');
     dispatch(loadChildrenStart({ refresh: true }));
-  }, [dispatch]);
+  }, [dispatch, selected?.id]);
 
   function refreshChildren() {
+    setUnavailableCalendar(null);
     setAbsenceRefresh((value) => value + 1);
     dispatch(loadChildrenStart({ refresh: true }));
   }
@@ -114,6 +117,7 @@ export default function ChildrenScreen() {
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (state) => {
       if (state === 'active') {
+        setUnavailableCalendar(null);
         reload();
       }
     });
@@ -152,7 +156,7 @@ export default function ChildrenScreen() {
 
   const header = (
     <Stack.Screen options={{
-      headerShown: currentSection !== 'profile',
+      headerShown: currentSection === 'home' || currentSection === 'group',
       title: currentSection === 'calendar' ? 'Календарь' : currentSection === 'group' ? 'Группа' : 'Главная',
     }} />
   );
@@ -190,14 +194,11 @@ export default function ChildrenScreen() {
 
   const status = statusById[selected.id];
   return (
-    <View style={styles.screen}>
+    <SafeAreaView edges={currentSection === 'calendar' ? ['top'] : []} style={styles.screen}>
       {header}
       <ParentChildSelector items={items} statuses={statusById} selected={selected} onSelect={selectChild} />
-      {items.length === 1 && currentSection === 'calendar' && (
-        <Text style={styles.contextName}>{personName(selected)}</Text>
-      )}
       {currentSection === 'calendar' ? (
-        <ChildAttendancePanel childId={selected.id} cursor={calendarCursor} onCursorChange={setCalendarCursor} onUnavailable={attendanceUnavailable} />
+        <ChildAttendancePanel key={selected.id} embedded showIdentity={items.length === 1} selected={selected} childId={selected.id} cursor={calendarCursor} onCursorChange={setCalendarCursor} onUnavailable={attendanceUnavailable} />
       ) : currentSection === 'group' ? (
         <ChildGroupPanel key={selected.id} child={selected} />
       ) : (
@@ -207,9 +208,9 @@ export default function ChildrenScreen() {
             gender={user?.gender ?? null} marking={markingIds.includes(selected.id)}
             onMark={() => confirmMark(selected)} onCancel={() => confirmCancel(selected)}
             onRetryStatus={() => dispatch(loadStatusStart(selected.id))}
-            absenceActions={<ChildAbsence child={selected}
-              refresh={`${absenceRefresh}:${status?.visit?.pending?.id ?? status?.visit?.decidedAt ?? status?.value ?? ''}`} />}
           />
+          <ChildAbsence child={selected} calendarAvailable={showCalendar}
+            refresh={`${absenceRefresh}:${status?.visit?.pending?.id ?? status?.visit?.decidedAt ?? status?.value ?? ''}`} />
         </ScrollView>
       )}
       {navigation}
@@ -224,16 +225,14 @@ export default function ChildrenScreen() {
           onClose={() => setMarking(null)}
         />
       )}
-    </View>
+    </SafeAreaView>
   );
 }
 
 const useStyles = makeStyles((c) =>
   StyleSheet.create({
-    screen: { flex: 1, backgroundColor: c.card },
-    contextName: { alignSelf: 'center', width: '100%', maxWidth: 480, paddingHorizontal: space.lg,
-      paddingTop: space.md, fontSize: 16, fontWeight: '600', color: c.text },
-    container: { padding: space.lg, width: '100%', maxWidth: 480, alignSelf: 'center' },
+    screen: { flex: 1, backgroundColor: c.background },
+    container: { padding: space.md, gap: space.md, width: '100%', maxWidth: 480, alignSelf: 'center' },
     center: {
       flex: 1,
       justifyContent: 'center',

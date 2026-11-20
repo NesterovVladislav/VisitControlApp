@@ -61,11 +61,12 @@ function failureText(error: unknown) {
   }
 }
 
-export default function AbsenceSheet({ child, initialRules, initialMode, initialEntry, onClose, onSaved, onReload }: {
+export default function AbsenceSheet({ child, initialRules, initialMode, initialEntry, fromCalendar = false, onClose, onSaved, onReload }: {
   child: Child;
   initialRules: AbsenceRules;
   initialMode: 'list' | 'create';
   initialEntry?: AbsenceNotice;
+  fromCalendar?: boolean;
   onClose: () => void;
   onReload?: () => void;
   onSaved: (entry: AbsenceNotice, message: string, keepOpen?: boolean) => void;
@@ -74,6 +75,8 @@ export default function AbsenceSheet({ child, initialRules, initialMode, initial
   const colors = usePalette();
   const [rules, setRules] = useState(initialRules);
   const [mode, setMode] = useState<Mode>(initialEntry ? 'edit' : initialMode);
+  const [detail, setDetail] = useState(Boolean(initialEntry) && fromCalendar);
+  const [actions, setActions] = useState(false);
   const [entryLoading, setEntryLoading] = useState(Boolean(initialEntry));
   const [entryFailed, setEntryFailed] = useState(false);
   const [entryRetry, setEntryRetry] = useState(0);
@@ -225,6 +228,8 @@ export default function AbsenceSheet({ child, initialRules, initialMode, initial
 
   function openEdit(entry: AbsenceNotice) {
     clearAlerts();
+    setActions(false);
+    setDetail(false);
     setEditing(entry);
     setFromDate(entry.from);
     setToDate(entry.to);
@@ -245,6 +250,8 @@ export default function AbsenceSheet({ child, initialRules, initialMode, initial
   function restoreDraft() {
     if (!draft) return;
     clearAlerts();
+    setActions(false);
+    setDetail(false);
     setEditing(draft.editing);
     setChoice(draft.choice);
     setFromDate(draft.fromDate);
@@ -276,6 +283,8 @@ export default function AbsenceSheet({ child, initialRules, initialMode, initial
 
   function startAnotherPeriod() {
     clearAlerts();
+    setDetail(false);
+    setActions(false);
     setMode('create');
     setChoice(preferredChoice(rules));
     setEditing(null);
@@ -531,20 +540,22 @@ export default function AbsenceSheet({ child, initialRules, initialMode, initial
   }
 
   const readOnly = mode === 'edit' && (entryLoading || entryFailed || !editing?.editable);
-  const showSubmit = mode !== 'list' && (mode === 'create' || dirty) && !confirmCancel && returnDay === null && !reasonOpen && !readOnly && !uncertain;
-  const title = confirmDiscard ? 'Выйти без сохранения?' : returnDay !== null ? 'Когда ' + personName(child) + ' вернётся?'
+  const showSubmit = !detail && mode !== 'list' && (mode === 'create' || dirty) && !confirmCancel && returnDay === null && !reasonOpen && !readOnly && !uncertain;
+  const title = confirmDiscard ? 'Выйти без сохранения?' : returnDay !== null ? 'День возвращения'
     : confirmCancel ? 'Отменить отсутствие?'
       : reasonOpen ? 'Причина отсутствия'
-        : mode === 'create' ? personName(child) + ' не придёт'
-          : mode === 'edit' ? 'Отсутствие · ' + personName(child) : 'Все периоды';
+        : mode === 'create' ? 'Сообщить об отсутствии'
+          : mode === 'edit' ? (actions ? 'Действия' : detail ? 'Отсутствие' : 'Изменить отсутствие') : 'Отсутствия';
   const close = () => {
     if (guard.current || uncertain) return;
     if (confirmDiscard) setConfirmDiscard(false);
     else if (reasonOpen) setReasonOpen(false);
     else if (confirmCancel) setConfirmCancel(false);
     else if (returnDay !== null) setReturnDay(null);
+    else if (actions) setActions(false);
     else if (draft || (mode === 'edit' && dirty) || (mode === 'create'
       && (reason || comment.trim() || fromDate || toDate || choice !== preferredChoice(rules)))) setConfirmDiscard(true);
+    else if (fromCalendar && !detail && editing) setDetail(true);
     else onClose();
   };
 
@@ -584,7 +595,7 @@ export default function AbsenceSheet({ child, initialRules, initialMode, initial
   ) : undefined;
 
   return (
-    <BottomSheet title={title} onClose={close} closeLabel={reasonOpen ? 'Назад' : 'Закрыть'}
+    <BottomSheet title={title} onClose={close} closeLabel={reasonOpen || confirmCancel || returnDay || actions || (fromCalendar && editing && !detail) ? 'Назад' : 'Закрыть'}
       closeDisabled={busy || uncertain} footer={submitFooter}>
       {entryLoading && <Text accessibilityLiveRegion="polite" style={styles.hint}>Обновляем запись…</Text>}
       {entryFailed && <ActionButton label="Обновить запись" variant="text"
@@ -633,6 +644,27 @@ export default function AbsenceSheet({ child, initialRules, initialMode, initial
             setConfirmCancel(false);
             clearAlerts();
           }} />
+        </View>
+      ) : detail && editing ? (
+        <View style={styles.section}>
+          {actions ? <Pressable accessibilityRole="button" style={styles.inlineAction} disabled={busy || uncertain} onPress={() => {
+            if (editing.cancel_effect?.kind === 'SHORTEN' && editing.editable && returnMin && returnMin <= editing.to) {
+              setReturnCalendarOpen(false);
+              setReturnDay(returnMin);
+            } else setConfirmCancel(true);
+          }}><Text style={editing.cancel_effect?.kind === 'SHORTEN' ? styles.link : styles.error}>
+            {editing.cancel_effect?.kind === 'SHORTEN' ? 'Указать день возвращения' : 'Отменить отсутствие'}
+          </Text></Pressable> : <>
+            <Text style={styles.body}>{absenceRangeText(editing.from, editing.to)}</Text>
+            <Text style={styles.hint}>{reasonLabel}</Text>
+            {comment ? <Text style={styles.body}>{comment}</Text> : null}
+            {editing.paid_days.filter(d => !d.waived).map(d => <Text key={d.date} style={styles.paidText}>₽ {absenceDateText(d.date)} оплачивается</Text>)}
+            {!entryLoading && !entryFailed && <View style={styles.detailActions}>
+              {editing.editable && <View style={styles.editAction}><ActionButton label="Изменить" onPress={() => setDetail(false)} /></View>}
+              {editing.cancellable && <Pressable style={styles.more} accessibilityRole="button" accessibilityLabel="Действия с периодом" onPress={() => setActions(true)}>
+                <IconSymbol name="ellipsis" size={24} color={colors.actionPrimary} /></Pressable>}
+            </View>}
+          </>}
         </View>
       ) : reasonOpen ? (
         <View accessibilityRole="radiogroup">
@@ -729,7 +761,7 @@ export default function AbsenceSheet({ child, initialRules, initialMode, initial
               </View>
             )}
           </View>
-          {!entryLoading && !entryFailed && editing?.cancellable && (editing.cancel_effect?.kind === 'SHORTEN' ? (
+          {(!fromCalendar || draft) && !entryLoading && !entryFailed && editing?.cancellable && (editing.cancel_effect?.kind === 'SHORTEN' ? (
             <Pressable accessibilityRole="button" style={styles.inlineAction} disabled={busy || uncertain} onPress={() => {
               clearAlerts();
               if (editing.editable && returnMin && returnMin <= editing.to) {
@@ -751,7 +783,7 @@ export default function AbsenceSheet({ child, initialRules, initialMode, initial
       {error && !showSubmit && <StatusMessage tone="error" message={error} />}
       {conflict && <ActionButton label="Открыть существующее предупреждение" variant="text" disabled={busy}
         onPress={() => void openConflict()} />}
-      {!uncertain && !entryLoading && !reasonOpen && !confirmCancel && returnDay === null && mode === 'edit' && (
+      {!fromCalendar && !uncertain && !entryLoading && !reasonOpen && !confirmCancel && returnDay === null && mode === 'edit' && (
         <Pressable accessibilityRole="button" accessibilityLabel="Все периоды"
           style={styles.navigation} disabled={busy} onPress={backToList}>
           <Text style={styles.link}>Все периоды</Text>
@@ -763,6 +795,9 @@ export default function AbsenceSheet({ child, initialRules, initialMode, initial
 }
 
 const useStyles = makeStyles((c) => StyleSheet.create({
+  detailActions: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
+  editAction: { flex: 1 },
+  more: { minHeight: 48, minWidth: 48, alignItems: 'center', justifyContent: 'center' },
   section: { gap: space.md },
   commentToggle: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', minHeight: controlHeight.touch },
   chevronOpen: { transform: [{ rotate: '180deg' }] },

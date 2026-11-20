@@ -64,7 +64,7 @@ const useStyles = makeStyles((c) => StyleSheet.create({
   entry: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: c.separator, marginTop: space.sm,
     paddingTop: space.xxs, paddingBottom: space.xxs, alignItems: 'center' },
   caption: { color: c.textSecondary, fontSize: typeSize.caption },
-  overview: { backgroundColor: c.card, borderRadius: radius.card, gap: space.md, padding: space.lg },
+  overview: { backgroundColor: c.card, borderRadius: radius.card, gap: space.xs, padding: space.md },
   heading: { color: c.text, fontSize: typeSize.body, fontWeight: '700' },
   totals: { flexDirection: 'row' },
   total: { flex: 1, gap: space.xxs, paddingEnd: space.sm },

@@ -68,7 +68,7 @@ describe('child QR code for the kindergarten employee', () => {
     mockApi.issueHandover.mockResolvedValue({ token: 'vc1:abc', expiresIn: 90 });
     const screen = await render(sheet('OUT'));
 
-    expect(screen.getByText('Приход · Иванова Мария')).toBeTruthy();
+    expect(screen.getByText('Иванова Мария')).toBeTruthy();
     await fireEvent.press(screen.getByRole('button', { name: 'Кто привёл ребёнка?' }));
 
     await fireEvent.changeText(screen.getByPlaceholderText('Необязательно'), 'Привела бабушка');
@@ -78,7 +78,7 @@ describe('child QR code for the kindergarten employee', () => {
     expect(mockApi.issueHandover).toHaveBeenCalledWith('c1', 'IN', 'Привела бабушка');
     expect(await screen.findByText('QR:vc1:abc')).toBeTruthy();
     expect(screen.getByText('Код обновится через 1:30')).toBeTruthy();
-    expect(screen.getByText('Приход · Иванова Мария')).toBeVisible();
+    expect(screen.getByText('Иванова Мария')).toBeVisible();
     expect(screen.getByText('Следующий: Иванов Пётр ›')).toBeTruthy();
   });
 
@@ -90,7 +90,7 @@ describe('child QR code for the kindergarten employee', () => {
     await fireEvent.changeText(screen.getByPlaceholderText('Необязательно'), 'Привёл дедушка');
     await fireEvent.press(screen.getByText('Показать QR-код'));
     await screen.findByText('QR:vc1:abc');
-    await fireEvent.press(screen.getByText('Назад'));
+    await fireEvent.press(screen.getByLabelText('Назад'));
     expect(screen.getByDisplayValue('Привёл дедушка')).toBeTruthy();
     await fireEvent.press(screen.getByText('Отправить отметку'));
     expect(onConfirm).toHaveBeenCalledWith('Привёл дедушка');
@@ -108,7 +108,7 @@ describe('child QR code for the kindergarten employee', () => {
     mockApi.issueHandover.mockResolvedValue({ token: 'vc1:out', expiresIn: 90 });
     const screen = await render(sheet('IN'));
 
-    expect(screen.getByText('Уход · Иванова Мария')).toBeTruthy();
+    expect(screen.getByText('Иванова Мария')).toBeTruthy();
     await fireEvent.press(screen.getByText('Показать QR-код'));
 
     expect(mockApi.issueHandover).toHaveBeenCalledWith('c1', 'OUT', '');
@@ -136,7 +136,7 @@ describe('child QR code for the kindergarten employee', () => {
     await fireEvent.press(screen.getByRole('button', { name: 'Показать QR-код' }));
     await screen.findByText('QR:vc1:abc');
     expect(mockApi.issueHandover).toHaveBeenLastCalledWith('c2', 'OUT', '');
-    expect(screen.getByText('Уход · Иванов Пётр')).toBeVisible();
+    expect(screen.getByText('Иванов Пётр')).toBeVisible();
   });
 
   it('explains why the code was not issued and keeps the comment', async () => {
