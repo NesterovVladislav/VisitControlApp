@@ -181,7 +181,7 @@ const useStyles = makeStyles((c) => StyleSheet.create({
   screen: { flex: 1, backgroundColor: c.background },
   content: { width: '100%', maxWidth: 480, alignSelf: 'center', gap: space.sm,
     paddingHorizontal: space.md, paddingTop: space.sm, paddingBottom: space.sm },
-  shortContent: { gap: space.xxs, paddingVertical: space.xxs },
+  shortContent: { gap: space.xxs, paddingTop: space.xxs, paddingBottom: 0 },
   identity: { borderRadius: radius.card, backgroundColor: c.card, flexDirection: 'row', alignItems: 'center',
     gap: space.sm, paddingVertical: space.md, paddingHorizontal: space.lg },
   context: { paddingHorizontal: space.sm },
