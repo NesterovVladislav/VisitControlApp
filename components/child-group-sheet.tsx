@@ -65,7 +65,7 @@ function GroupContents({ child, onClose }: PanelProps) {
 
   const group = state.status === 'loaded' ? state.group : undefined;
   const present = group?.children.filter(member => member.present).length ?? 0;
-  const header = (
+  const header = (group?.name || onClose) ? (
     <View style={styles.header}>
       <Text style={styles.title} accessibilityRole="header">{group?.name || 'Группа'}</Text>
       {group?.name && (
@@ -77,7 +77,7 @@ function GroupContents({ child, onClose }: PanelProps) {
         <IconSymbol name="xmark" size={22} color={c.textSecondary} />
       </Pressable>}
     </View>
-  );
+  ) : null;
 
   return (
     <FlatList
@@ -94,7 +94,7 @@ function GroupContents({ child, onClose }: PanelProps) {
           <Text style={[styles.member, item.own && styles.own]}>{`${item.surname} ${item.firstName}`.trim()}</Text>
         </View>
       )}
-      ListEmptyComponent={<View style={[styles.empty, styles.last]}>{
+      ListEmptyComponent={<View style={[styles.empty, styles.last, !header && styles.standalone]}>{
         state.status === 'loading' ? <ActivityIndicator accessibilityLabel="Загружаем группу" color={c.actionPrimary} /> :
           state.status === 'failed' ? (
             <>
@@ -120,9 +120,10 @@ export default function ChildGroupSheet({ child, onClose }: { child: Child | nul
 const useStyles = makeStyles((c) => StyleSheet.create({
   screen: { flex: 1, backgroundColor: c.background },
   content: { padding: space.md, paddingBottom: space.section,
-    width: '100%', maxWidth: 440, alignSelf: 'center' },
+    width: '100%', maxWidth: 480, alignSelf: 'center' },
   header: { flexDirection: 'row', alignItems: 'center', gap: space.md, padding: space.lg, backgroundColor: c.card,
     borderTopLeftRadius: radius.card, borderTopRightRadius: radius.card },
+  standalone: { borderRadius: radius.card },
   last: { borderBottomLeftRadius: radius.card, borderBottomRightRadius: radius.card },
   close: { alignItems: 'center', justifyContent: 'center', width: controlHeight.touch, height: controlHeight.touch },
   title: { flex: 1, fontSize: typeSize.sheetTitle, fontWeight: '700', color: c.text },

@@ -9,6 +9,7 @@ import { radius, space, typeSize } from '../constants/ui-tokens';
 import type { Child } from '../store/types/children';
 import { personName } from '../utils/people-format';
 import { ActionButton, StatusMessage } from './ui';
+import { CompactBackHeader } from './profile-page-header';
 import AbsenceSheet from './absence-sheet';
 import { periodLabel } from './calendar-absence-entry';
 
@@ -50,8 +51,7 @@ export function CalendarAbsenceList({ child, rules, day, onBack, onReturnToDay, 
   }
   function refresh() { setRevision(n => n + 1); onRefresh(); }
   return <View style={s.screen}>
-    <View style={s.header}><Pressable style={s.back} accessibilityRole="button" accessibilityLabel="Назад в календарь" onPress={onBack}>
-      <Ionicons name="arrow-back" size={22} color={c.actionPrimary} /></Pressable><Text accessibilityRole="header" style={s.heading}>Отсутствия</Text></View>
+    <CompactBackHeader title="Отсутствия" backLabel="Назад в календарь" onBack={onBack} />
     <ScrollView contentContainerStyle={s.content}><Text style={s.context}>{personName(child)}</Text>
       <View style={s.panel}>
         {failed ? <><StatusMessage message="Не удалось загрузить отсутствия" tone="error" /><ActionButton variant="text" label="Повторить" onPress={() => setRevision(n => n + 1)} /></> :
@@ -70,9 +70,6 @@ export function CalendarAbsenceList({ child, rules, day, onBack, onReturnToDay, 
 }
 const useStyles = makeStyles(c => StyleSheet.create({
   screen: { flex: 1, backgroundColor: c.background },
-  header: { flexDirection: 'row', alignItems: 'center', gap: space.xs, backgroundColor: c.card },
-  back: { width: 48, height: 48, alignItems: 'center', justifyContent: 'center' },
-  heading: { color: c.text, fontWeight: '600', fontSize: typeSize.navigationTitle },
   content: { padding: space.md, gap: space.md, width: '100%', maxWidth: 480, alignSelf: 'center' },
   panel: { borderRadius: radius.card, backgroundColor: c.card, padding: space.md },
   row: { minHeight: 56, gap: space.sm, alignItems: 'center', flexDirection: 'row', paddingVertical: space.sm, borderBottomWidth: StyleSheet.hairlineWidth, borderColor: c.separator },

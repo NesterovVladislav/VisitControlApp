@@ -21,7 +21,7 @@ import ChildAbsence from '../components/child-absence';
 import { ChildGroupPanel } from '../components/child-group-sheet';
 import { ChildAttendancePanel } from '../components/child-attendance-panel';
 import ParentVisitFlow from '../components/parent-visit-flow';
-import { ParentChildSelector, ParentSection, ParentSectionBar } from '../components/parent-navigation';
+import { ParentChildSelector, ParentSection, ParentSectionBar, parentSectionTitle } from '../components/parent-navigation';
 import { hasAttendanceAccess } from '../hooks/use-own-attendance';
 import { useAppDispatch, useAppSelector } from '../store';
 import {
@@ -52,6 +52,7 @@ export default function ChildrenScreen() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [section, setSection] = useState<ParentSection>('home');
   const [unavailableCalendar, setUnavailableCalendar] = useState<string | null>(null);
+  const [absenceListOpen, setAbsenceListOpen] = useState(false);
   const [calendarCursor, setCalendarCursor] = useState<string | null>(null);
   const selected = items.find(child => child.id === selectedId) ?? items[0];
   const showCalendar = Boolean(selected && hasAttendanceAccess(selected) && selected.id !== unavailableCalendar);
@@ -154,21 +155,22 @@ export default function ChildrenScreen() {
   const qrNext = qrCandidates.length > 1 ? qrCandidates[(qrIndex + 1) % qrCandidates.length] : null;
   const pollQrStatus = useCallback((id: string) => dispatch(loadStatusStart(id)), [dispatch]);
 
+  const nestedCalendar = currentSection === 'calendar' && absenceListOpen;
   const header = (
     <Stack.Screen options={{
-      headerShown: currentSection === 'home' || currentSection === 'group',
-      title: currentSection === 'calendar' ? 'Календарь' : currentSection === 'group' ? 'Группа' : 'Главная',
+      title: parentSectionTitle(currentSection),
+      headerShown: !nestedCalendar,
     }} />
   );
   const navigation = <ParentSectionBar selected={currentSection} showCalendar={showCalendar}
     showGroup={Boolean(selected)} onSelect={setSection} />;
 
   if (currentSection === 'profile') return (
-    <SafeAreaView edges={['top']} style={styles.screen}>
+    <View style={styles.screen}>
       {header}
       <ParentAccount />
       {navigation}
-    </SafeAreaView>
+    </View>
   );
 
   if (!selected || listStatus !== 'loaded') return (
@@ -193,12 +195,13 @@ export default function ChildrenScreen() {
   );
 
   const status = statusById[selected.id];
+  const childPicker = (context?: string) => <ParentChildSelector calendarContext={context} items={items} statuses={statusById} selected={selected} onSelect={selectChild} />;
   return (
-    <SafeAreaView edges={currentSection === 'calendar' ? ['top'] : []} style={styles.screen}>
+    <SafeAreaView edges={nestedCalendar ? ['top'] : []} style={styles.screen}>
       {header}
-      <ParentChildSelector items={items} statuses={statusById} selected={selected} onSelect={selectChild} />
+      {currentSection !== 'calendar' && childPicker()}
       {currentSection === 'calendar' ? (
-        <ChildAttendancePanel key={selected.id} embedded showIdentity={items.length === 1} selected={selected} childId={selected.id} cursor={calendarCursor} onCursorChange={setCalendarCursor} onUnavailable={attendanceUnavailable} />
+        <ChildAttendancePanel key={selected.id} renderChildPicker={items.length > 1 ? childPicker : undefined} embedded onListVisibility={setAbsenceListOpen} showIdentity={items.length === 1} selected={selected} childId={selected.id} cursor={calendarCursor} onCursorChange={setCalendarCursor} onUnavailable={attendanceUnavailable} />
       ) : currentSection === 'group' ? (
         <ChildGroupPanel key={selected.id} child={selected} />
       ) : (

@@ -6,6 +6,7 @@ import { useSessionLifecycle } from '../../hooks/use-session-lifecycle';
 import { useAppDispatch, useAppSelector } from '../../store';
 import { bootstrapSession } from '../../store/reducers/auth';
 import { AuthPhase } from '../../store/types/auth';
+import { renderProfilePageHeader } from '../profile-page-header';
 import { brandHeaderTitle } from '../header-brand-title';
 import { BiometricSetupScreen } from './biometric-setup-screen';
 import { CreatePinScreen } from './create-pin-screen';
@@ -38,8 +39,9 @@ function SessionNavigator({ phase }: { phase: AuthPhase }) {
           name="children"
           options={{
             gestureEnabled: false,
+            header: renderProfilePageHeader,
             headerBackVisible: false,
-            title: 'Мои дети',
+            title: 'Главная',
           }}
         />
         <Stack.Screen
@@ -48,26 +50,26 @@ function SessionNavigator({ phase }: { phase: AuthPhase }) {
         />
         <Stack.Screen
           name="profile/index"
-          options={{ title: 'Профиль', headerBackTitle: 'Назад' }}
+          options={{ header: renderProfilePageHeader, title: 'Профиль', headerBackTitle: 'Назад' }}
         />
-        <Stack.Screen name="profile/about" options={{ title: 'О приложении', headerBackTitle: 'Профиль' }} />
-        <Stack.Screen name="profile/details" options={{ title: 'Личные данные', headerBackTitle: 'Профиль' }} />
-        <Stack.Screen name="profile/theme" options={{ title: 'Тема', headerBackTitle: 'Профиль' }} />
+        <Stack.Screen name="profile/about" options={{ header: renderProfilePageHeader, title: 'О приложении', headerBackTitle: 'Профиль' }} />
+        <Stack.Screen name="profile/details" options={{ header: renderProfilePageHeader, title: 'Личные данные', headerBackTitle: 'Профиль' }} />
+        <Stack.Screen name="profile/theme" options={{ header: renderProfilePageHeader, title: 'Тема', headerBackTitle: 'Профиль' }} />
         <Stack.Screen
           name="profile/edit"
-          options={{ title: 'Редактирование', headerBackTitle: 'Назад' }}
+          options={{ header: renderProfilePageHeader, title: 'Редактирование', headerBackTitle: 'Назад' }}
         />
         <Stack.Screen
           name="profile/password"
-          options={{ title: 'Смена пароля', headerBackTitle: 'Профиль' }}
+          options={{ header: renderProfilePageHeader, title: 'Смена пароля', headerBackTitle: 'Профиль' }}
         />
         <Stack.Screen
           name="profile/child/[id]"
-          options={{ title: 'Данные ребёнка', headerBackTitle: 'Профиль' }}
+          options={{ header: renderProfilePageHeader, title: 'Данные ребёнка', headerBackTitle: 'Профиль' }}
         />
         <Stack.Screen
           name="profile/add-child"
-          options={{ title: 'Добавить ребёнка', headerBackTitle: 'Профиль' }}
+          options={{ header: renderProfilePageHeader, title: 'Добавить ребёнка', headerBackTitle: 'Профиль' }}
         />
         <Stack.Screen name="menu" options={{ headerShown: false }} />
         <Stack.Screen

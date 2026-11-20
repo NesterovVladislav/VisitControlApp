@@ -1,7 +1,7 @@
 import { personName } from '@/utils/people-format';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { controlHeight, space, typeSize } from '../constants/ui-tokens';
@@ -19,19 +19,26 @@ const sections = [
 ] as const;
 export type ParentSection = typeof sections[number]['id'];
 
+export function parentSectionTitle(section: ParentSection) {
+  return sections.find(item => item.id === section)!.label;
+}
+
 function childStatus(status?: ChildStatus) {
   if (status?.visit?.pending) return pendingLabel(status.visit.pending);
   if (!status?.value) return status?.error ? 'Статус неизвестен' : 'Загружаем статус';
   return isInKindergarten(status.value) ? 'В саду' : 'Не в саду';
 }
 
-export function ParentChildSelector({ items, selected, statuses, onSelect }: {
+export function ParentChildSelector({ items, selected, statuses, onSelect, calendarContext }: {
+  calendarContext?: string;
   items: Child[];
   selected: Child;
   statuses: Record<string, ChildStatus>;
   onSelect: (child: Child) => void;
 }) {
   const styles = useStyles();
+  const { height } = useWindowDimensions();
+  const compactPicker = calendarContext !== undefined && height < 680;
   const [open, setOpen] = useState(false);
   function choice(child: Child, compact: boolean) {
     const active = selected.id === child.id;
@@ -48,14 +55,14 @@ export function ParentChildSelector({ items, selected, statuses, onSelect }: {
   }
   if (items.length < 2) return null;
   return (
-    <View style={styles.band}>
-      {items.length === 2 ? items.map(child => choice(child, true)) : (
-        <Pressable style={styles.picker} accessibilityRole="button" accessibilityLabel={`Выбрать ребёнка: ${personName(selected)}, ${childStatus(statuses[selected.id])}`}
+    <View style={[styles.band, compactPicker && styles.compactBand]}>
+      {items.length === 2 && !compactPicker ? items.map(child => choice(child, true)) : (
+        <Pressable style={[styles.picker, compactPicker && styles.compactPicker]} accessibilityRole="button" accessibilityLabel={`Выбрать ребёнка: ${personName(selected)}, ${childStatus(statuses[selected.id])}`}
           accessibilityState={{ expanded: open }}
           onPress={() => setOpen(true)}>
           <View style={styles.grow}>
             <Text style={styles.name}>{personName(selected)}</Text>
-            <Text style={styles.status}>{childStatus(statuses[selected.id])}</Text>
+            {compactPicker ? (calendarContext ? <Text style={styles.status}>{calendarContext}</Text> : null) : <Text style={styles.status}>{childStatus(statuses[selected.id])}</Text>}
           </View>
           <IconSymbol name="chevron.down" size={22} color={styles.name.color} />
         </Pressable>
@@ -93,6 +100,8 @@ export function ParentSectionBar({ selected, showCalendar, showGroup = true, onS
 const useStyles = makeStyles(c => StyleSheet.create({
   band: { flexDirection: 'row', alignSelf: 'center', width: '100%', maxWidth: 480, paddingHorizontal: space.lg,
     paddingTop: space.sm, gap: space.md },
+  compactPicker: { paddingVertical: space.xxs },
+  compactBand: { paddingTop: 0 },
   choice: { minHeight: controlHeight.touch, paddingVertical: space.sm, paddingHorizontal: space.sm,
     borderBottomWidth: 2, borderColor: c.separator, justifyContent: 'center' },
   half: { flex: 1 },

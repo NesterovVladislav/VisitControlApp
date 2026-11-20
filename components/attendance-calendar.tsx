@@ -1,3 +1,4 @@
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { useRef, useState, type ElementRef, type KeyboardEvent } from 'react';
 import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 
@@ -64,25 +65,31 @@ function AttendanceDayDetails({ day, onClose, onOpenPeriod }: { day: AttendanceD
   );
 }
 
-export function AttendanceMonthHeader({ label, onPrevious, onNext, canNext }: {
+export function AttendanceMonthHeader({ label, onPrevious, onNext, canNext, onLegend }: {
   label: string;
   onPrevious: () => void;
   onNext: () => void;
   canNext: boolean;
+  onLegend?: () => void;
 }) {
   const styles = useStyles();
   return (
     <View style={styles.monthHeader}>
       <ActionButton variant="text" label="‹" accessibilityLabel="Предыдущий месяц" onPress={onPrevious} />
-      <Text style={styles.monthTitle} accessibilityRole="header" aria-live="polite">{label}</Text>
+      <View style={styles.monthCenter}>
+        <Text style={styles.monthTitle} accessibilityRole="header" aria-live="polite">{label}</Text>
+        {onLegend && <Pressable accessibilityRole="button" accessibilityLabel="Обозначения" onPress={onLegend} style={styles.info}>
+          <Ionicons name="information-circle-outline" size={20} color={styles.info.color} />
+        </Pressable>}
+      </View>
       <ActionButton variant="text" label="›" accessibilityLabel="Следующий месяц" disabled={!canNext} onPress={onNext} />
     </View>
   );
 }
 
-export function AttendanceCalendar({ month, days, today, showLegend, onCloseLegend, onOpenPeriod, compact, initialOpenDate, onDayClosed }: {
+export function AttendanceCalendar({ month, days, today, showLegend, onCloseLegend, onOpenPeriod, compact, inlineMarks, initialOpenDate, onDayClosed }: {
   initialOpenDate?: string; onDayClosed?: () => void;
-  showLegend?: boolean; onCloseLegend?: () => void; onOpenPeriod?: (day: AttendanceDay) => void; compact?: boolean;
+  showLegend?: boolean; onCloseLegend?: () => void; onOpenPeriod?: (day: AttendanceDay) => void; compact?: boolean; inlineMarks?: boolean;
   month: ReturnType<typeof calendarMonth>;
   days: AttendanceDay[];
   today: string;
@@ -144,14 +151,14 @@ export function AttendanceCalendar({ month, days, today, showLegend, onCloseLege
                 <Pressable key={day.date} style={styles.cell} accessibilityLabel={label} accessibilityRole="button"
                   onPress={() => setOpenDate(day.date)} {...webProps}>
                   {({ pressed }) => (
-                    <View style={[styles.day, compact && styles.compactDay, styles[mark.tone], isToday && styles.today,
+                    <View style={[styles.day, compact && styles.compactDay, inlineMarks && styles.inlineDay, styles[mark.tone], isToday && styles.today,
                       pressed && styles.pressed, focusedDate === day.date && styles.focused]}>
                       <Text style={[styles.dayNumber, mark.tone === 'inactive' && styles.secondary]}>
                         {Number(day.date.slice(-2))}
                       </Text>
                       <Text style={[styles.symbol, mark.tone === 'visit' && styles.visitedSymbol,
                         mark.tone === 'absence' && styles.paid, mark.tone === 'planned' && styles.plannedSymbol]}>
-                        {mark.symbol ?? '\u00a0'}{day.paid && <Text style={styles.paid}> ₽</Text>}
+                        {mark.symbol ?? (inlineMarks ? '' : '\u00a0')}{day.paid && <Text style={styles.paid}>{inlineMarks ? '₽' : ' ₽'}</Text>}
                       </Text>
                     </View>
                   )}
@@ -194,7 +201,9 @@ export function AttendanceCalendar({ month, days, today, showLegend, onCloseLege
 
 const useStyles = makeStyles((c) => StyleSheet.create({
   monthHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space.sm },
-  monthTitle: { flex: 1, color: c.text, textAlign: 'center', fontSize: typeSize.navigationTitle, fontWeight: '700' },
+  monthCenter: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
+  info: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', color: c.actionPrimary },
+  monthTitle: { flexShrink: 1, color: c.text, textAlign: 'center', fontSize: typeSize.navigationTitle, fontWeight: '700' },
   week: { flexDirection: 'row' },
   weekday: { flex: 1, textAlign: 'center', color: c.textSecondary, fontSize: typeSize.caption },
   cell: { flex: 1, minWidth: 0 },
@@ -203,6 +212,7 @@ const useStyles = makeStyles((c) => StyleSheet.create({
     borderWidth: 2, borderColor: 'transparent', borderRadius: radius.control, paddingVertical: 2,
   },
   compactDay: { minHeight: 38, margin: 1, paddingVertical: 0 },
+  inlineDay: { minHeight: 28, flexDirection: 'row', justifyContent: 'center', columnGap: 1 },
   dayNumber: { color: c.text, fontSize: typeSize.label, fontWeight: '600', lineHeight: 18, includeFontPadding: false },
   secondary: { color: c.textSecondary },
   visit: { backgroundColor: c.successSoft },

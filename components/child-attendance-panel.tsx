@@ -1,12 +1,11 @@
 import { useFocusEffect } from '@react-navigation/native';
-import Ionicons from '@expo/vector-icons/Ionicons';
 import { CalendarAbsenceEntry } from './calendar-absence-entry';
 import { CalendarAbsenceList } from './calendar-absence-list';
 import { getAbsenceRules, type AbsenceRules } from '../services/api/absence';
 import { ApiError } from '../services/errors/api-error';
 import { personName } from '@/utils/people-format';
-import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, AppState, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { type ReactNode, useCallback, useEffect, useLayoutEffect, useState } from 'react';
+import { ActivityIndicator, AppState, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 
 import { AttendanceCalendar, AttendanceMonthHeader } from './attendance-calendar';
 import { AttendanceOverview } from './attendance-overview';
@@ -29,6 +28,7 @@ function groupLabel(group: AttendanceChild['groups'][number], transferred: boole
 }
 
 interface PanelProps {
+  renderChildPicker?: (context?: string) => ReactNode;
   childId?: string;
   cursor: string | null;
   onCursorChange: (month: string) => void;
@@ -36,21 +36,28 @@ interface PanelProps {
   showIdentity?: boolean;
   embedded?: boolean;
   onChooseChild?: () => void;
+  onListVisibility?: (open: boolean) => void;
   onUnavailable?: () => void;
 }
 
 export function ChildAttendancePanel({
-  childId, cursor, onCursorChange, selected, showIdentity, embedded = false, onChooseChild, onUnavailable,
+  childId, cursor, onCursorChange, selected, showIdentity, renderChildPicker, embedded = false, onChooseChild, onUnavailable, onListVisibility,
 }: PanelProps) {
   const styles = useStyles();
   const colors = usePalette();
   const { width, height } = useWindowDimensions();
   const narrow = width < 380;
+  const short = embedded && height < 680;
   const [restoredDay, setRestoredDay] = useState<string>();
   const [legend, setLegend] = useState(false);
   const [absence, setAbsence] = useState<AbsenceRules>();
   const [absenceFailed, setAbsenceFailed] = useState(false);
   const [list, setList] = useState<{ day?: AttendanceDay }>();
+  const listVisible = Boolean(embedded && list && selected && absence);
+  useLayoutEffect(() => {
+    onListVisibility?.(listVisible);
+    return () => onListVisibility?.(false);
+  }, [listVisible, onListVisibility]);
   const backToMonth = useCallback(() => { setRestoredDay(list?.day?.date); setList(undefined); }, [list]);
   const [revision, setRevision] = useState(0);
   const clock = useAttendanceToday(Boolean(childId), revision);
@@ -109,15 +116,13 @@ export function ChildAttendancePanel({
     return <CalendarAbsenceList child={selected} rules={absence} day={list.day} onBack={backToMonth} onRefresh={retry}
       onReturnToDay={backToMonth} />;
   }
+  const context = [displayName, ...(report?.groups.map(group => groupLabel(group, report.groups.length > 1)) ?? [])].filter(Boolean).join(' · ');
   return <View style={styles.screen}>
-    {embedded && <View style={styles.header}>
-      <View style={styles.identityText}><Text accessibilityRole="header" style={styles.heading}>Календарь</Text>
-        <Text style={styles.group}>{[displayName, ...(report?.groups.map(group => groupLabel(group, report.groups.length > 1)) ?? [])].filter(Boolean).join(' · ')}</Text>
-      </View>
-      {report && !failed && !outsideGroup && <Pressable style={styles.legend} accessibilityRole="button" accessibilityLabel="Обозначения" onPress={() => setLegend(true)}>
-        <Ionicons name="information-circle-outline" color={colors.actionPrimary} size={22} /></Pressable>}
-    </View>}
-    <ScrollView style={styles.screen} contentContainerStyle={[styles.content, narrow && styles.narrowContent]}>
+    {renderChildPicker?.(short ? context : undefined)}
+    <ScrollView style={styles.screen} contentContainerStyle={[styles.content, short && styles.shortContent]}>
+      {embedded && context && !(short && renderChildPicker) ? (
+        <Text style={[styles.context, styles.group]}>{context}</Text>
+      ) : null}
       {!embedded && (displayName || report?.groups.length || onChooseChild) ? (
         <View style={showIdentity ? styles.identity : styles.context}>
           {displayName && selected && <Avatar firstName={selected.firstName} surname={selected.surname} photoUrl={selected.photoUrl} size={40} />}
@@ -142,6 +147,7 @@ export function ChildAttendancePanel({
         {month && (
           <View style={narrow && styles.panelInset}>
             <AttendanceMonthHeader label={month.label} canNext={Boolean(lastMonth && month.from < lastMonth)}
+              onLegend={embedded && report && !failed && !outsideGroup ? () => setLegend(true) : undefined}
               onPrevious={() => onCursorChange(shiftCalendarMonth(month.from, -1))}
               onNext={() => onCursorChange(shiftCalendarMonth(month.from, 1))} />
           </View>
@@ -157,7 +163,7 @@ export function ChildAttendancePanel({
           </View>
         ) : month && today && report ? (
           <AttendanceCalendar key={childId} month={month} days={report.days} today={today}
-            initialOpenDate={restoredDay} onDayClosed={() => setRestoredDay(undefined)} compact={embedded && height < 720}
+            initialOpenDate={restoredDay} onDayClosed={() => setRestoredDay(undefined)} compact={embedded && height < 720} inlineMarks={short}
             showLegend={embedded ? legend : undefined} onCloseLegend={embedded ? () => setLegend(false) : undefined}
             onOpenPeriod={embedded && absence && selected ? day => setList({ day }) : undefined} />
         ) : (
@@ -166,19 +172,16 @@ export function ChildAttendancePanel({
           </View>
         )}
       </View>
-      {!failed && report && !outsideGroup && <AttendanceOverview summary={report.summary} />}
+      {!failed && report && !outsideGroup && <AttendanceOverview compact={short} summary={report.summary} />}
     </ScrollView>
   </View>;
 }
 
 const useStyles = makeStyles((c) => StyleSheet.create({
-  header: { flexDirection: 'row', alignItems: 'center', paddingLeft: space.lg, backgroundColor: c.card, minHeight: 52, paddingVertical: space.xxs },
-  heading: { color: c.text, fontWeight: '700', fontSize: typeSize.navigationTitle },
-  legend: { width: 48, height: 44, justifyContent: 'center', alignItems: 'center' },
   screen: { flex: 1, backgroundColor: c.background },
-  content: { width: '100%', maxWidth: 440, alignSelf: 'center', gap: space.sm,
-    paddingHorizontal: space.sm, paddingTop: space.sm, paddingBottom: space.sm },
-  narrowContent: { paddingHorizontal: space.xs },
+  content: { width: '100%', maxWidth: 480, alignSelf: 'center', gap: space.sm,
+    paddingHorizontal: space.md, paddingTop: space.sm, paddingBottom: space.sm },
+  shortContent: { gap: space.xxs, paddingVertical: space.xxs },
   identity: { borderRadius: radius.card, backgroundColor: c.card, flexDirection: 'row', alignItems: 'center',
     gap: space.sm, paddingVertical: space.md, paddingHorizontal: space.lg },
   context: { paddingHorizontal: space.sm },

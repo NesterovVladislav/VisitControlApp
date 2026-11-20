@@ -7,6 +7,7 @@ import AbsenceSheet from './absence-sheet';
 import { CalendarAbsenceList } from './calendar-absence-list';
 import { periodLabel } from './calendar-absence-entry';
 
+jest.mock('./header-brand-title', () => require('react-native').Text);
 jest.mock('@react-navigation/native', () => ({
   useFocusEffect: (cb: () => void) => jest.requireActual('react').useEffect(cb, [cb]),
 }));

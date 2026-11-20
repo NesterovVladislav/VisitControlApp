@@ -11,13 +11,14 @@ const LOGO_SIZE = 28;
 interface HeaderBrandTitleProps {
   children: string;
   tintColor?: string;
+  fitContainer?: boolean;
 }
 
 /**
  * Заголовок экрана с логотипом сада слева. Название сада известно сразу после входа, логотип подгружается:
  * до этого и без логотипа — буква названия. У технического администратора сада нет — обычный заголовок.
  */
-export default function HeaderBrandTitle({ children, tintColor }: HeaderBrandTitleProps) {
+export default function HeaderBrandTitle({ children, tintColor, fitContainer }: HeaderBrandTitleProps) {
   const { width } = useWindowDimensions();
   const organization = useAppSelector((state) =>
     state.auth.phase === 'authenticated' ? (state.auth.user?.organization ?? null) : null
@@ -30,7 +31,7 @@ export default function HeaderBrandTitle({ children, tintColor }: HeaderBrandTit
   // Сад последнего входа мог быть другим: чужой логотип не показываем
   const logoUrl = brand?.id === organization.id ? brand.logoUrl : null;
   return (
-    <View style={[styles.row, { maxWidth: width - HEADER_BUTTONS_WIDTH }]}>
+    <View style={[styles.row, !fitContainer && { maxWidth: width - HEADER_BUTTONS_WIDTH }]}>
       <OrganizationLogo key={logoUrl} name={organization.name} logoUrl={logoUrl} size={LOGO_SIZE} />
       {children ? (
         <HeaderTitle tintColor={tintColor} style={styles.title} numberOfLines={1}>
