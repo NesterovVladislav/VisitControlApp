@@ -1,3 +1,4 @@
+import { personName } from '@/utils/people-format';
 import { useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
@@ -531,11 +532,11 @@ export default function AbsenceSheet({ child, initialRules, initialMode, initial
 
   const readOnly = mode === 'edit' && (entryLoading || entryFailed || !editing?.editable);
   const showSubmit = mode !== 'list' && (mode === 'create' || dirty) && !confirmCancel && returnDay === null && !reasonOpen && !readOnly && !uncertain;
-  const title = confirmDiscard ? 'Выйти без сохранения?' : returnDay !== null ? 'Когда ' + child.firstName + ' вернётся?'
+  const title = confirmDiscard ? 'Выйти без сохранения?' : returnDay !== null ? 'Когда ' + personName(child) + ' вернётся?'
     : confirmCancel ? 'Отменить отсутствие?'
       : reasonOpen ? 'Причина отсутствия'
-        : mode === 'create' ? child.firstName + ' не придёт'
-          : mode === 'edit' ? 'Отсутствие · ' + child.firstName : 'Все периоды';
+        : mode === 'create' ? personName(child) + ' не придёт'
+          : mode === 'edit' ? 'Отсутствие · ' + personName(child) : 'Все периоды';
   const close = () => {
     if (guard.current || uncertain) return;
     if (confirmDiscard) setConfirmDiscard(false);
@@ -625,7 +626,7 @@ export default function AbsenceSheet({ child, initialRules, initialMode, initial
       ) : confirmCancel && editing ? (
         <View style={styles.section}>
           {editing.cancel_effect?.return_date && (
-            <Text style={styles.hint}>{child.firstName} сможет прийти {absenceDateText(editing.cancel_effect.return_date)}.</Text>
+            <Text style={styles.hint}>{personName(child)} сможет прийти {absenceDateText(editing.cancel_effect.return_date)}.</Text>
           )}
           <ActionButton label={editing.cancel_effect?.kind === 'SHORTEN' ? 'Сократить отсутствие' : 'Отменить отсутствие'} loading={busy} disabled={uncertain} onPress={confirmCancellation} />
           <ActionButton label="Оставить" variant="text" disabled={busy} onPress={() => {

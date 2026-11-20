@@ -58,7 +58,7 @@ export default function OptionSheet({
   }
 
   return (
-    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose} onDismiss={runPending}>
+    <Modal visible={visible} animationType="fade" transparent onRequestClose={onClose} onDismiss={runPending}>
       <Pressable style={styles.backdrop} onPress={onClose} accessibilityLabel="Закрыть" />
       <View style={styles.sheet}>
         <View style={styles.header}>

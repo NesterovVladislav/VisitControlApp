@@ -1,3 +1,4 @@
+import { personName } from '@/utils/people-format';
 import { useRouter } from 'expo-router';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import Avatar from '../../components/avatar';
@@ -22,7 +23,7 @@ export default function ProfileDetails() {
     <View style={s.identity}>
       <Avatar firstName={user.firstName} surname={user.surname} photoUrl={user.photoUrl} size={52} />
       <View style={s.summary}>
-        <Text style={s.name}>{user.firstName} {user.surname}</Text>
+        <Text style={s.name}>{personName(user)}</Text>
         <Text style={s.hint}>{[roleLabel(user.role), user.organization?.name].filter(Boolean).join(' · ')}</Text>
       </View>
     </View>

@@ -1,3 +1,4 @@
+import { personName } from '@/utils/people-format';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 
@@ -55,7 +56,7 @@ export function ChildAttendancePanel({
   }, [unavailable, onUnavailable]);
 
   const displayName = showIdentity
-    ? (selected ? `${selected.firstName} ${selected.surname}`.trim() : report?.name)
+    ? (selected ? personName(selected) : report?.name)
     : undefined;
   function retry() {
     setRevision((value) => value + 1);

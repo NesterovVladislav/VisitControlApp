@@ -13,7 +13,7 @@ const REASON_MAX_LENGTH = 500;
 const PHOTO_SIZE = 88;
 
 function names(request: PhotoRequest): { firstName: string; surname: string } {
-  const [firstName = '', surname = ''] = request.userName.split(' ');
+  const [surname = '', firstName = ''] = request.userName.split(' ');
   return { firstName, surname };
 }
 

@@ -111,7 +111,7 @@ export default function LinkChildSheet({ showBranch }: { showBranch: boolean }) 
   const pending = link?.status === 'pending';
 
   return (
-    <Modal visible animationType="slide" transparent onRequestClose={close}>
+    <Modal visible animationType="fade" transparent onRequestClose={close}>
       <Pressable style={styles.backdrop} onPress={close} accessibilityLabel="Закрыть" />
       <View style={styles.sheet}>
         <View style={styles.sheetHeader}>

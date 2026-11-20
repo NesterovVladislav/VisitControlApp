@@ -1,3 +1,4 @@
+import { personName } from '@/utils/people-format';
 import { useFocusEffect } from '@react-navigation/native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
@@ -34,7 +35,7 @@ export default function ChildAttendanceScreen() {
       {picker && (
         <BottomSheet title="Выберите ребёнка" onClose={() => setPicker(false)}>
           {children.map((item) => (
-            <ActionButton key={item.id} label={`${item.firstName} ${item.surname}`.trim()}
+            <ActionButton key={item.id} label={personName(item)}
               variant={item.id === childId ? 'primary' : 'text'}
               onPress={() => {
                 setPicker(false);

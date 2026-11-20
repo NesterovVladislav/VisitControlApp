@@ -102,7 +102,7 @@ describe('presence by branch', () => {
     const screen = await render(<VisitsScreen />);
 
     expect(screen.getByText('РОМАШКА · 1 ИЗ 18')).toBeTruthy();
-    expect(screen.getByText('Мария Иванова')).toBeTruthy();
+    expect(screen.getByText('Иванова Мария')).toBeTruthy();
     expect(screen.queryByText('Центральный')).toBeNull();
   });
 
@@ -113,7 +113,7 @@ describe('presence by branch', () => {
 
     expect(screen.getByText('В саду 1 из 33')).toBeTruthy();
     expect(screen.getByText('РОМАШКА · 1 ИЗ 18')).toBeTruthy();
-    expect(screen.getByText('Мария Иванова')).toBeTruthy();
+    expect(screen.getByText('Иванова Мария')).toBeTruthy();
     expect(screen.getByText('СОЛНЫШКО · 0 ИЗ 15')).toBeTruthy();
     expect(screen.getByText('Сейчас никого нет')).toBeTruthy();
     expect(screen.queryByText('Анна Иванова')).toBeNull();
@@ -151,7 +151,7 @@ describe('presence by branch', () => {
     const visit = (status: 'IN' | 'OUT', datetime: string, representativeName: string) => ({
       key: `c1|${datetime}|${status}`,
       childId: 'c1',
-      childName: 'Мария Иванова',
+      childName: 'Иванова Мария',
       representativeName,
       status,
       datetime,
@@ -174,7 +174,7 @@ describe('presence by branch', () => {
     const mark = {
       id: 'm1',
       status: 'IN',
-      childName: 'Мария Иванова',
+      childName: 'Иванова Мария',
       representativeId: 'mother',
       representativeName: 'Иванова А.',
       linkRole: 'PARENT',
@@ -187,7 +187,7 @@ describe('presence by branch', () => {
 
     // Число на переключателе — все, кто ждёт, в том числе в других группах
     expect(screen.getByText('Очередь 3')).toBeTruthy();
-    expect(screen.getByText('→ Мария Иванова')).toBeTruthy();
+    expect(screen.getByText('→ Иванова Мария')).toBeTruthy();
     expect(screen.getByText('Привёл(а) — Иванова А. (родитель)')).toBeTruthy();
     expect(screen.getByText('«Привела бабушка»')).toBeTruthy();
 
@@ -200,7 +200,7 @@ describe('presence by branch', () => {
     const mark = {
       id: 'm1',
       status: 'OUT',
-      childName: 'Мария Иванова',
+      childName: 'Иванова Мария',
       representativeId: 'me',
       representativeName: 'Иванова А.',
       linkRole: 'PARENT',

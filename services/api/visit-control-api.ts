@@ -1,3 +1,4 @@
+import { personName } from '@/utils/people-format';
 import { PasswordResetError, ResetCodeTiming, sanitizePasswordResetError, VerifiedResetCode } from './password-reset-contract';
 import { AxiosError, AxiosInstance, AxiosResponse } from 'axios';
 import { createApiClient, setupAuthToken } from './client';
@@ -79,11 +80,11 @@ function mapPhotoRequest(dto: PhotoRequestDto): PhotoRequest {
     id: dto.external_key,
     status: dto.status,
     userId: dto.user.external_key,
-    userName: `${dto.user.first_name} ${dto.user.surname}`.trim(),
+    userName: dtoName(dto.user),
     currentPhotoUrl: dto.user.photo_url ?? null,
     imageUrl: dto.image_url ?? null,
     reason: dto.decision_comment ?? null,
-    applicantName: dto.applicant ? shortName(dto.applicant) : null,
+    applicantName: dto.applicant ? dtoName(dto.applicant) : null,
   };
 }
 
@@ -164,7 +165,7 @@ function mapPresentChild(dto: UserShortInfoDto): PresentChild {
 }
 
 function byName(a: PresentChild, b: PresentChild): number {
-  return `${a.firstName} ${a.surname}`.localeCompare(`${b.firstName} ${b.surname}`, 'ru');
+  return personName(a).localeCompare(personName(b), 'ru');
 }
 
 interface BranchDto {
@@ -252,10 +253,8 @@ export function toWallClockIso(value: string | number[]): string {
   return new Date(year, month - 1, day, hour, minute, second, millis).toISOString();
 }
 
-/** «Иванова А.» */
-function shortName(dto: UserShortInfoDto): string {
-  const initial = dto.first_name ? ` ${dto.first_name.charAt(0)}.` : '';
-  return `${dto.surname}${initial}`;
+function dtoName(dto: UserShortInfoDto): string {
+  return personName({ surname: dto.surname, firstName: dto.first_name });
 }
 
 function mapVisit(dto: VisitFullInfoDto): VisitEntry {
@@ -263,15 +262,15 @@ function mapVisit(dto: VisitFullInfoDto): VisitEntry {
   return {
     key: `${dto.visitor.external_key}|${datetime}|${dto.status}`,
     childId: dto.visitor.external_key,
-    childName: `${dto.visitor.first_name} ${dto.visitor.surname}`.trim(),
-    representativeName: shortName(dto.representative),
+    childName: dtoName(dto.visitor),
+    representativeName: dtoName(dto.representative),
     status: dto.status,
     datetime,
     group: dto.group
       ? { id: dto.group.external_key, name: dto.group.name, branchName: dto.group.branch_name ?? null }
       : null,
     confirmation: dto.confirmation_status ?? null,
-    decidedBy: dto.decided_by ? shortName(dto.decided_by) : null,
+    decidedBy: dto.decided_by ? dtoName(dto.decided_by) : null,
     comment: dto.comment ?? null,
   };
 }
@@ -280,11 +279,11 @@ function mapQueueItem(dto: VisitFullInfoDto): VisitQueueItem {
   return {
     id: dto.external_key ?? '',
     status: dto.status,
-    childName: `${dto.visitor.first_name} ${dto.visitor.surname}`.trim(),
+    childName: dtoName(dto.visitor),
     childPhotoUrl: dto.visitor.photo_url ?? null,
     representativePhotoUrl: dto.representative.photo_url ?? null,
     representativeId: dto.representative.external_key,
-    representativeName: shortName(dto.representative),
+    representativeName: dtoName(dto.representative),
     linkRole: dto.link_role ?? null,
     datetime: toWallClockIso(dto.datetime),
     comment: dto.comment ?? null,
@@ -301,7 +300,7 @@ function mapChildVisit(dto: ChildVisitStatusDto | ''): ChildVisit {
   const rejected = dto.last_rejected;
   return {
     status: dto.status,
-    decidedBy: dto.decided_by ? shortName(dto.decided_by) : null,
+    decidedBy: dto.decided_by ? dtoName(dto.decided_by) : null,
     decidedAt: dto.decided_at ? toWallClockIso(dto.decided_at) : null,
     pending: pending?.external_key
       ? { id: pending.external_key, status: pending.status, datetime: toWallClockIso(pending.datetime) }
@@ -444,7 +443,7 @@ function mapChildChange(dto: ChildChangeDto): ChildChange {
       birthDate: dto.old_birth_date ? toIsoDate(dto.old_birth_date) : null,
     },
     reason: dto.decision_comment ?? null,
-    applicantName: dto.applicant ? shortName(dto.applicant) : null,
+    applicantName: dto.applicant ? dtoName(dto.applicant) : null,
   };
 }
 
@@ -473,7 +472,7 @@ function mapChildRequest(dto: ChildRequestDto): ChildRequest {
     patronymic: dto.patronymic ?? null,
     birthDate: dto.birth_date ? toIsoDate(dto.birth_date) : null,
     gender: dto.gender ?? null,
-    applicantName: dto.applicant ? shortName(dto.applicant) : null,
+    applicantName: dto.applicant ? dtoName(dto.applicant) : null,
     applicantRole: dto.applicant_role ?? null,
     matches: (dto.matches ?? []).map((match) => ({
       id: match.external_key,
@@ -1136,8 +1135,8 @@ class VisitControlApiClient {
     const dto = await this.post<VisitFullInfoDto>('/visit/handover/redeem', { token }, { skipLogging: true });
     return {
       status: dto.status,
-      childName: `${dto.visitor.first_name} ${dto.visitor.surname}`.trim(),
-      representativeName: shortName(dto.representative),
+      childName: dtoName(dto.visitor),
+      representativeName: dtoName(dto.representative),
       linkRole: dto.link_role ?? null,
       groupName: dto.group?.name ?? null,
     };

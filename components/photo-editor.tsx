@@ -1,3 +1,4 @@
+import { personName } from '@/utils/people-format';
 import React, { useEffect } from 'react';
 import { ActivityIndicator, Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Avatar from './avatar';
@@ -72,7 +73,7 @@ export default function PhotoEditor({ userId, childId, firstName, surname, photo
 
   function openMenu() {
     Alert.alert(
-      childId ? `Фотография: ${firstName}` : 'Фотография профиля',
+      childId ? `Фотография: ${personName({ surname, firstName })}` : 'Фотография профиля',
       immediate ? undefined : 'Новая фотография появится после подтверждения сада',
       [
         { text: 'Сделать снимок', onPress: () => void pick('camera') },

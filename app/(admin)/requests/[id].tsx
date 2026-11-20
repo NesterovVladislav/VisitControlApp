@@ -1,3 +1,4 @@
+import { personName } from '@/utils/people-format';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
 import {
@@ -144,7 +145,7 @@ export default function RequestScreen() {
     }
     Alert.alert(
       'Подтвердить заявку?',
-      `${target.firstName} получит роль «${roleLabel(roleName)}» и сможет войти в приложение: на ${target.email} ` +
+      `${personName(target)} получит роль «${roleLabel(roleName)}» и сможет войти в приложение: на ${target.email} ` +
         `придёт письмо с паролем.${childrenSummary(Object.values(chosen))}`,
       [
         { text: 'Отмена', style: 'cancel' },
@@ -265,7 +266,7 @@ export default function RequestScreen() {
             {undecided.length > 0 ? (
               <Text style={styles.hint}>
                 Похожий ребёнок уже есть в саду. Выберите для{' '}
-                {undecided.map((child) => child.firstName).join(', ')}: это он или новый ребёнок
+                {undecided.map((child) => personName(child)).join(', ')}: это он или новый ребёнок
               </Text>
             ) : null}
             <TouchableOpacity
@@ -349,7 +350,7 @@ function ChildDecisionView({
             disabled={disabled}
             accessibilityRole="radio"
             accessibilityState={{ checked: selected, disabled }}
-            accessibilityLabel={`${child.firstName}: ${option.label}`}
+            accessibilityLabel={`${personName(child)}: ${option.label}`}
           >
             <View style={[styles.radio, selected && styles.radioSelected]}>
               {selected ? <View style={styles.radioDot} /> : null}
@@ -381,7 +382,7 @@ function OutcomeView({
   if (outcome.result === 'approved') {
     title = 'Заявка подтверждена';
     text = outcome.passwordSent
-      ? `${request.firstName} может войти: пароль отправлен на ${request.email}.`
+      ? `${personName(request)} может войти: пароль отправлен на ${request.email}.`
       : `Пользователь активирован, но письмо с паролем на ${request.email} не отправилось.`;
   } else if (outcome.result === 'rejected') {
     title = 'Заявка отклонена';
@@ -400,7 +401,7 @@ function OutcomeView({
       {outcome.result === 'approved' && outcome.childrenAdded ? (
         <Text style={styles.hint}>
           {outcome.childrenAdded} {plural(outcome.childrenAdded, ['ребёнок', 'ребёнка', 'детей'])} в «Моих детях»
-          у {request.firstName}. Распределить детей по группам можно во вкладке «Сад»
+          у {personName(request)}. Распределить детей по группам можно во вкладке «Сад»
         </Text>
       ) : outcome.result === 'approved' && request.role === 'PARENT' ? (
         <Text style={styles.hint}>

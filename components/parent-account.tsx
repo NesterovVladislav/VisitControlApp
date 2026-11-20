@@ -1,3 +1,4 @@
+import { personName } from '@/utils/people-format';
 import { useFocusEffect } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
 import { useCallback } from 'react';
@@ -50,7 +51,7 @@ export default function ParentAccount() {
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => dispatch(refreshProfile({ pull: true }))} />}>
       <View style={s.identity}>
         <Avatar firstName={user.firstName} surname={user.surname} photoUrl={user.photoUrl} size={60} />
-        <Text style={s.name}>{[user.firstName, user.surname].filter(Boolean).join(' ')}</Text>
+        <Text style={s.name}>{personName(user)}</Text>
       </View>
       <AccountRow label="Личные данные" onPress={() => router.push('/profile/details')} />
       {canAddChild(user.role) && <ProfileChildren compact />}

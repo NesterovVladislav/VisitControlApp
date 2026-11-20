@@ -1,3 +1,4 @@
+import { personName } from '@/utils/people-format';
 import { useRouter } from 'expo-router';
 import React from 'react';
 import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
@@ -53,7 +54,7 @@ export default function MoreScreen() {
           <View style={styles.parentModeText}>
             <Text style={styles.parentModeTitle}>Режим родителя</Text>
             <Text style={styles.parentModeChildren} numberOfLines={1}>
-              {children.map((child) => child.firstName).join(', ')}
+              {children.map((child) => personName(child)).join(', ')}
             </Text>
           </View>
           <IconSymbol name="chevron.right" size={22} color={c.textTertiary} />

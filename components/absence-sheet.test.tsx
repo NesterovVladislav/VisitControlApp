@@ -207,7 +207,7 @@ describe('absence write safety', () => {
         initialRules={rules} initialMode="list" initialEntry={original} onClose={jest.fn()} onSaved={onSaved} />,
     );
     await fireEvent.press(await screen.findByRole('button', { name: 'Отменить отсутствие' }));
-    expect(screen.getByText('Анна сможет прийти 17.11.2026.')).toBeVisible();
+    expect(screen.getByText('Примерова Анна сможет прийти 17.11.2026.')).toBeVisible();
     expect(cancelAbsence).not.toHaveBeenCalled();
     await fireEvent.press(screen.getByRole('button', { name: 'Отменить отсутствие' }));
     expect(cancelAbsence).toHaveBeenCalledWith(original.external_key);

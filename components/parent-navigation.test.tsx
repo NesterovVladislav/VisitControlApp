@@ -14,15 +14,15 @@ it('shows no selector for one child, and selects a sibling when there are two', 
   const screen = await render(<ParentChildSelector {...props} items={[children[0]]} />);
   expect(screen.toJSON()).toBeNull();
   await screen.rerender(<ParentChildSelector {...props} items={children.slice(0, 2)} />);
-  await fireEvent.press(screen.getByLabelText(/Михаил Пример/));
+  await fireEvent.press(screen.getByLabelText(/Пример Михаил/));
   expect(onSelect).toHaveBeenCalledWith(children[1]);
 });
 
 it('announces the selected child in the chooser and lets the parent select the third child', async () => {
   const onSelect = jest.fn();
   const screen = await render(<ParentChildSelector selected={children[0]} items={children} statuses={{}} onSelect={onSelect} />);
-  await fireEvent.press(screen.getByLabelText(/Выбрать ребёнка: Алиса Пример/));
-  await fireEvent.press(screen.getByLabelText(/Анна Пример/));
+  await fireEvent.press(screen.getByLabelText(/Выбрать ребёнка: Пример Алиса/));
+  await fireEvent.press(screen.getByLabelText(/Пример Анна/));
   expect(onSelect).toHaveBeenCalledWith(children[2]);
 });
 

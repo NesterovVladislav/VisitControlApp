@@ -1,5 +1,5 @@
-import type { ReactNode } from 'react';
-import { KeyboardAvoidingView, Modal, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useRef, type ReactNode } from 'react';
+import { Animated, Easing, KeyboardAvoidingView, Modal, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { space, typeSize } from '../../constants/ui-tokens';
@@ -18,16 +18,27 @@ type Props = {
 export function BottomSheet({ title, onClose, closeLabel = 'Закрыть', closeDisabled, children, footer }: Props) {
   const styles = useStyles();
   const { bottom } = useSafeAreaInsets();
+  const offset = useRef(new Animated.Value(24)).current;
+  useEffect(() => {
+    const entrance = Animated.timing(offset, {
+      toValue: 0,
+      duration: 200,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    });
+    entrance.start();
+    return () => entrance.stop();
+  }, [offset]);
   const bottomPadding = Math.max(bottom, space.lg);
 
   return (
-    <Modal transparent animationType="slide" accessibilityLabel={title} onRequestClose={onClose}>
+    <Modal transparent animationType="fade" accessibilityLabel={title} onRequestClose={onClose}>
       <KeyboardAvoidingView style={styles.root} behavior="padding">
         <View accessible={false} importantForAccessibility="no" aria-hidden
           style={StyleSheet.absoluteFill}
           onStartShouldSetResponder={() => !closeDisabled}
           onResponderRelease={onClose} />
-        <View style={styles.sheet} accessibilityViewIsModal>
+        <Animated.View style={[styles.sheet, { transform: [{ translateY: offset }] }]} accessibilityViewIsModal>
           <View style={styles.header}>
             <Text style={styles.title} accessibilityRole="header">{title}</Text>
             <ActionButton label={closeLabel} variant="text" disabled={closeDisabled} onPress={onClose} />
@@ -38,7 +49,7 @@ export function BottomSheet({ title, onClose, closeLabel = 'Закрыть', clo
             {children}
           </ScrollView>
           {footer && <View style={[styles.footer, { paddingBottom: bottomPadding }]}>{footer}</View>}
-        </View>
+        </Animated.View>
       </KeyboardAvoidingView>
     </Modal>
   );

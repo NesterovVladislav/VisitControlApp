@@ -1,3 +1,4 @@
+import { personName } from '@/utils/people-format';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput } from 'react-native';
 import QrCode from './child-visit-code';
@@ -46,7 +47,7 @@ function VisitSession({ child, seenStatus, status, qrAvailable, continueQr = fal
   const directionChanged = known && isInKindergarten(status.value) === arriving;
   const actionable = known && !directionChanged && !status?.visit?.pending;
   const inQr = phase === 'issuing' || phase === 'code';
-  const name = `${child.firstName} ${child.surname}`.trim();
+  const name = personName(child);
   const label = arriving ? 'Кто привёл ребёнка?' : 'Кто забрал ребёнка?';
   const busy = phase === 'issuing';
 
@@ -113,7 +114,7 @@ function VisitSession({ child, seenStatus, status, qrAvailable, continueQr = fal
       {phase === 'done' ? (
         <>
           <StatusMessage tone="success" message={arriving ? 'Сад принял ребёнка' : 'Сад отдал ребёнка'} />
-          {next && <ActionButton label={`Следующий: ${next.firstName} ›`} onPress={() => onNext(next)} />}
+          {next && <ActionButton label={`Следующий: ${personName(next)} ›`} onPress={() => onNext(next)} />}
           <ActionButton label="Готово" variant={next ? 'text' : 'primary'} onPress={onClose} />
         </>
       ) : phase === 'code' && actionable && qrAvailable ? (
@@ -121,7 +122,7 @@ function VisitSession({ child, seenStatus, status, qrAvailable, continueQr = fal
           <QrCode token={token} />
           <Text style={styles.instruction}>Покажите код сотруднику</Text>
           <Text style={styles.countdown}>Код обновится через {countdownLabel(secondsLeft)}</Text>
-          {next && <ActionButton label={`Следующий: ${next.firstName} ›`} variant="text" onPress={() => onNext(next)} />}
+          {next && <ActionButton label={`Следующий: ${personName(next)} ›`} variant="text" onPress={() => onNext(next)} />}
         </>
       ) : (
         <>

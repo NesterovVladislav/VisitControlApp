@@ -72,7 +72,7 @@ describe('photo in the profile', () => {
     fireEvent.press(screen.getByText('Добавить фотографию'));
 
     const [title, message, buttons] = alert.mock.calls[0];
-    expect(title).toBe('Фотография: Петя');
+    expect(title).toBe('Фотография: Иванов Петя');
     expect(message).toBe('Новая фотография появится после подтверждения сада');
     // Фотографии ещё нет — убирать нечего
     expect(buttons?.map((button) => button.text)).toEqual(['Сделать снимок', 'Выбрать из галереи', 'Отмена']);

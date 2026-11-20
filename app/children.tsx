@@ -1,3 +1,4 @@
+import { personName } from '@/utils/people-format';
 import { useFocusEffect } from '@react-navigation/native';
 import { Stack } from 'expo-router';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
@@ -137,7 +138,7 @@ export default function ChildrenScreen() {
   }
 
   function confirmCancel(child: Child) {
-    Alert.alert(`${child.firstName} ${child.surname}`.trim(), 'Отменить отметку? Сад её ещё не подтвердил', [
+    Alert.alert(personName(child), 'Отменить отметку? Сад её ещё не подтвердил', [
       { text: 'Нет', style: 'cancel' },
       { text: 'Отменить отметку', style: 'destructive', onPress: () => dispatch(cancelMarkStart(child.id)) },
     ]);
@@ -193,7 +194,7 @@ export default function ChildrenScreen() {
       {header}
       <ParentChildSelector items={items} statuses={statusById} selected={selected} onSelect={selectChild} />
       {items.length === 1 && currentSection === 'calendar' && (
-        <Text style={styles.contextName}>{selected.firstName} {selected.surname}</Text>
+        <Text style={styles.contextName}>{personName(selected)}</Text>
       )}
       {currentSection === 'calendar' ? (
         <ChildAttendancePanel childId={selected.id} cursor={calendarCursor} onCursorChange={setCalendarCursor} onUnavailable={attendanceUnavailable} />

@@ -1,3 +1,4 @@
+import { personName } from '@/utils/people-format';
 import { useFocusEffect } from '@react-navigation/native';
 import { useCallback, useEffect, useState } from 'react';
 import { AppState, Pressable, StyleSheet, Text, View } from 'react-native';
@@ -96,7 +97,7 @@ function ChildAbsenceContent({ child, refresh, onChanged }: Props) {
   const summaryTitle = !isOneDay ? 'Период отсутствия' : current.from === rules.today_date
     ? 'Сегодня не придёт' : current.from === tomorrow ? 'Завтра не придёт' : 'Запланировано отсутствие';
   const reason = rules.reasons.find(item => item.code === current?.reason)?.name;
-  const childName = `${child.firstName} ${child.surname}`;
+  const childName = personName(child);
 
   return (
     <View style={styles.block}>

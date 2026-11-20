@@ -196,7 +196,7 @@ export default function VisitQueue() {
 
 /** «Петя Иванов» или «Иванова А.» — для инициалов в заглушке фотографии. */
 function nameParts(name: string): { firstName: string; surname: string } {
-  const [firstName = '', surname = ''] = name.split(' ');
+  const [surname = '', firstName = ''] = name.split(' ');
   return { firstName, surname };
 }
 function QueueCard({
@@ -320,7 +320,7 @@ function GroupPicker({
   ];
 
   return (
-    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+    <Modal visible={visible} animationType="fade" transparent onRequestClose={onClose}>
       <Pressable style={styles.backdrop} onPress={onClose} accessibilityLabel="Закрыть" />
       <View style={styles.sheet}>
         <View style={styles.sheetHeader}>

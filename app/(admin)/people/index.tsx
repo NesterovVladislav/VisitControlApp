@@ -346,7 +346,7 @@ function GroupFilterModal({
     filter.kind === current.kind && (filter.kind !== 'group' || (current.kind === 'group' && filter.id === current.id));
 
   return (
-    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+    <Modal visible={visible} animationType="fade" transparent onRequestClose={onClose}>
       <Pressable style={styles.backdrop} onPress={onClose} accessibilityLabel="Закрыть" />
       <View style={styles.sheet}>
         <View style={styles.sheetHeader}>

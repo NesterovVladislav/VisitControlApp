@@ -38,6 +38,7 @@ describe('child card and kindergarten confirmation', () => {
     const onMark = jest.fn();
     const screen = await renderCard(idle, { onMark });
 
+    expect(screen.getByText('Иванова Мария')).toBeTruthy();
     expect(screen.getByText('Не в саду')).toBeTruthy();
     await fireEvent.press(screen.getByText('Привела в сад'));
     expect(onMark).toHaveBeenCalled();
@@ -92,10 +93,10 @@ describe('child card and kindergarten confirmation', () => {
 
   it('keeps just one visit action on the selected child home', async () => {
     const screen = await renderCard(idle, { hideIdentity: true, showAbsence: true });
-    expect(screen.queryByText('Мария Иванова')).toBeNull();
+    expect(screen.queryByText('Иванова Мария')).toBeNull();
     expect(screen.queryByText('Не в саду')).toBeNull();
     expect(screen.getAllByRole('button').map((button) => button.props.accessibilityLabel)).toEqual([
-      'Привела в сад: Мария Иванова',
+      'Привела в сад: Иванова Мария',
       'Не придёт',
     ]);
   });

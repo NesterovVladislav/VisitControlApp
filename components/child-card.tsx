@@ -1,3 +1,4 @@
+import { personName } from '@/utils/people-format';
 import React from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import {
@@ -80,7 +81,7 @@ export default function ChildCard({
   const value = status?.value ?? null;
   const known = value !== null;
   const inKindergarten = isInKindergarten(value);
-  const name = `${child.firstName} ${child.surname}`.trim();
+  const name = personName(child);
   const disabled = !known || marking;
   const visit = status?.visit ?? null;
   const pending = visit?.pending ?? null;
@@ -122,7 +123,7 @@ export default function ChildCard({
     <View style={styles.card}>
       {!hideIdentity && <View style={styles.header}>
         <Avatar firstName={child.firstName} surname={child.surname} photoUrl={child.photoUrl} size={48} />
-        <Text style={[styles.name, styles.headerName]}>{child.firstName}</Text>
+        <Text style={[styles.name, styles.headerName]}>{name}</Text>
       </View>}
       {(!hideIdentity || !known) && <View style={styles.status}>{statusView}</View>}
       {pending ? <Text style={styles.detail}>отмечено в {timeOfDay(pending.datetime)}</Text> : null}

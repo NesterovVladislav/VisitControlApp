@@ -1,3 +1,4 @@
+import { personName } from '@/utils/people-format';
 import { useFocusEffect } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
 import React, { useCallback, useEffect } from 'react';
@@ -78,7 +79,7 @@ export default function ProfileChildren({ compact = false }: { compact?: boolean
                     <Avatar firstName={child.firstName} surname={child.surname} photoUrl={child.photoUrl} size={36} />
                   </View>
                   <View style={styles.rowText}>
-                    <Text style={styles.name}>{compact ? child.firstName : childRequestName(child)}</Text>
+                    <Text style={styles.name}>{compact ? personName(child) : childRequestName(child)}</Text>
                     {changeLabel ? (
                       <Text
                         style={[styles.status, child.change?.status === 'REJECTED' && styles.statusRejected]}

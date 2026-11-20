@@ -1,3 +1,4 @@
+import { personName } from '@/utils/people-format';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
@@ -34,11 +35,10 @@ export function ParentChildSelector({ items, selected, statuses, onSelect }: {
   const [open, setOpen] = useState(false);
   function choice(child: Child, compact: boolean) {
     const active = selected.id === child.id;
-    const sameFirstName = items.some(other => other.id !== child.id && other.firstName === child.firstName);
-    const name = compact && !sameFirstName ? child.firstName : `${child.firstName} ${child.surname}`.trim();
+    const name = personName(child);
     return (
       <Pressable key={child.id} accessibilityRole="button" accessibilityState={{ selected: active }}
-        accessibilityLabel={`${child.firstName} ${child.surname}, ${childStatus(statuses[child.id])}`}
+        accessibilityLabel={`${personName(child)}, ${childStatus(statuses[child.id])}`}
         onPress={() => { onSelect(child); setOpen(false); }}
         style={[styles.choice, compact && styles.half, active && styles.selected]}>
         <Text style={styles.name}>{name}</Text>
@@ -50,11 +50,11 @@ export function ParentChildSelector({ items, selected, statuses, onSelect }: {
   return (
     <View style={styles.band}>
       {items.length === 2 ? items.map(child => choice(child, true)) : (
-        <Pressable style={styles.picker} accessibilityRole="button" accessibilityLabel={`Выбрать ребёнка: ${selected.firstName} ${selected.surname}, ${childStatus(statuses[selected.id])}`}
+        <Pressable style={styles.picker} accessibilityRole="button" accessibilityLabel={`Выбрать ребёнка: ${personName(selected)}, ${childStatus(statuses[selected.id])}`}
           accessibilityState={{ expanded: open }}
           onPress={() => setOpen(true)}>
           <View style={styles.grow}>
-            <Text style={styles.name}>{selected.firstName} {selected.surname}</Text>
+            <Text style={styles.name}>{personName(selected)}</Text>
             <Text style={styles.status}>{childStatus(statuses[selected.id])}</Text>
           </View>
           <IconSymbol name="chevron.down" size={22} color={styles.name.color} />
