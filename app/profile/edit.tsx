@@ -4,7 +4,6 @@ import { useNavigation, usePreventRemove } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  ActivityIndicator,
   Alert,
   Keyboard,
   KeyboardAvoidingView,
@@ -12,9 +11,11 @@ import {
   StyleSheet,
   Text,
   TextInput,
-  TouchableOpacity,
   View,
 } from 'react-native';
+import { roleLabel } from '../../utils/profile-format';
+import { ActionButton } from '../../components/ui';
+import { ProfileIdentity } from '../../components/profile-person';
 import PhotoEditor from '../../components/photo-editor';
 import CheckboxRow from '../../components/checkbox-row';
 import FormField from '../../components/form-field';
@@ -32,14 +33,13 @@ import {
   validateProfileField,
   validateProfileForm,
 } from '../../utils/profile-edit';
-import { makeStyles, usePalette } from '../../hooks/use-palette';
+import { makeStyles } from '../../hooks/use-palette';
 
 /**
  * Непосредственное изменение своих личных данных для всех ролей. Email остаётся логином.
  */
 export default function ProfileEditScreen() {
   const layout = useProfileLayout();
-  const c = usePalette();
   const styles = useStyles();
   const router = useRouter();
   const navigation = useNavigation();
@@ -122,12 +122,11 @@ export default function ProfileEditScreen() {
       keyboardVerticalOffset={headerHeight}
     >
       <ScrollView contentContainerStyle={layout.content} keyboardShouldPersistTaps="handled">
-        {user.organization && (
-          <View style={layout.block}>
-            <PhotoEditor userId={user.id} firstName={user.firstName} surname={user.surname}
-              photoUrl={user.photoUrl} canEdit />
-          </View>
-        )}
+        <View style={layout.block}>
+          {user.organization ? <PhotoEditor userId={user.id} firstName={user.firstName} surname={user.surname}
+            subtitle={[roleLabel(user.role), user.organization?.name].filter(Boolean).join(' · ')}
+            photoUrl={user.photoUrl} canEdit /> : <ProfileIdentity {...user} subtitle={roleLabel(user.role)} />}
+        </View>
         <View style={layout.block}>
           <FormField
             label="Фамилия"
@@ -237,16 +236,7 @@ export default function ProfileEditScreen() {
           </View>
         ) : null}
 
-        <TouchableOpacity
-          style={[styles.button, (!changed || saving) && styles.buttonDisabled]}
-          onPress={save}
-          disabled={!changed || saving}
-          accessibilityRole="button"
-          accessibilityLabel="Сохранить"
-          accessibilityState={{ disabled: !changed || saving, busy: saving }}
-        >
-          {saving ? <ActivityIndicator color={c.onPrimary} /> : <Text style={styles.buttonText}>Сохранить</Text>}
-        </TouchableOpacity>
+        <ActionButton label="Сохранить" onPress={save} disabled={!changed} loading={saving} />
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -276,23 +266,6 @@ const useStyles = makeStyles((c) =>
       color: c.danger,
       fontSize: 14,
       lineHeight: 20,
-    },
-    button: {
-      backgroundColor: c.primary,
-      borderRadius: 8,
-      padding: 16,
-      alignItems: 'center',
-      justifyContent: 'center',
-      marginTop: 8,
-      minHeight: 50,
-    },
-    buttonDisabled: {
-      backgroundColor: c.disabled,
-    },
-    buttonText: {
-      color: c.onPrimary,
-      fontSize: 16,
-      fontWeight: '600',
     },
   })
 );

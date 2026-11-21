@@ -5,7 +5,7 @@ import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'rea
 import { RefreshControl } from '../../components/ui/refresh-control';
 import PhotoEditor from '@/components/photo-editor';
 import ProfileChildren from '@/components/profile-children';
-import ProfileSummary from '@/components/profile-summary';
+import { roleLabel } from '../../utils/profile-format';
 import SegmentedControl from '@/components/segmented-control';
 import { ActionButton } from '@/components/ui';
 import { IconSymbol } from '@/components/ui/icon-symbol';
@@ -104,15 +104,15 @@ export default function ProfileScreen() {
         }}
       />
       {/* Свою фотографию меняет сам пользователь; у технического администратора сада и фотографии нет */}
-      <PhotoEditor
+      <View style={styles.card}>
+        <PhotoEditor
         userId={user.id}
         firstName={user.firstName}
         surname={user.surname}
         photoUrl={user.photoUrl}
+        subtitle={[roleLabel(user.role), user.organization?.name].filter(Boolean).join(' · ')}
         canEdit={user.organization !== null}
-      />
-      <View style={[styles.card, styles.summary]}>
-        <ProfileSummary user={user} hideAvatar />
+        />
       </View>
 
       <InfoCard
@@ -194,11 +194,6 @@ const useStyles = makeStyles((c) =>
       shadowOpacity: 0.1,
       shadowRadius: 4,
       elevation: 3,
-    },
-    summary: {
-      flexDirection: 'row',
-      padding: 16,
-      marginBottom: 20,
     },
     sectionTitle: {
       fontSize: 12,

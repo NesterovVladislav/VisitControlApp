@@ -67,6 +67,8 @@ function SessionNavigator({ phase }: { phase: AuthPhase }) {
           name="profile/child/[id]"
           options={{ header: renderProfilePageHeader, title: 'Данные ребёнка', headerBackTitle: 'Профиль' }}
         />
+        <Stack.Screen name="profile/child/edit/[id]" options={{ header: renderProfilePageHeader,
+          title: 'Редактирование', headerBackTitle: 'Данные ребёнка' }} />
         <Stack.Screen
           name="profile/add-child"
           options={{ header: renderProfilePageHeader, title: 'Добавить ребёнка', headerBackTitle: 'Профиль' }}
