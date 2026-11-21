@@ -10,7 +10,7 @@ type Props = {
   onPress: () => void;
   disabled?: boolean;
   loading?: boolean;
-  variant?: 'primary' | 'text';
+  variant?: 'primary' | 'text' | 'destructive';
   role?: 'button' | 'link';
 };
 
@@ -21,7 +21,7 @@ export function ActionButton({
   const colors = usePalette();
   const [focused, setFocused] = useState(false);
   const blocked = disabled || loading;
-  const primary = variant === 'primary';
+  const primary = variant !== 'text';
 
   return (
     <Pressable
@@ -36,6 +36,7 @@ export function ActionButton({
       style={({ pressed }) => [
         styles.base,
         primary && styles.primary,
+        variant === 'destructive' && styles.destructive,
         primary && blocked && styles.inactive,
         pressed && styles.pressed,
         focused && !blocked && styles.focused,
@@ -63,6 +64,7 @@ const useStyles = makeStyles((c) =>
       borderColor: 'transparent',
     },
     primary: { minHeight: controlHeight.action, backgroundColor: c.actionPrimary },
+    destructive: { backgroundColor: c.danger },
     inactive: { backgroundColor: c.fill },
     pressed: { opacity: 0.8 },
     focused: { borderColor: c.text },

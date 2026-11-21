@@ -1,3 +1,4 @@
+import { clearOrganizationBrand } from '../../services/organization/organization-brand';
 import { PayloadAction } from '@reduxjs/toolkit';
 import {
   call,
@@ -346,20 +347,26 @@ let cleanupInFlight = false;
 let pendingCleanupReason: LogoutReason | null = null;
 
 function noticeFor(reason: LogoutReason): string | undefined {
+  if (reason === 'accountDeleted') return 'Аккаунт удалён';
   if (reason === 'passwordChanged') return 'Пароль изменён. Войдите с новым паролем.';
   return reason === 'expired' ? AUTH_ERRORS.expired : undefined;
 }
 
 function* cleanupByReason(reason: LogoutReason) {
-  if (cleanupInFlight) return;
+  if (cleanupInFlight) {
+    if (reason === 'accountDeleted') pendingCleanupReason = reason;
+    return;
+  }
   cleanupInFlight = true;
   pendingCleanupReason = reason;
   clearAuthToken();
 
   try {
     yield call([protectedSessionRepository, protectedSessionRepository.clear]);
+    const completedReason = pendingCleanupReason ?? reason;
+    if (completedReason === 'accountDeleted') yield call(clearOrganizationBrand);
     pendingCleanupReason = null;
-    yield put(logoutCompleted({ reason, notice: noticeFor(reason) }));
+    yield put(logoutCompleted({ reason: completedReason, notice: noticeFor(completedReason) }));
   } catch {
     yield put(storageUnavailable(AUTH_ERRORS.storage));
   } finally {

@@ -1,7 +1,8 @@
+import { ProfileAccountActions } from '../../components/profile-account-actions';
 import { useFocusEffect } from '@react-navigation/native';
 import { Stack, useRouter } from 'expo-router';
 import React, { useCallback } from 'react';
-import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import {  ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { RefreshControl } from '../../components/ui/refresh-control';
 import PhotoEditor from '@/components/photo-editor';
 import ProfileChildren from '@/components/profile-children';
@@ -11,7 +12,6 @@ import { ActionButton } from '@/components/ui';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { space } from '../../constants/ui-tokens';
 import { useAppDispatch, useAppSelector } from '../../store';
-import { logoutRequested } from '../../store/reducers/auth';
 import { refreshProfile } from '../../store/reducers/profile';
 import { canAddChild } from '../../utils/child-requests';
 import { formatBirthDate, formatPhoneForDisplay, genderLabel } from '../../utils/profile-format';
@@ -74,13 +74,6 @@ export default function ProfileScreen() {
       dispatch(refreshProfile());
     }, [dispatch])
   );
-
-  function confirmLogout() {
-    Alert.alert('Выйти из аккаунта?', undefined, [
-      { text: 'Отмена', style: 'cancel' },
-      { text: 'Выйти', style: 'destructive', onPress: () => dispatch(logoutRequested({ reason: 'user' })) },
-    ]);
-  }
 
   if (!user) {
     return null;
@@ -151,15 +144,7 @@ export default function ProfileScreen() {
         </Text>
       </View>
 
-      <View style={styles.card}>
-        <TouchableOpacity style={styles.actionRow} onPress={() => router.push('/profile/about')} accessibilityRole="button">
-          <Text style={styles.action}>О приложении</Text>
-          <IconSymbol name="chevron.right" size={22} color={c.textTertiary} />
-        </TouchableOpacity>
-        <TouchableOpacity style={[styles.actionRow, styles.rowBorder]} onPress={confirmLogout} accessibilityRole="button">
-          <Text style={styles.logout}>Выйти</Text>
-        </TouchableOpacity>
-      </View>
+      <ProfileAccountActions role={user.role} />
     </ScrollView>
   );
 }

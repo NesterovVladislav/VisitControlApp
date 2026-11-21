@@ -1,3 +1,5 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { ORGANIZATION_BRAND_KEY } from '../../services/organization/organization-brand';
 import { AxiosError } from 'axios';
 import { runSaga, stdChannel } from 'redux-saga';
 
@@ -387,6 +389,14 @@ it('clears an in-memory token when persistence after login fails', async () => {
     expect(getAuthToken()).toBeNull();
     expect(mockRepository.clear).toHaveBeenCalledTimes(1);
     expect(dispatched).toContainEqual(logoutCompleted({ reason: 'user' }));
+  });
+
+  it('clears the remembered garden and device session after confirmed account deletion', async () => {
+    await AsyncStorage.setItem(ORGANIZATION_BRAND_KEY, 'previous brand');
+    const actions = await runWorker(cleanupSessionSaga, logoutRequested({ reason: 'accountDeleted' }));
+    expect(await AsyncStorage.getItem(ORGANIZATION_BRAND_KEY)).toBeNull();
+    expect(mockRepository.clear).toHaveBeenCalledTimes(1);
+    expect(actions).toContainEqual(logoutCompleted({ reason: 'accountDeleted', notice: 'Аккаунт удалён' }));
   });
 
   it('coalesces concurrent expiry cleanup', async () => {

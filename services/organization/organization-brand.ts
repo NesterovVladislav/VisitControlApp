@@ -47,3 +47,7 @@ export async function saveOrganizationBrand(
     console.warn('[Organization] Failed to save brand', error instanceof Error ? error.message : 'unknown');
   }
 }
+
+export function clearOrganizationBrand() {
+  return AsyncStorage.removeItem(ORGANIZATION_BRAND_KEY);
+}
