@@ -1,3 +1,4 @@
+jest.mock('react-native-safe-area-context', () => jest.requireActual('react-native-safe-area-context/jest/mock').default);
 import { fireEvent, render } from '@testing-library/react-native';
 import { Alert, Platform } from 'react-native';
 

@@ -1,6 +1,7 @@
+import { AppModal } from './ui/android-safe-window';
 import { SheetControl } from './ui/sheet-control';
 import { useEffect, useRef, useState } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { controlHeight, radius, space, typeSize } from '../constants/ui-tokens';
@@ -82,7 +83,7 @@ export default function AbsencePeriodPicker({
   }
 
   return (
-    <Modal animationType="slide" presentationStyle="fullScreen" onRequestClose={onClose}>
+    <AppModal animationType="slide" presentationStyle="fullScreen" onRequestClose={onClose}>
       <View style={[styles.screen, { paddingTop: insets.top, paddingBottom: insets.bottom }]} accessibilityViewIsModal>
         <View style={styles.header}>
           <View style={styles.headerContent}>
@@ -145,7 +146,7 @@ export default function AbsencePeriodPicker({
           />
         </View>
       </View>
-    </Modal>
+    </AppModal>
   );
 }
 

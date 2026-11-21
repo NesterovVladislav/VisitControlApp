@@ -1,5 +1,6 @@
+import { AppModal } from './android-safe-window';
 import { useEffect, useRef, type ReactNode } from 'react';
-import { Animated, Easing, KeyboardAvoidingView, Modal, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Animated, Easing, KeyboardAvoidingView, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { space, typeSize } from '../../constants/ui-tokens';
@@ -32,7 +33,7 @@ export function BottomSheet({ title, onClose, closeLabel = 'Закрыть', clo
   const bottomPadding = Math.max(bottom, space.lg);
 
   return (
-    <Modal transparent animationType="fade" accessibilityLabel={title} onRequestClose={onClose}>
+    <AppModal transparent animationType="fade" accessibilityLabel={title} onRequestClose={onClose}>
       <KeyboardAvoidingView style={styles.root} behavior="padding">
         <View accessible={false} importantForAccessibility="no" aria-hidden
           style={StyleSheet.absoluteFill}
@@ -52,7 +53,7 @@ export function BottomSheet({ title, onClose, closeLabel = 'Закрыть', clo
           {footer && <View style={[styles.footer, { paddingBottom: bottomPadding }]}>{footer}</View>}
         </Animated.View>
       </KeyboardAvoidingView>
-    </Modal>
+    </AppModal>
   );
 }
 

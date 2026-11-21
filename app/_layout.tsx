@@ -5,6 +5,7 @@ import { Platform } from 'react-native';
 import 'react-native-reanimated';
 import { Provider } from 'react-redux';
 
+import { AndroidSafeWindow } from '../components/ui/android-safe-window';
 import { SessionGate } from '../components/session/session-gate';
 import { WebAlertHost } from '../components/web-alert-host';
 import { Palette, palettes } from '../constants/palette';
@@ -49,7 +50,7 @@ export default function RootLayout() {
   return (
     <Provider store={store}>
       <ThemeProvider value={themes[scheme]}>
-        <SessionGate />
+        <AndroidSafeWindow><SessionGate /></AndroidSafeWindow>
         {/* Только в браузере: там нет системного Alert. На телефоне — null */}
         <WebAlertHost />
         <StatusBar style="auto" />

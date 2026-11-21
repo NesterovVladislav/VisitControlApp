@@ -1,8 +1,8 @@
+import { AppModal } from './ui/android-safe-window';
 import { SheetControl } from './ui/sheet-control';
 import React, { useEffect, useState } from 'react';
 import {
   KeyboardAvoidingView,
-  Modal,
   Pressable,
   StyleSheet,
   Text,
@@ -65,7 +65,7 @@ export default function CommentSheet({
   const disabled = required && trimmed.length === 0;
 
   return (
-    <Modal visible={visible} animationType="fade" transparent onRequestClose={onClose}>
+    <AppModal visible={visible} animationType="fade" transparent onRequestClose={onClose}>
       {/* На Android с edgeToEdgeEnabled система не сжимает окно под клавиатуру, поэтому padding нужен и там. */}
       <KeyboardAvoidingView style={styles.root} behavior="padding">
         <Pressable style={styles.backdrop} onPress={onClose} accessibilityLabel="Закрыть" />
@@ -114,7 +114,7 @@ export default function CommentSheet({
           </View>
         </View>
       </KeyboardAvoidingView>
-    </Modal>
+    </AppModal>
   );
 }
 

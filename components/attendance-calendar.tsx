@@ -1,3 +1,4 @@
+import Feather from '@expo/vector-icons/Feather';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useRef, useState, type ElementRef, type KeyboardEvent } from 'react';
 import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
@@ -22,14 +23,15 @@ const nonworkingSymbol = '×';
 type Mark = {
   tone: 'visit' | 'absence' | 'planned' | 'inactive' | 'plain';
   symbol?: string;
+  icon?: keyof typeof Feather.glyphMap;
   label: string;
 };
 
 function dayMark(day: AttendanceDay): Mark {
   switch (day.status) {
     case 'FULL': return { tone: 'visit', symbol: '✓', label: 'Полный день' };
-    case 'FIRST_HALF': return { tone: 'visit', symbol: '◩', label: 'Первая половина дня' };
-    case 'SECOND_HALF': return { tone: 'visit', symbol: '◪', label: 'Вторая половина дня' };
+    case 'FIRST_HALF': return { tone: 'visit', icon: 'sunrise', label: 'Первая половина дня' };
+    case 'SECOND_HALF': return { tone: 'visit', icon: 'sunset', label: 'Вторая половина дня' };
     case 'NOT_IN_GROUP': return { tone: 'inactive', symbol: '–', label: 'Вне группы' };
     case 'NONE': break;
   }
@@ -37,13 +39,54 @@ function dayMark(day: AttendanceDay): Mark {
     const reason = attendanceReason(day.reason);
     return {
       tone: day.future ? 'planned' : 'absence',
-      symbol: reason.mark,
+      icon: reason.icon,
       label: `${day.future ? 'Запланированный пропуск' : 'Пропуск'} · ${reason.label}`,
     };
   }
   if (!day.working) return { tone: 'inactive', symbol: nonworkingSymbol, label: 'Нерабочий день' };
   if (day.future) return { tone: 'plain', label: 'Будущий день' };
   return { tone: 'plain', symbol: '·', label: 'Нет отметки' };
+}
+
+function CalendarMark({ mark, paid, inline }: { mark: Mark; paid?: boolean; inline?: boolean }) {
+  const styles = useStyles();
+  const ink = mark.tone === 'visit' ? styles.visitedSymbol : mark.tone === 'absence'
+    ? styles.paid : mark.tone === 'planned' ? styles.plannedSymbol : styles.secondary;
+  return <View style={styles.mark}>
+    {mark.icon ? <Feather name={mark.icon} size={inline ? 12 : 14} color={ink.color} /> :
+      <Text style={[styles.symbol, ink]}>{mark.symbol}</Text>}
+    {paid && <Text style={[styles.symbol, styles.paid]}>₽</Text>}
+  </View>;
+}
+
+function CalendarLegend() {
+  const styles = useStyles();
+  const sample = (status: AttendanceDay['status'], values: Partial<AttendanceDay> = {}) =>
+    dayMark({ date: '', status, working: true, future: false, paid: false, reason: null, holiday: null, ...values });
+  const row = (mark: Mark, label = mark.label, today = false, paid = false) => (
+    <View key={label} accessible accessibilityLabel={label} style={styles.legendRow}>
+      <View style={[styles.swatch, styles[mark.tone], today && styles.today]}>
+        {today || (!mark.symbol && !mark.icon && !paid) ? <Text style={styles.dayNumber}>12</Text> : null}
+        <CalendarMark mark={mark} paid={paid} />
+      </View>
+      <Text style={styles.legendLabel}>{label}</Text>
+    </View>
+  );
+  return <View style={styles.legendSections}>
+    <View><Text accessibilityRole="header" style={styles.legendHeading}>Посещение</Text>
+      {row(sample('FULL'))}{row(sample('FIRST_HALF'))}{row(sample('SECOND_HALF'))}
+    </View>
+    <View><Text accessibilityRole="header" style={styles.legendHeading}>Причины отсутствия</Text>
+      {Object.entries(attendanceReasons).map(([code, reason]) => row(sample('NONE', { reason: code }), reason.label))}
+    </View>
+    <View><Text accessibilityRole="header" style={styles.legendHeading}>Отметки календаря</Text>
+      {row({ tone: 'planned', label: 'Запланированное отсутствие' })}
+      {row({ tone: 'absence', label: paidLabel }, paidLabel, false, true)}
+      {row({ tone: 'plain', label: 'Сегодня' }, 'Сегодня', true)}
+      {row(sample('NONE'))}{row(sample('NONE', { working: false }))}{row(sample('NOT_IN_GROUP'))}
+      {row(sample('NONE', { future: true }))}
+    </View>
+  </View>;
 }
 
 function AttendanceDayDetails({ day, onClose, onOpenPeriod }: { day: AttendanceDay; onClose: () => void; onOpenPeriod?: () => void }) {
@@ -156,10 +199,7 @@ export function AttendanceCalendar({ month, days, today, showLegend, onCloseLege
                       <Text style={[styles.dayNumber, mark.tone === 'inactive' && styles.secondary]}>
                         {Number(day.date.slice(-2))}
                       </Text>
-                      <Text style={[styles.symbol, mark.tone === 'visit' && styles.visitedSymbol,
-                        mark.tone === 'absence' && styles.paid, mark.tone === 'planned' && styles.plannedSymbol]}>
-                        {mark.symbol ?? (inlineMarks ? '' : '\u00a0')}{day.paid && <Text style={styles.paid}>{inlineMarks ? '₽' : ' ₽'}</Text>}
-                      </Text>
+                      <CalendarMark mark={mark} paid={day.paid} inline={inlineMarks} />
                     </View>
                   )}
                 </Pressable>
@@ -174,20 +214,7 @@ export function AttendanceCalendar({ month, days, today, showLegend, onCloseLege
       </View>}
       {(showLegend ?? legend) && (
         <BottomSheet title="Обозначения" onClose={onCloseLegend ?? (() => setLegend(false))}>
-          <View style={styles.sheetContent}>
-            <Text style={styles.sheetText}>✓ Полный день</Text>
-            <Text style={styles.sheetText}>◩ Первая половина дня</Text>
-            <Text style={styles.sheetText}>◪ Вторая половина дня</Text>
-            {Object.values(attendanceReasons).map((reason) => (
-              <Text key={reason.mark} style={styles.sheetText}>{reason.mark} {reason.label}</Text>
-            ))}
-            <Text style={styles.sheetText}>Пунктирная рамка · запланированный пропуск</Text>
-            <Text style={styles.sheetText}>Знак рубля · оплачиваемый пропуск</Text>
-            <Text style={styles.sheetText}>· Нет отметки</Text>
-            <Text style={styles.sheetText}>{nonworkingSymbol} Нерабочий день</Text>
-            <Text style={styles.sheetText}>– Вне группы</Text>
-            <Text style={styles.sheetText}>Сплошная синяя рамка · сегодня</Text>
-          </View>
+          <CalendarLegend />
         </BottomSheet>
       )}
       {selectedDay && <AttendanceDayDetails day={selectedDay} onClose={() => { setOpenDate(undefined); onDayClosed?.(); }}
@@ -228,6 +255,13 @@ const useStyles = makeStyles((c) => StyleSheet.create({
   plannedSymbol: { color: c.actionPrimary },
   paid: { color: c.danger },
   legendAction: { alignSelf: 'flex-start' },
+  mark: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
+  legendSections: { gap: space.lg },
+  legendHeading: { color: c.text, fontSize: typeSize.body, fontWeight: '700', marginBottom: space.xs },
+  legendRow: { flexDirection: 'row', alignItems: 'center', minHeight: 36, gap: space.md },
+  legendLabel: { color: c.text, flex: 1, fontSize: typeSize.label },
+  swatch: { minWidth: 36, minHeight: 28, alignItems: 'center', justifyContent: 'center', flexDirection: 'row',
+    borderWidth: 2, borderColor: 'transparent', borderRadius: radius.control },
   sheetContent: { gap: space.sm },
   sheetText: { color: c.text, fontSize: typeSize.label, lineHeight: space.xl },
 }));

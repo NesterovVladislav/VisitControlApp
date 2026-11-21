@@ -1,10 +1,10 @@
+import { AppModal } from './ui/android-safe-window';
 import { useFocusEffect } from '@react-navigation/native';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
   AppState,
-  Modal,
   Pressable,
   ScrollView,
   SectionList,
@@ -320,7 +320,7 @@ function GroupPicker({
   ];
 
   return (
-    <Modal visible={visible} animationType="fade" transparent onRequestClose={onClose}>
+    <AppModal visible={visible} animationType="fade" transparent onRequestClose={onClose}>
       <Pressable style={styles.backdrop} onPress={onClose} accessibilityLabel="Закрыть" />
       <View style={styles.sheet}>
         <View style={styles.sheetHeader}>
@@ -345,7 +345,7 @@ function GroupPicker({
           ))}
         </ScrollView>
       </View>
-    </Modal>
+    </AppModal>
   );
 }
 

@@ -1,10 +1,10 @@
+import { AppModal } from './ui/android-safe-window';
 import { SheetControl } from './ui/sheet-control';
 import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
   FlatList,
-  Modal,
   Pressable,
   StyleSheet,
   Text,
@@ -112,7 +112,7 @@ export default function LinkChildSheet({ showBranch }: { showBranch: boolean }) 
   const pending = link?.status === 'pending';
 
   return (
-    <Modal visible animationType="fade" transparent onRequestClose={close}>
+    <AppModal visible animationType="fade" transparent onRequestClose={close}>
       <Pressable style={styles.backdrop} onPress={close} accessibilityLabel="Закрыть" />
       <View style={styles.sheet}>
         <View style={styles.sheetHeader}>
@@ -204,7 +204,7 @@ export default function LinkChildSheet({ showBranch }: { showBranch: boolean }) 
           </>
         )}
       </View>
-    </Modal>
+    </AppModal>
   );
 }
 

@@ -1,6 +1,7 @@
+import { AppModal } from './ui/android-safe-window';
 import { useFocusEffect } from '@react-navigation/native';
 import React, { useCallback, useRef, useState } from 'react';
-import { ActivityIndicator, AppState, Modal, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, AppState, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ActionButton, StatusMessage } from './ui';
@@ -111,9 +112,9 @@ export default function ChildGroupSheet({ child, onClose }: { child: Child | nul
   const styles = useStyles();
   if (!child) return null;
   return (
-    <Modal visible animationType="slide" onRequestClose={onClose}>
+    <AppModal visible animationType="slide" onRequestClose={onClose}>
       <SafeAreaView style={styles.screen}><ChildGroupPanel child={child} onClose={onClose} /></SafeAreaView>
-    </Modal>
+    </AppModal>
   );
 }
 

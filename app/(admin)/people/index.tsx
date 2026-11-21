@@ -1,10 +1,10 @@
+import { AppModal } from '../../../components/ui/android-safe-window';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'expo-router';
 import {
   ActivityIndicator,
   FlatList,
   Linking,
-  Modal,
   Pressable,
   SectionList,
   StyleSheet,
@@ -346,7 +346,7 @@ function GroupFilterModal({
     filter.kind === current.kind && (filter.kind !== 'group' || (current.kind === 'group' && filter.id === current.id));
 
   return (
-    <Modal visible={visible} animationType="fade" transparent onRequestClose={onClose}>
+    <AppModal visible={visible} animationType="fade" transparent onRequestClose={onClose}>
       <Pressable style={styles.backdrop} onPress={onClose} accessibilityLabel="Закрыть" />
       <View style={styles.sheet}>
         <View style={styles.sheetHeader}>
@@ -384,7 +384,7 @@ function GroupFilterModal({
           }
         />
       </View>
-    </Modal>
+    </AppModal>
   );
 }
 
