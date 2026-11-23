@@ -39,7 +39,7 @@ export function parentSubtitle(person: Pick<Person, 'children' | 'gender'>): str
   const byLabel = new Map<string, string[]>();
   for (const child of children) {
     const label = linkLabel(child.linkRole, person.gender);
-    byLabel.set(label, [...(byLabel.get(label) ?? []), child.firstName]);
+    byLabel.set(label, [...(byLabel.get(label) ?? []), personName(child)]);
   }
   return [...byLabel].map(([label, names]) => `${label}: ${names.join(', ')}`).join(' · ');
 }

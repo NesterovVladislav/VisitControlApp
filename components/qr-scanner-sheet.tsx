@@ -1,7 +1,9 @@
+import { AppModal } from './ui/android-safe-window';
+import { SheetControl } from './ui/sheet-control';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as Haptics from 'expo-haptics';
 import React, { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Linking, Modal, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Linking, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { makeStyles, usePalette } from '../hooks/use-palette';
 import { visitControlApi } from '../services/api';
 import { HandoverResult } from '../store/types/visits';
@@ -133,17 +135,15 @@ export default function QrScannerSheet({ visible, onScanned, onClose }: QrScanne
   }
 
   return (
-    <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
+    <AppModal visible={visible} animationType="slide" onRequestClose={onClose}>
       <View style={styles.screen}>
         <View style={styles.header}>
           <Text style={styles.headerTitle}>Сканировать QR</Text>
-          <TouchableOpacity onPress={onClose} accessibilityRole="button" hitSlop={8}>
-            <Text style={styles.close}>Закрыть</Text>
-          </TouchableOpacity>
+          <SheetControl onPress={onClose} />
         </View>
         <View style={styles.body}>{body}</View>
       </View>
-    </Modal>
+    </AppModal>
   );
 }
 

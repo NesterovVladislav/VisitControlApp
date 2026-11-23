@@ -1,225 +1,138 @@
-import React, { useCallback, useEffect, useState } from 'react';
-import {
-  ActivityIndicator,
-  FlatList,
-  Modal,
-  Platform,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import { AppModal } from './ui/android-safe-window';
+import { useFocusEffect } from '@react-navigation/native';
+import React, { useCallback, useRef, useState } from 'react';
+import { ActivityIndicator, AppState, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+
+import { ActionButton, StatusMessage } from './ui';
+import { IconSymbol } from './ui/icon-symbol';
 import { RefreshControl } from './ui/refresh-control';
-import { useVisitListStyles } from './visit-list';
+import { controlHeight, radius, space, typeSize } from '../constants/ui-tokens';
 import { makeStyles, usePalette } from '../hooks/use-palette';
 import { visitControlApi } from '../services/api';
 import { ApiError } from '../services/errors/api-error';
-import { Child, ChildGroup } from '../store/types/children';
-
-interface ChildGroupSheetProps {
-  /** Чью группу показать; null — шторка закрыта */
-  child: Child | null;
-  onClose: () => void;
-}
+import type { Child, ChildGroup } from '../store/types/children';
 
 type State =
   | { status: 'loading' }
   | { status: 'failed' }
   | { status: 'loaded'; group: ChildGroup };
 
-/**
- * Группа ребёнка для родителя: дети группы и кто из них сейчас в саду — зелёный кружок, кого нет — серый.
- * Только фамилия и имя: остальное о чужих детях родителю не показывается. Список живёт, пока шторка открыта,
- * и в общем хранилище не лежит.
- */
-export default function ChildGroupSheet({ child, onClose }: ChildGroupSheetProps) {
+interface PanelProps {
+  child: Child;
+  onClose?: () => void;
+}
+
+export function ChildGroupPanel({ child, onClose }: PanelProps) {
+  // Reset the list immediately, including a refresh in flight, when switching children.
+  return <GroupContents key={child.id} child={child} onClose={onClose} />;
+}
+
+function GroupContents({ child, onClose }: PanelProps) {
   const c = usePalette();
   const styles = useStyles();
-  const visitListStyles = useVisitListStyles();
-  const childId = child?.id ?? null;
   const [state, setState] = useState<State>({ status: 'loading' });
   const [refreshing, setRefreshing] = useState(false);
+  const request = useRef(0);
+  const invalidateRequest = useCallback(() => ++request.current, []);
 
-  const load = useCallback(
-    async (isCurrent: () => boolean = () => true) => {
-      if (!childId) return;
-      try {
-        const group = await visitControlApi.getChildGroup(childId);
-        if (isCurrent()) setState({ status: 'loaded', group });
-      } catch (error) {
-        console.warn('[Child Group] Failed to load', error instanceof ApiError ? error.status : error);
-        if (isCurrent()) setState({ status: 'failed' });
-      }
-    },
-    [childId]
-  );
+  const load = useCallback(async (refresh = false) => {
+    const id = invalidateRequest();
+    if (refresh) setRefreshing(true);
+    else setState({ status: 'loading' });
+    try {
+      const group = await visitControlApi.getChildGroup(child.id);
+      if (id === request.current) setState({ status: 'loaded', group });
+    } catch (error) {
+      if (id !== request.current) return;
+      console.warn('[Child Group] Failed to load', error instanceof ApiError ? error.status : error);
+      setState({ status: 'failed' });
+    } finally {
+      if (id === request.current) setRefreshing(false);
+    }
+  }, [child.id, invalidateRequest]);
 
-  // Каждое открытие — свежий список: дети приходят и уходят в течение дня
-  useEffect(() => {
-    let current = true;
-    setState({ status: 'loading' });
-    void load(() => current);
+  useFocusEffect(useCallback(() => {
+    void load();
+    const subscription = AppState.addEventListener('change', (appState) => {
+      if (appState === 'active') void load(true);
+    });
     return () => {
-      current = false;
+      invalidateRequest();
+      subscription.remove();
+      setState({ status: 'loading' });
     };
-  }, [load]);
+  }, [load, invalidateRequest]));
 
-  if (!child) {
-    return null;
-  }
-
-  const group = state.status === 'loaded' ? state.group : null;
-  const presentCount = group ? group.children.filter((member) => member.present).length : 0;
-
-  let body: React.ReactNode;
-  if (state.status === 'loading') {
-    body = (
-      <View style={styles.center}>
-        <ActivityIndicator size="large" color={c.primary} />
-      </View>
-    );
-  } else if (state.status === 'failed') {
-    body = (
-      <View style={styles.center}>
-        <Text style={styles.message}>Не удалось загрузить группу</Text>
-        <TouchableOpacity
-          style={styles.retry}
-          onPress={() => {
-            setState({ status: 'loading' });
-            void load();
-          }}
-          accessibilityRole="button"
-        >
-          <Text style={styles.retryText}>Повторить</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  } else if (state.group.children.length === 0) {
-    body = (
-      <View style={styles.center}>
-        <Text style={styles.message}>
-          {state.group.name ? 'В группе пока нет детей' : 'Сад ещё не определил ребёнка в группу'}
+  const group = state.status === 'loaded' ? state.group : undefined;
+  const present = group?.children.filter(member => member.present).length ?? 0;
+  const header = (group?.name || onClose) ? (
+    <View style={styles.header}>
+      <Text style={styles.title} accessibilityRole="header">{group?.name || 'Группа'}</Text>
+      {group?.name && (
+        <Text style={styles.count} accessibilityLabel={`В саду ${present} из ${group.children.length}`}>
+          {`${present}/${group.children.length}`}
         </Text>
-      </View>
-    );
-  } else {
-    const members = state.group.children;
-    body = (
-      <FlatList
-        data={members}
-        keyExtractor={(_, index) => String(index)}
-        contentContainerStyle={styles.list}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={async () => {
-              setRefreshing(true);
-              await load();
-              setRefreshing(false);
-            }}
-          />
-        }
-        renderItem={({ item, index }) => (
-          <View
-            style={[
-              visitListStyles.row,
-              index === 0 && visitListStyles.rowFirst,
-              index === members.length - 1 && visitListStyles.rowLast,
-            ]}
-          >
-            <View
-              style={[visitListStyles.dot, item.present ? visitListStyles.dotIn : visitListStyles.dotOut]}
-              accessibilityLabel={item.present ? 'В саду' : 'Не в саду'}
-            />
-            <Text style={[visitListStyles.rowTitle, item.own && styles.own]}>
-              {`${item.surname} ${item.firstName}`.trim()}
-            </Text>
-          </View>
-        )}
-      />
-    );
-  }
+      )}
+      {onClose && <Pressable accessibilityRole="button" accessibilityLabel="Закрыть" onPress={onClose} style={styles.close}>
+        <IconSymbol name="xmark" size={22} color={c.textSecondary} />
+      </Pressable>}
+    </View>
+  ) : null;
 
   return (
-    <Modal visible animationType="slide" onRequestClose={onClose}>
-      <View style={styles.screen}>
-        <View style={styles.header}>
-          <View style={styles.headerText}>
-            <Text style={styles.title}>{group?.name ? `Группа «${group.name}»` : 'Группа'}</Text>
-            {group && group.children.length > 0 ? (
-              <Text style={styles.subtitle}>
-                В саду {presentCount} из {group.children.length}
-              </Text>
-            ) : null}
-          </View>
-          <TouchableOpacity onPress={onClose} accessibilityRole="button" hitSlop={8}>
-            <Text style={styles.close}>Закрыть</Text>
-          </TouchableOpacity>
+    <FlatList
+      style={styles.screen}
+      data={group?.children ?? []}
+      contentContainerStyle={styles.content}
+      ListHeaderComponent={header}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void load(true)} />}
+      keyExtractor={(item, index) => `${item.surname}-${item.firstName}-${index}`}
+      renderItem={({ item, index }) => (
+        <View style={[styles.row, index === (group?.children.length ?? 0) - 1 && styles.last]} accessible accessibilityLabel={`${item.surname} ${item.firstName}, ${item.present ? 'В саду' : 'Не в саду'}`}>
+          <View
+            style={[styles.dot, { backgroundColor: item.present ? c.success : c.textTertiary }]} />
+          <Text style={[styles.member, item.own && styles.own]}>{`${item.surname} ${item.firstName}`.trim()}</Text>
         </View>
-        {body}
-      </View>
-    </Modal>
+      )}
+      ListEmptyComponent={<View style={[styles.empty, styles.last, !header && styles.standalone]}>{
+        state.status === 'loading' ? <ActivityIndicator accessibilityLabel="Загружаем группу" color={c.actionPrimary} /> :
+          state.status === 'failed' ? (
+            <>
+              <StatusMessage message="Не удалось загрузить группу" tone="error" />
+              <ActionButton variant="text" label="Повторить" onPress={() => void load()} />
+            </>
+          ) : <StatusMessage message={group?.name ? 'В группе пока нет детей' : 'Сад ещё не определил ребёнка в группу'} />
+      }</View>}
+    />
   );
 }
 
-const useStyles = makeStyles((c) =>
-  StyleSheet.create({
-    screen: {
-      flex: 1,
-      backgroundColor: c.background,
-    },
-    header: {
-      flexDirection: 'row',
-      alignItems: 'flex-start',
-      justifyContent: 'space-between',
-      paddingHorizontal: 20,
-      paddingTop: Platform.OS === 'ios' ? 60 : 28,
-      paddingBottom: 12,
-    },
-    headerText: {
-      flex: 1,
-      marginRight: 12,
-    },
-    title: {
-      fontSize: 22,
-      fontWeight: '700',
-      color: c.text,
-    },
-    subtitle: {
-      marginTop: 4,
-      fontSize: 16,
-      color: c.textSecondary,
-    },
-    close: {
-      fontSize: 16,
-      color: c.primary,
-    },
-    list: {
-      padding: 20,
-    },
-    own: {
-      fontWeight: '600',
-    },
-    center: {
-      flex: 1,
-      alignItems: 'center',
-      justifyContent: 'center',
-      padding: 20,
-    },
-    message: {
-      fontSize: 16,
-      color: c.textSecondary,
-      textAlign: 'center',
-    },
-    retry: {
-      marginTop: 16,
-      minHeight: 44,
-      justifyContent: 'center',
-    },
-    retryText: {
-      fontSize: 16,
-      fontWeight: '500',
-      color: c.primary,
-    },
-  })
-);
+export default function ChildGroupSheet({ child, onClose }: { child: Child | null; onClose: () => void }) {
+  const styles = useStyles();
+  if (!child) return null;
+  return (
+    <AppModal visible animationType="slide" onRequestClose={onClose}>
+      <SafeAreaView style={styles.screen}><ChildGroupPanel child={child} onClose={onClose} /></SafeAreaView>
+    </AppModal>
+  );
+}
+
+const useStyles = makeStyles((c) => StyleSheet.create({
+  screen: { flex: 1, backgroundColor: c.background },
+  content: { padding: space.md, paddingBottom: space.section,
+    width: '100%', maxWidth: 480, alignSelf: 'center' },
+  header: { flexDirection: 'row', alignItems: 'center', gap: space.md, padding: space.lg, backgroundColor: c.card,
+    borderTopLeftRadius: radius.card, borderTopRightRadius: radius.card },
+  standalone: { borderRadius: radius.card },
+  last: { borderBottomLeftRadius: radius.card, borderBottomRightRadius: radius.card },
+  close: { alignItems: 'center', justifyContent: 'center', width: controlHeight.touch, height: controlHeight.touch },
+  title: { flex: 1, fontSize: typeSize.sheetTitle, fontWeight: '700', color: c.text },
+  count: { fontSize: typeSize.body, fontWeight: '700', color: c.text, fontVariant: ['tabular-nums'] },
+  row: { flexDirection: 'row', alignItems: 'center', gap: space.md, paddingVertical: space.md, paddingHorizontal: space.lg, minHeight: controlHeight.field,
+    backgroundColor: c.card, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: c.separator },
+  dot: { width: space.sm, height: space.sm, borderRadius: space.sm },
+  member: { flex: 1, fontSize: typeSize.body, color: c.text },
+  own: { fontWeight: '700' },
+  empty: { gap: space.md, padding: space.lg, backgroundColor: c.card },
+}));

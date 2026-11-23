@@ -1,6 +1,7 @@
+import { personName } from '@/utils/people-format';
 import React, { useEffect } from 'react';
-import { ActivityIndicator, Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import Avatar from './avatar';
+import { ActivityIndicator, Alert, StyleSheet, Text, TouchableOpacity } from 'react-native';
+import { ProfileIdentity } from './profile-person';
 import { makeStyles, usePalette } from '../hooks/use-palette';
 import { PhotoPermissionError, PhotoSource, pickPhoto } from '../services/photos/pick-photo';
 import { useAppDispatch, useAppSelector } from '../store';
@@ -23,16 +24,17 @@ interface PhotoEditorProps {
   photoUrl?: string | null;
   /** Свою фотографию меняет сам пользователь, фотографию ребёнка — только родитель */
   canEdit: boolean;
+  subtitle?: string;
 }
 
-const PHOTO_SIZE = 96;
+
 
 /**
  * Фотография в профиле — своя или своего ребёнка — и её замена: снимок или галерея, удаление, отзыв заявки.
  * Родитель и сотрудник отправляют фотографию на подтверждение сада, до решения остаётся прежняя;
  * администратор и директор меняют сразу. См. visit-control-service/docs/profile-photos.md.
  */
-export default function PhotoEditor({ userId, childId, firstName, surname, photoUrl, canEdit }: PhotoEditorProps) {
+export default function PhotoEditor({ userId, childId, firstName, surname, photoUrl, canEdit, subtitle }: PhotoEditorProps) {
   const c = usePalette();
   const styles = useStyles();
   const dispatch = useAppDispatch();
@@ -72,7 +74,7 @@ export default function PhotoEditor({ userId, childId, firstName, surname, photo
 
   function openMenu() {
     Alert.alert(
-      childId ? `Фотография: ${firstName}` : 'Фотография профиля',
+      childId ? `Фотография: ${personName({ surname, firstName })}` : 'Фотография профиля',
       immediate ? undefined : 'Новая фотография появится после подтверждения сада',
       [
         { text: 'Сделать снимок', onPress: () => void pick('camera') },
@@ -100,14 +102,7 @@ export default function PhotoEditor({ userId, childId, firstName, surname, photo
   }
 
   return (
-    <View style={styles.container}>
-      {/* Пока заявка ждёт, заявитель видит новую фотографию; остальные — прежнюю */}
-      <Avatar
-        firstName={firstName}
-        surname={surname}
-        photoUrl={pending?.imageUrl ?? photoUrl}
-        size={PHOTO_SIZE}
-      />
+    <ProfileIdentity firstName={firstName} surname={surname} photoUrl={pending?.imageUrl ?? photoUrl} subtitle={subtitle}>
       {busy || cancelling ? (
         <ActivityIndicator style={styles.action} color={c.primary} />
       ) : pending ? (
@@ -131,19 +126,13 @@ export default function PhotoEditor({ userId, childId, firstName, surname, photo
           ) : null}
         </>
       )}
-    </View>
+    </ProfileIdentity>
   );
 }
 
 const useStyles = makeStyles((c) =>
   StyleSheet.create({
-    container: {
-      alignItems: 'center',
-      paddingVertical: 16,
-    },
-    action: {
-      marginTop: 12,
-    },
+    action: { alignSelf: 'flex-start', minHeight: 44, justifyContent: 'center' },
     link: {
       fontSize: 15,
       fontWeight: '500',
@@ -153,7 +142,7 @@ const useStyles = makeStyles((c) =>
       marginTop: 12,
       fontSize: 14,
       color: c.textSecondary,
-      textAlign: 'center',
+      textAlign: 'left',
     },
     rejected: {
       color: c.danger,

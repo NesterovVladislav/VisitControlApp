@@ -27,7 +27,7 @@ export function AttendanceEntry({ childName, summary, onOpen }: {
   );
 }
 
-export function AttendanceOverview({ summary }: { summary: AttendanceSummary }) {
+export function AttendanceOverview({ summary, compact }: { summary: AttendanceSummary; compact?: boolean }) {
   const styles = useStyles();
   const totals = [
     { label: 'Полных дней', count: summary.full },
@@ -36,18 +36,18 @@ export function AttendanceOverview({ summary }: { summary: AttendanceSummary }) 
   ];
 
   return (
-    <View style={styles.overview}>
+    <View style={[styles.overview, compact && styles.compactOverview]}>
       <Text style={styles.heading} accessibilityRole="header">Итоги за месяц</Text>
       <View style={styles.totals}>
         {totals.map(({ label, count }, index) => (
-          <View key={label} style={[styles.total, index > 0 && styles.totalDivider]}>
+          <View key={label} style={[styles.total, index > 0 && styles.totalDivider, compact && styles.compactTotal]}>
             <Text style={styles.count}>{count}</Text>
             <Text style={styles.caption}>{label}</Text>
           </View>
         ))}
       </View>
       {summary.reasons.length > 0 && (
-        <View style={styles.reasons} accessibilityLabel="Пропуски по причинам">
+        <View style={[styles.reasons, compact && styles.inlineReasons]} accessibilityLabel="Пропуски по причинам">
           {summary.reasons.map(({ reason, count }) => (
             <Text key={reason} style={styles.caption}>{attendanceReason(reason).label} · {count}</Text>
           ))}
@@ -64,7 +64,10 @@ const useStyles = makeStyles((c) => StyleSheet.create({
   entry: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: c.separator, marginTop: space.sm,
     paddingTop: space.xxs, paddingBottom: space.xxs, alignItems: 'center' },
   caption: { color: c.textSecondary, fontSize: typeSize.caption },
-  overview: { backgroundColor: c.card, borderRadius: radius.card, gap: space.md, padding: space.lg },
+  overview: { backgroundColor: c.card, borderRadius: radius.card, gap: space.xs, padding: space.md },
+  compactTotal: { paddingHorizontal: space.xxs, gap: 0 },
+  compactOverview: { paddingHorizontal: space.sm, paddingVertical: space.xs, gap: space.xxs },
+  inlineReasons: { flexDirection: 'row', flexWrap: 'wrap', columnGap: space.md, rowGap: 0 },
   heading: { color: c.text, fontSize: typeSize.body, fontWeight: '700' },
   totals: { flexDirection: 'row' },
   total: { flex: 1, gap: space.xxs, paddingEnd: space.sm },

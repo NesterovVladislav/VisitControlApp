@@ -1,3 +1,5 @@
+import Feather from '@expo/vector-icons/Feather';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { useRef, useState, type ElementRef, type KeyboardEvent } from 'react';
 import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 
@@ -21,14 +23,15 @@ const nonworkingSymbol = '×';
 type Mark = {
   tone: 'visit' | 'absence' | 'planned' | 'inactive' | 'plain';
   symbol?: string;
+  icon?: keyof typeof Feather.glyphMap;
   label: string;
 };
 
 function dayMark(day: AttendanceDay): Mark {
   switch (day.status) {
     case 'FULL': return { tone: 'visit', symbol: '✓', label: 'Полный день' };
-    case 'FIRST_HALF': return { tone: 'visit', symbol: '◩', label: 'Первая половина дня' };
-    case 'SECOND_HALF': return { tone: 'visit', symbol: '◪', label: 'Вторая половина дня' };
+    case 'FIRST_HALF': return { tone: 'visit', icon: 'sunrise', label: 'Первая половина дня' };
+    case 'SECOND_HALF': return { tone: 'visit', icon: 'sunset', label: 'Вторая половина дня' };
     case 'NOT_IN_GROUP': return { tone: 'inactive', symbol: '–', label: 'Вне группы' };
     case 'NONE': break;
   }
@@ -36,7 +39,7 @@ function dayMark(day: AttendanceDay): Mark {
     const reason = attendanceReason(day.reason);
     return {
       tone: day.future ? 'planned' : 'absence',
-      symbol: reason.mark,
+      icon: reason.icon,
       label: `${day.future ? 'Запланированный пропуск' : 'Пропуск'} · ${reason.label}`,
     };
   }
@@ -45,7 +48,48 @@ function dayMark(day: AttendanceDay): Mark {
   return { tone: 'plain', symbol: '·', label: 'Нет отметки' };
 }
 
-function AttendanceDayDetails({ day, onClose }: { day: AttendanceDay; onClose: () => void }) {
+function CalendarMark({ mark, paid, inline }: { mark: Mark; paid?: boolean; inline?: boolean }) {
+  const styles = useStyles();
+  const ink = mark.tone === 'visit' ? styles.visitedSymbol : mark.tone === 'absence'
+    ? styles.paid : mark.tone === 'planned' ? styles.plannedSymbol : styles.secondary;
+  return <View style={styles.mark}>
+    {mark.icon ? <Feather name={mark.icon} size={inline ? 12 : 14} color={ink.color} /> :
+      <Text style={[styles.symbol, ink]}>{mark.symbol}</Text>}
+    {paid && <Text style={[styles.symbol, styles.paid]}>₽</Text>}
+  </View>;
+}
+
+function CalendarLegend() {
+  const styles = useStyles();
+  const sample = (status: AttendanceDay['status'], values: Partial<AttendanceDay> = {}) =>
+    dayMark({ date: '', status, working: true, future: false, paid: false, reason: null, holiday: null, ...values });
+  const row = (mark: Mark, label = mark.label, today = false, paid = false) => (
+    <View key={label} accessible accessibilityLabel={label} style={styles.legendRow}>
+      <View style={[styles.swatch, styles[mark.tone], today && styles.today]}>
+        {today || (!mark.symbol && !mark.icon && !paid) ? <Text style={styles.dayNumber}>12</Text> : null}
+        <CalendarMark mark={mark} paid={paid} />
+      </View>
+      <Text style={styles.legendLabel}>{label}</Text>
+    </View>
+  );
+  return <View style={styles.legendSections}>
+    <View><Text accessibilityRole="header" style={styles.legendHeading}>Посещение</Text>
+      {row(sample('FULL'))}{row(sample('FIRST_HALF'))}{row(sample('SECOND_HALF'))}
+    </View>
+    <View><Text accessibilityRole="header" style={styles.legendHeading}>Причины отсутствия</Text>
+      {Object.entries(attendanceReasons).map(([code, reason]) => row(sample('NONE', { reason: code }), reason.label))}
+    </View>
+    <View><Text accessibilityRole="header" style={styles.legendHeading}>Отметки календаря</Text>
+      {row({ tone: 'planned', label: 'Запланированное отсутствие' })}
+      {row({ tone: 'absence', label: paidLabel }, paidLabel, false, true)}
+      {row({ tone: 'plain', label: 'Сегодня' }, 'Сегодня', true)}
+      {row(sample('NONE'))}{row(sample('NONE', { working: false }))}{row(sample('NOT_IN_GROUP'))}
+      {row(sample('NONE', { future: true }))}
+    </View>
+  </View>;
+}
+
+function AttendanceDayDetails({ day, onClose, onOpenPeriod }: { day: AttendanceDay; onClose: () => void; onOpenPeriod?: () => void }) {
   const styles = useStyles();
   const { absencePeriod } = day;
   return (
@@ -53,7 +97,7 @@ function AttendanceDayDetails({ day, onClose }: { day: AttendanceDay; onClose: (
       <View style={styles.sheetContent}>
         <Text style={styles.sheetText}>{dayMark(day).label}</Text>
         {day.holiday && <Text style={styles.sheetText}>{day.holiday}</Text>}
-        {absencePeriod && (
+        {absencePeriod && onOpenPeriod ? <ActionButton label={'Период отсутствия: ' + formatBirthDate(absencePeriod.from) + ' — ' + formatBirthDate(absencePeriod.to)} variant="text" onPress={onOpenPeriod} /> : absencePeriod && (
           <Text style={styles.sheetText}>
             {formatBirthDate(absencePeriod.from)} — {formatBirthDate(absencePeriod.to)}
           </Text>
@@ -64,30 +108,38 @@ function AttendanceDayDetails({ day, onClose }: { day: AttendanceDay; onClose: (
   );
 }
 
-export function AttendanceMonthHeader({ label, onPrevious, onNext, canNext }: {
+export function AttendanceMonthHeader({ label, onPrevious, onNext, canNext, onLegend }: {
   label: string;
   onPrevious: () => void;
   onNext: () => void;
   canNext: boolean;
+  onLegend?: () => void;
 }) {
   const styles = useStyles();
   return (
     <View style={styles.monthHeader}>
       <ActionButton variant="text" label="‹" accessibilityLabel="Предыдущий месяц" onPress={onPrevious} />
-      <Text style={styles.monthTitle} accessibilityRole="header" aria-live="polite">{label}</Text>
+      <View style={styles.monthCenter}>
+        <Text style={styles.monthTitle} accessibilityRole="header" aria-live="polite">{label}</Text>
+        {onLegend && <Pressable accessibilityRole="button" accessibilityLabel="Обозначения" onPress={onLegend} style={styles.info}>
+          <Ionicons name="information-circle-outline" size={20} color={styles.info.color} />
+        </Pressable>}
+      </View>
       <ActionButton variant="text" label="›" accessibilityLabel="Следующий месяц" disabled={!canNext} onPress={onNext} />
     </View>
   );
 }
 
-export function AttendanceCalendar({ month, days, today }: {
+export function AttendanceCalendar({ month, days, today, showLegend, onCloseLegend, onOpenPeriod, compact, inlineMarks, initialOpenDate, onDayClosed }: {
+  initialOpenDate?: string; onDayClosed?: () => void;
+  showLegend?: boolean; onCloseLegend?: () => void; onOpenPeriod?: (day: AttendanceDay) => void; compact?: boolean; inlineMarks?: boolean;
   month: ReturnType<typeof calendarMonth>;
   days: AttendanceDay[];
   today: string;
 }) {
   const styles = useStyles();
   const [legend, setLegend] = useState(false);
-  const [openDate, setOpenDate] = useState<string>();
+  const [openDate, setOpenDate] = useState(initialOpenDate);
   const [tabDate, setTabDate] = useState<string>();
   const [focusedDate, setFocusedDate] = useState<string>();
   const dateButtons = useRef(new Map<string, ElementRef<typeof Pressable>>());
@@ -142,15 +194,12 @@ export function AttendanceCalendar({ month, days, today }: {
                 <Pressable key={day.date} style={styles.cell} accessibilityLabel={label} accessibilityRole="button"
                   onPress={() => setOpenDate(day.date)} {...webProps}>
                   {({ pressed }) => (
-                    <View style={[styles.day, styles[mark.tone], isToday && styles.today,
+                    <View style={[styles.day, compact && styles.compactDay, inlineMarks && styles.inlineDay, styles[mark.tone], isToday && styles.today,
                       pressed && styles.pressed, focusedDate === day.date && styles.focused]}>
                       <Text style={[styles.dayNumber, mark.tone === 'inactive' && styles.secondary]}>
                         {Number(day.date.slice(-2))}
                       </Text>
-                      <Text style={[styles.symbol, mark.tone === 'visit' && styles.visitedSymbol,
-                        mark.tone === 'absence' && styles.paid, mark.tone === 'planned' && styles.plannedSymbol]}>
-                        {mark.symbol ?? '\u00a0'}{day.paid && <Text style={styles.paid}> ₽</Text>}
-                      </Text>
+                      <CalendarMark mark={mark} paid={day.paid} inline={inlineMarks} />
                     </View>
                   )}
                 </Pressable>
@@ -160,35 +209,28 @@ export function AttendanceCalendar({ month, days, today }: {
         ))}
       </View>
 
-      <View style={styles.legendAction}>
+      {showLegend === undefined && <View style={styles.legendAction}>
         <ActionButton variant="text" label="Обозначения" onPress={() => setLegend(true)} />
-      </View>
-      {legend && (
-        <BottomSheet title="Обозначения" onClose={() => setLegend(false)}>
-          <View style={styles.sheetContent}>
-            <Text style={styles.sheetText}>✓ Полный день</Text>
-            <Text style={styles.sheetText}>◩ Первая половина дня</Text>
-            <Text style={styles.sheetText}>◪ Вторая половина дня</Text>
-            {Object.values(attendanceReasons).map((reason) => (
-              <Text key={reason.mark} style={styles.sheetText}>{reason.mark} {reason.label}</Text>
-            ))}
-            <Text style={styles.sheetText}>Пунктирная рамка · запланированный пропуск</Text>
-            <Text style={styles.sheetText}>Знак рубля · оплачиваемый пропуск</Text>
-            <Text style={styles.sheetText}>· Нет отметки</Text>
-            <Text style={styles.sheetText}>{nonworkingSymbol} Нерабочий день</Text>
-            <Text style={styles.sheetText}>– Вне группы</Text>
-            <Text style={styles.sheetText}>Сплошная синяя рамка · сегодня</Text>
-          </View>
+      </View>}
+      {(showLegend ?? legend) && (
+        <BottomSheet title="Обозначения" onClose={onCloseLegend ?? (() => setLegend(false))}>
+          <CalendarLegend />
         </BottomSheet>
       )}
-      {selectedDay && <AttendanceDayDetails day={selectedDay} onClose={() => setOpenDate(undefined)} />}
+      {selectedDay && <AttendanceDayDetails day={selectedDay} onClose={() => { setOpenDate(undefined); onDayClosed?.(); }}
+        onOpenPeriod={onOpenPeriod && selectedDay.absencePeriod && selectedDay.absencePeriod.to >= today ? () => {
+          setOpenDate(undefined);
+          onOpenPeriod(selectedDay);
+        } : undefined} />}
     </>
   );
 }
 
 const useStyles = makeStyles((c) => StyleSheet.create({
   monthHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space.sm },
-  monthTitle: { flex: 1, color: c.text, textAlign: 'center', fontSize: typeSize.navigationTitle, fontWeight: '700' },
+  monthCenter: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
+  info: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', color: c.actionPrimary },
+  monthTitle: { flexShrink: 1, color: c.text, textAlign: 'center', fontSize: typeSize.navigationTitle, fontWeight: '700' },
   week: { flexDirection: 'row' },
   weekday: { flex: 1, textAlign: 'center', color: c.textSecondary, fontSize: typeSize.caption },
   cell: { flex: 1, minWidth: 0 },
@@ -196,6 +238,8 @@ const useStyles = makeStyles((c) => StyleSheet.create({
     minHeight: controlHeight.touch, alignItems: 'center', flexGrow: 1, margin: 2,
     borderWidth: 2, borderColor: 'transparent', borderRadius: radius.control, paddingVertical: 2,
   },
+  compactDay: { minHeight: 38, margin: 1, paddingVertical: 0 },
+  inlineDay: { minHeight: 28, flexDirection: 'row', justifyContent: 'center', columnGap: 1 },
   dayNumber: { color: c.text, fontSize: typeSize.label, fontWeight: '600', lineHeight: 18, includeFontPadding: false },
   secondary: { color: c.textSecondary },
   visit: { backgroundColor: c.successSoft },
@@ -211,6 +255,13 @@ const useStyles = makeStyles((c) => StyleSheet.create({
   plannedSymbol: { color: c.actionPrimary },
   paid: { color: c.danger },
   legendAction: { alignSelf: 'flex-start' },
+  mark: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
+  legendSections: { gap: space.lg },
+  legendHeading: { color: c.text, fontSize: typeSize.body, fontWeight: '700', marginBottom: space.xs },
+  legendRow: { flexDirection: 'row', alignItems: 'center', minHeight: 36, gap: space.md },
+  legendLabel: { color: c.text, flex: 1, fontSize: typeSize.label },
+  swatch: { minWidth: 36, minHeight: 28, alignItems: 'center', justifyContent: 'center', flexDirection: 'row',
+    borderWidth: 2, borderColor: 'transparent', borderRadius: radius.control },
   sheetContent: { gap: space.sm },
   sheetText: { color: c.text, fontSize: typeSize.label, lineHeight: space.xl },
 }));

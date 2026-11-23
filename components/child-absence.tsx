@@ -1,25 +1,35 @@
+import { personName } from '@/utils/people-format';
 import { useFocusEffect } from '@react-navigation/native';
 import { useCallback, useEffect, useState } from 'react';
-import { AppState, StyleSheet, Text, View } from 'react-native';
+import { AppState, Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { radius, space, typeSize } from '../constants/ui-tokens';
-import { makeStyles } from '../hooks/use-palette';
-import { AbsenceNotice, AbsenceRules, getAbsenceRules } from '../services/api/absence';
+import { controlHeight, space, typeSize } from '../constants/ui-tokens';
+import { makeStyles, usePalette } from '../hooks/use-palette';
+import { AbsenceNotice, AbsenceRules, getAbsenceRules, shiftAbsenceDay } from '../services/api/absence';
 import { ApiError } from '../services/errors/api-error';
 import { Child } from '../store/types/children';
 import { absenceDateText, absenceRangeText } from './absence-calendar';
 import AbsenceSheet from './absence-sheet';
 import { ActionButton, StatusMessage } from './ui';
+import { IconSymbol } from './ui/icon-symbol';
 
-type SheetTarget = { mode: 'create' } | { mode: 'list'; entry: AbsenceNotice };
+type SheetTarget = { mode: 'create' } | { mode: 'list'; entry?: AbsenceNotice };
 type SavedNotice = { message: string; entry?: AbsenceNotice };
 
-export default function ChildAbsence({ child, refresh, onChanged }: {
+type Props = {
   child: Child;
   refresh: string;
+  calendarAvailable?: boolean;
   onChanged?: () => void;
-}) {
+};
+
+export default function ChildAbsence(props: Props) {
+  return <ChildAbsenceContent key={props.child.id} {...props} />;
+}
+
+function ChildAbsenceContent({ child, refresh, onChanged, calendarAvailable = false }: Props) {
   const styles = useStyles();
+  const colors = usePalette();
   const [rules, setRules] = useState<AbsenceRules | null>(null);
   const [target, setTarget] = useState<SheetTarget | null>(null);
   const [success, setSuccess] = useState<SavedNotice | null>(null);
@@ -80,29 +90,37 @@ export default function ChildAbsence({ child, refresh, onChanged }: {
 
   if (!rules) return null;
   const current = success?.entry ?? rules.current;
+  const showSummary = current && (!calendarAvailable || (current.from <= rules.today_date && current.to >= rules.today_date));
   const paidDates = current?.paid_days.filter((day) => !day.waived).map((day) => day.date).sort() ?? [];
   const paidDatesText = paidDates.map((date) => absenceDateText(date).slice(0, 5)).join(', ');
   const detailsLabel = current?.editable || current?.cancellable ? 'Изменить' : 'Подробнее';
-  const childName = `${child.firstName} ${child.surname}`;
+  const isOneDay = current && current.from === current.to;
+  const tomorrow = shiftAbsenceDay(rules.today_date, 1);
+  const summaryTitle = calendarAvailable && current ? 'Отсутствует до ' + absenceDateText(current.to) : !isOneDay ? 'Период отсутствия' : current.from === rules.today_date
+    ? 'Сегодня не придёт' : current.from === tomorrow ? 'Завтра не придёт' : 'Запланировано отсутствие';
+  const reason = rules.reasons.find(item => item.code === current?.reason)?.name;
+  const childName = personName(child);
 
+  if (!showSummary && !success && !rules.can_report && calendarAvailable) return null;
   return (
     <View style={styles.block}>
-      {current && (
+      {showSummary && current && (
         <View style={styles.summary}>
-          <View style={styles.summaryHeader}>
-            <Text style={styles.title}>Не придёт</Text>
-            <ActionButton variant="text" label={detailsLabel}
-              accessibilityLabel={`Отсутствия: ${childName}. ${detailsLabel} ${absenceRangeText(current.from, current.to)}`}
-              onPress={() => setTarget({ mode: 'list', entry: current })} />
-          </View>
-          <View style={styles.summaryContent}>
-            <Text style={styles.text}>{absenceRangeText(current.from, current.to)}</Text>
-            {paidDates.length > 0 && (
-              <Text style={styles.paid} accessibilityLabel={`Оплата за ${paidDates.map(absenceDateText).join(', ')}`}>
-                ₽ {paidDatesText} {paidDates.length === 1 ? 'оплачивается' : 'оплачиваются'}
-              </Text>
-            )}
-          </View>
+          <Pressable style={styles.summaryHeader} accessibilityRole="button"
+            accessibilityLabel={`Отсутствия: ${childName}. ${detailsLabel} ${absenceRangeText(current.from, current.to)}${reason ? '. ' + reason : ''}`}
+            onPress={() => setTarget({ mode: 'list', entry: current })}>
+            <View style={styles.summaryContent}>
+              <Text style={styles.title}>{summaryTitle}</Text>
+              <Text style={styles.text}>{absenceRangeText(current.from, current.to)}</Text>
+              {reason && <Text style={styles.text}>{reason}</Text>}
+            </View>
+            <IconSymbol name="chevron.right" size={20} color={colors.textSecondary} />
+          </Pressable>
+          {paidDates.length > 0 && (
+            <Text style={styles.paid} accessibilityLabel={`Оплата за ${paidDates.map(absenceDateText).join(', ')}`}>
+              ₽ {paidDatesText} {paidDates.length === 1 ? 'оплачивается' : 'оплачиваются'}
+            </Text>
+          )}
           {success?.entry && <View style={styles.confirmation} accessibilityLiveRegion="polite" aria-live="polite">
             <Text style={styles.confirmationText}
               accessibilityLabel={`${success.message} · ${absenceRangeText(success.entry.from, success.entry.to)}`}>
@@ -111,10 +129,11 @@ export default function ChildAbsence({ child, refresh, onChanged }: {
           </View>}
         </View>
       )}
-      {success && !success.entry && <StatusMessage message={success.message} tone="success" />}
-      {rules.can_report && !current && (
-        <ActionButton variant="text" label="Не придёт"
-          accessibilityLabel={`Не придёт: ${childName}`}
+      {success && (!success.entry || !showSummary) && <StatusMessage message={success.message} tone="success" />}
+      {!calendarAvailable && !current && <ActionButton variant="text" label="Отсутствия" onPress={() => setTarget({ mode: 'list' })} />}
+      {rules.can_report && (
+        <ActionButton variant="text" label="Сообщить об отсутствии"
+          accessibilityLabel={`Сообщить об отсутствии: ${childName}`}
           onPress={() => setTarget({ mode: 'create' })} />
       )}
       {target && (
@@ -127,12 +146,12 @@ export default function ChildAbsence({ child, refresh, onChanged }: {
 }
 
 const useStyles = makeStyles((c) => StyleSheet.create({
-  block: { gap: space.sm, marginTop: space.sm },
-  summary: { backgroundColor: c.primarySoft, borderRadius: radius.card, padding: space.md, paddingTop: space.xxs, gap: space.xxs },
-  summaryHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space.sm },
-  summaryContent: { gap: space.xxs },
-  title: { flex: 1, fontSize: typeSize.body, fontWeight: '700', color: c.text },
-  text: { fontSize: typeSize.label, color: c.text },
+  block: { gap: space.sm, backgroundColor: c.card, borderRadius: 10, padding: space.md },
+  summary: { paddingVertical: space.xs },
+  summaryHeader: { minHeight: controlHeight.touch, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space.sm },
+  summaryContent: { flex: 1, gap: space.xxs },
+  title: { fontSize: typeSize.body, fontWeight: '700', color: c.text },
+  text: { fontSize: typeSize.label, color: c.textSecondary },
   paid: { fontSize: typeSize.caption, color: c.danger },
   confirmation: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: c.separator,
     marginTop: space.xs, paddingTop: space.sm },

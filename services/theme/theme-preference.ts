@@ -4,6 +4,8 @@ import { Appearance, Platform } from 'react-native';
 /** Тема, выбранная в профиле: как в системе, всегда светлая или всегда тёмная. */
 export type ThemePreference = 'system' | 'light' | 'dark';
 
+export const themeLabels: Record<ThemePreference, string> = { system: 'Системная', light: 'Светлая', dark: 'Тёмная' };
+
 export const THEME_PREFERENCE_KEY = 'visit-control.theme.v1';
 
 export interface ThemePreferenceStore {

@@ -1,5 +1,7 @@
+import { AppModal } from './ui/android-safe-window';
+import { SheetControl } from './ui/sheet-control';
 import React, { useRef } from 'react';
-import { Modal, Platform, Pressable, SectionList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Platform, Pressable, SectionList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { IconSymbol } from './ui/icon-symbol';
 import { useVisitListStyles } from './visit-list';
 import { makeStyles, usePalette } from '../hooks/use-palette';
@@ -58,16 +60,14 @@ export default function OptionSheet({
   }
 
   return (
-    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose} onDismiss={runPending}>
+    <AppModal visible={visible} animationType="fade" transparent onRequestClose={onClose} onDismiss={runPending}>
       <Pressable style={styles.backdrop} onPress={onClose} accessibilityLabel="Закрыть" />
       <View style={styles.sheet}>
         <View style={styles.header}>
           <Text style={styles.title} numberOfLines={1}>
             {title}
           </Text>
-          <TouchableOpacity onPress={onClose} accessibilityRole="button" hitSlop={8}>
-            <Text style={styles.close}>Отмена</Text>
-          </TouchableOpacity>
+          <SheetControl onPress={onClose} />
         </View>
         <SectionList
           sections={sections}
@@ -93,7 +93,7 @@ export default function OptionSheet({
           )}
         />
       </View>
-    </Modal>
+    </AppModal>
   );
 }
 

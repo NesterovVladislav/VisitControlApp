@@ -97,7 +97,7 @@ describe('PeopleScreen', () => {
     });
     const screen = await render(<PeopleScreen />);
 
-    expect(screen.getByText('мама: Мария')).toBeTruthy();
+    expect(screen.getByText('мама: Иванова Мария')).toBeTruthy();
     await fireEvent.press(screen.getByLabelText('Позвонить: Иванова Анна'));
     expect(openURL).toHaveBeenCalledWith('tel:+79123456789');
     expect(screen.queryByText('Все группы')).toBeNull();

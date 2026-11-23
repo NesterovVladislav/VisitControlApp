@@ -1,5 +1,5 @@
 import { ApiError } from '../../services/errors/api-error';
-import reducer, { decideMarkFailure, decideMarkSuccess, loadQueueSuccess, queueAvailability } from '../reducers/visit-queue';
+import reducer, { decideMarkFailure, decideMarkSuccess, loadQueueSuccess, queueAccessDenied, queueAvailability } from '../reducers/visit-queue';
 import { QUEUE_MESSAGES, toDecisionError } from './visit-queue';
 
 jest.mock('../../services/api', () => ({ visitControlApi: {} }));
@@ -46,6 +46,11 @@ describe('visit queue decisions', () => {
     const failed = reducer(loaded, decideMarkFailure({ id: 'a', message: QUEUE_MESSAGES.network }));
     expect(failed.items).toHaveLength(2);
     expect(failed.error).toBe(QUEUE_MESSAGES.network);
+  });
+
+  it('clears previously visible children when access changes', () => {
+    const loaded = reducer(undefined, loadQueueSuccess({ items: [mark('a')], otherCount: 2 }));
+    expect(reducer(loaded, queueAccessDenied())).toMatchObject({ items: [], otherCount: 0, status: 'failed' });
   });
 
   it('empties the queue when confirmation is switched off in the kindergarten', () => {

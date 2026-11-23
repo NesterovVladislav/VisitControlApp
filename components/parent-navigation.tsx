@@ -1,0 +1,117 @@
+import { personName } from '@/utils/people-format';
+import Ionicons from '@expo/vector-icons/Ionicons';
+import { useState } from 'react';
+import { Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+import { controlHeight, space, typeSize } from '../constants/ui-tokens';
+import { makeStyles } from '../hooks/use-palette';
+import { Child, ChildStatus, isInKindergarten } from '../store/types/children';
+import { pendingLabel } from './child-card';
+import { BottomSheet } from './ui';
+import { IconSymbol } from './ui/icon-symbol';
+
+const sections = [
+  { id: 'home', label: 'Главная', icon: 'home-outline' },
+  { id: 'calendar', label: 'Календарь', icon: 'calendar-outline' },
+  { id: 'group', label: 'Группа', icon: 'people-outline' },
+  { id: 'profile', label: 'Профиль', icon: 'person-outline' },
+] as const;
+export type ParentSection = typeof sections[number]['id'];
+
+export function parentSectionTitle(section: ParentSection) {
+  return sections.find(item => item.id === section)!.label;
+}
+
+function childStatus(status?: ChildStatus) {
+  if (status?.visit?.pending) return pendingLabel(status.visit.pending);
+  if (!status?.value) return status?.error ? 'Статус неизвестен' : 'Загружаем статус';
+  return isInKindergarten(status.value) ? 'В саду' : 'Не в саду';
+}
+
+export function ParentChildSelector({ items, selected, statuses, onSelect, calendarContext }: {
+  calendarContext?: string;
+  items: Child[];
+  selected: Child;
+  statuses: Record<string, ChildStatus>;
+  onSelect: (child: Child) => void;
+}) {
+  const styles = useStyles();
+  const { height } = useWindowDimensions();
+  const compactPicker = calendarContext !== undefined && height < 680;
+  const [open, setOpen] = useState(false);
+  function choice(child: Child, compact: boolean) {
+    const active = selected.id === child.id;
+    const name = personName(child);
+    return (
+      <Pressable key={child.id} accessibilityRole="button" accessibilityState={{ selected: active }}
+        accessibilityLabel={`${personName(child)}, ${childStatus(statuses[child.id])}`}
+        onPress={() => { onSelect(child); setOpen(false); }}
+        style={[styles.choice, compact && styles.half, active && styles.selected]}>
+        <Text style={styles.name}>{name}</Text>
+        <Text style={styles.status}>{childStatus(statuses[child.id])}</Text>
+      </Pressable>
+    );
+  }
+  if (items.length < 2) return null;
+  return (
+    <View style={[styles.band, compactPicker && styles.compactBand]}>
+      {items.length === 2 && !compactPicker ? items.map(child => choice(child, true)) : (
+        <Pressable style={[styles.picker, compactPicker && styles.compactPicker]} accessibilityRole="button" accessibilityLabel={`Выбрать ребёнка: ${personName(selected)}, ${childStatus(statuses[selected.id])}`}
+          accessibilityState={{ expanded: open }}
+          onPress={() => setOpen(true)}>
+          <View style={styles.grow}>
+            <Text style={styles.name}>{personName(selected)}</Text>
+            {compactPicker ? (calendarContext ? <Text style={styles.status}>{calendarContext}</Text> : null) : <Text style={styles.status}>{childStatus(statuses[selected.id])}</Text>}
+          </View>
+          <IconSymbol name="chevron.down" size={22} color={styles.name.color} />
+        </Pressable>
+      )}
+      {open && <BottomSheet title="Выберите ребёнка" onClose={() => setOpen(false)}>
+        {items.map(child => choice(child, false))}
+      </BottomSheet>}
+    </View>
+  );
+}
+
+export function ParentSectionBar({ selected, showCalendar, showGroup = true, onSelect }: {
+  selected: ParentSection;
+  showCalendar: boolean;
+  showGroup?: boolean;
+  onSelect: (section: ParentSection) => void;
+}) {
+  const styles = useStyles();
+  const { bottom } = useSafeAreaInsets();
+  return (
+    <View style={[styles.bar, { paddingBottom: Math.max(bottom, space.xxs) }]} accessibilityRole="tablist">
+      {sections.filter(tab => (tab.id !== 'calendar' || showCalendar) && (tab.id !== 'group' || showGroup)).map(tab => (
+        <Pressable key={tab.id} accessibilityRole="tab" accessibilityState={{ selected: selected === tab.id }}
+          accessibilityLabel={tab.label}
+          style={styles.tab} onPress={() => onSelect(tab.id)}>
+          <View style={[styles.tabIcon, selected === tab.id && styles.selectedIcon]}>
+            <Ionicons name={tab.icon} size={22} color={selected === tab.id ? styles.selectedIcon.color : styles.tabIcon.color} />
+          </View>
+        </Pressable>
+      ))}
+    </View>
+  );
+}
+
+const useStyles = makeStyles(c => StyleSheet.create({
+  band: { flexDirection: 'row', alignSelf: 'center', width: '100%', maxWidth: 480, paddingHorizontal: space.lg,
+    paddingTop: space.sm, gap: space.md },
+  compactPicker: { paddingVertical: space.xxs },
+  compactBand: { paddingTop: 0 },
+  choice: { minHeight: controlHeight.touch, paddingVertical: space.sm, paddingHorizontal: space.sm,
+    borderBottomWidth: 2, borderColor: c.separator, justifyContent: 'center' },
+  half: { flex: 1 },
+  selected: { borderColor: c.actionPrimary },
+  name: { fontSize: typeSize.body, color: c.text, fontWeight: '600' },
+  status: { fontSize: typeSize.caption, color: c.textSecondary },
+  picker: { flex: 1, flexDirection: 'row', alignItems: 'center', paddingVertical: space.sm, minHeight: controlHeight.touch },
+  grow: { flex: 1 },
+  bar: { flexDirection: 'row', backgroundColor: c.card, borderTopWidth: StyleSheet.hairlineWidth, borderColor: c.separator },
+  tab: { flex: 1, minHeight: 48, justifyContent: 'center', alignItems: 'center' },
+  tabIcon: { alignItems: 'center', justifyContent: 'center', width: 46, height: 32, borderRadius: space.md, color: c.textSecondary },
+  selectedIcon: { backgroundColor: c.primarySoft, color: c.actionPrimary },
+}));

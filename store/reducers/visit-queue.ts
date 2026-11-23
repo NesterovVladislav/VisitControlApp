@@ -59,6 +59,12 @@ const visitQueueSlice = createSlice({
       state.status = 'loaded';
       state.refreshing = false;
     },
+    queueAccessDenied: (state) => {
+      state.items = [];
+      state.otherCount = 0;
+      state.status = 'failed';
+      state.refreshing = false;
+    },
     loadQueueFailure: (state) => {
       state.refreshing = false;
       // Если очередь уже была, оставляем её на экране
@@ -101,6 +107,7 @@ export const {
   loadQueueStart,
   loadQueueSuccess,
   loadQueueFailure,
+  queueAccessDenied,
   confirmMarkStart,
   rejectMarkStart,
   decideMarkSuccess,

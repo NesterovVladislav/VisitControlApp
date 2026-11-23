@@ -1,9 +1,10 @@
+import { AppModal } from './ui/android-safe-window';
+import { SheetControl } from './ui/sheet-control';
 import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
   FlatList,
-  Modal,
   Pressable,
   StyleSheet,
   Text,
@@ -111,20 +112,16 @@ export default function LinkChildSheet({ showBranch }: { showBranch: boolean }) 
   const pending = link?.status === 'pending';
 
   return (
-    <Modal visible animationType="slide" transparent onRequestClose={close}>
+    <AppModal visible animationType="fade" transparent onRequestClose={close}>
       <Pressable style={styles.backdrop} onPress={close} accessibilityLabel="Закрыть" />
       <View style={styles.sheet}>
         <View style={styles.sheetHeader}>
           {child ? (
-            <TouchableOpacity onPress={() => setChild(null)} accessibilityRole="button" hitSlop={8}>
-              <Text style={styles.link}>Назад</Text>
-            </TouchableOpacity>
+            <SheetControl back onPress={() => setChild(null)} />
           ) : (
             <View />
           )}
-          <TouchableOpacity onPress={close} accessibilityRole="button" hitSlop={8}>
-            <Text style={styles.link}>Отмена</Text>
-          </TouchableOpacity>
+          <SheetControl onPress={close} />
         </View>
         <Text style={styles.title}>Привязать ребёнка</Text>
         <Text style={styles.subtitle}>к {personName(adult)}</Text>
@@ -207,7 +204,7 @@ export default function LinkChildSheet({ showBranch }: { showBranch: boolean }) 
           </>
         )}
       </View>
-    </Modal>
+    </AppModal>
   );
 }
 

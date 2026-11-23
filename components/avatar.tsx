@@ -45,7 +45,7 @@ export default function Avatar({ firstName, surname, photoUrl, size = 44 }: Avat
       importantForAccessibility="no-hide-descendants"
     >
       <Text style={[styles.initials, { fontSize: size * 0.37 }]}>
-        {`${firstName.charAt(0)}${surname.charAt(0)}`.toUpperCase()}
+        {`${surname.charAt(0)}${firstName.charAt(0)}`.toUpperCase()}
       </Text>
     </View>
   );

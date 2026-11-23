@@ -1,21 +1,19 @@
+import { ProfileAccountActions } from '../../components/profile-account-actions';
 import { useFocusEffect } from '@react-navigation/native';
 import { Stack, useRouter } from 'expo-router';
 import React, { useCallback } from 'react';
-import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { RefreshControl } from '../../components/ui/refresh-control';
 import PhotoEditor from '@/components/photo-editor';
 import ProfileChildren from '@/components/profile-children';
-import ProfileSummary from '@/components/profile-summary';
 import SegmentedControl from '@/components/segmented-control';
 import { ActionButton } from '@/components/ui';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { space } from '../../constants/ui-tokens';
 import { useAppDispatch, useAppSelector } from '../../store';
-import { logoutRequested } from '../../store/reducers/auth';
 import { refreshProfile } from '../../store/reducers/profile';
 import { canAddChild } from '../../utils/child-requests';
-import { getAppVersionLabel } from '../../utils/app-version';
-import { formatBirthDate, formatPhoneForDisplay, genderLabel } from '../../utils/profile-format';
+import { formatBirthDate, formatPhoneForDisplay, genderLabel, roleLabel } from '../../utils/profile-format';
 import { makeStyles, usePalette } from '../../hooks/use-palette';
 import { useThemePreference } from '../../hooks/use-theme-preference';
 import { ThemePreference } from '../../services/theme/theme-preference';
@@ -76,13 +74,6 @@ export default function ProfileScreen() {
     }, [dispatch])
   );
 
-  function confirmLogout() {
-    Alert.alert('Выйти из аккаунта?', undefined, [
-      { text: 'Отмена', style: 'cancel' },
-      { text: 'Выйти', style: 'destructive', onPress: () => dispatch(logoutRequested({ reason: 'user' })) },
-    ]);
-  }
-
   if (!user) {
     return null;
   }
@@ -105,15 +96,15 @@ export default function ProfileScreen() {
         }}
       />
       {/* Свою фотографию меняет сам пользователь; у технического администратора сада и фотографии нет */}
-      <PhotoEditor
+      <View style={styles.card}>
+        <PhotoEditor
         userId={user.id}
         firstName={user.firstName}
         surname={user.surname}
         photoUrl={user.photoUrl}
+        subtitle={[roleLabel(user.role), user.organization?.name].filter(Boolean).join(' · ')}
         canEdit={user.organization !== null}
-      />
-      <View style={[styles.card, styles.summary]}>
-        <ProfileSummary user={user} hideAvatar />
+        />
       </View>
 
       <InfoCard
@@ -152,12 +143,7 @@ export default function ProfileScreen() {
         </Text>
       </View>
 
-      <View style={styles.card}>
-        <TouchableOpacity style={styles.actionRow} onPress={confirmLogout} accessibilityRole="button">
-          <Text style={styles.logout}>Выйти</Text>
-        </TouchableOpacity>
-      </View>
-      <Text style={styles.version} selectable>{getAppVersionLabel()}</Text>
+      <ProfileAccountActions role={user.role} />
     </ScrollView>
   );
 }
@@ -192,11 +178,6 @@ const useStyles = makeStyles((c) =>
       shadowOpacity: 0.1,
       shadowRadius: 4,
       elevation: 3,
-    },
-    summary: {
-      flexDirection: 'row',
-      padding: 16,
-      marginBottom: 20,
     },
     sectionTitle: {
       fontSize: 12,
@@ -242,13 +223,6 @@ const useStyles = makeStyles((c) =>
     logout: {
       fontSize: 16,
       color: c.danger,
-    },
-    version: {
-      fontSize: 13,
-      lineHeight: 18,
-      color: c.textSecondary,
-      textAlign: 'center',
-      marginBottom: 4,
     },
   })
 );

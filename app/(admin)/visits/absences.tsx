@@ -1,96 +1,82 @@
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { useFocusEffect } from '@react-navigation/native';
+import { useLocalSearchParams } from 'expo-router';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { Pressable, SectionList, StyleSheet, Text, View } from 'react-native';
 
-import OptionSheet, { SheetOption } from '../../../components/option-sheet';
+import AbsenceCalendar from '../../../components/absence-calendar';
+import { periodLabel } from '../../../components/calendar-absence-entry';
+import OptionSheet, { SheetSection } from '../../../components/option-sheet';
 import { ActionButton, BottomSheet, FormField, StatusMessage } from '../../../components/ui';
-import { IconSymbol } from '../../../components/ui/icon-symbol';
 import { RefreshControl } from '../../../components/ui/refresh-control';
-import { LoadState, useVisitListStyles } from '../../../components/visit-list';
+import { LoadState } from '../../../components/visit-list';
 import { controlHeight, radius, space, typeSize } from '../../../constants/ui-tokens';
 import { makeStyles, usePalette } from '../../../hooks/use-palette';
 import { AbsenceDay, AbsenceDayRow, getAbsenceDay, getNeighboringAbsenceDay } from '../../../services/api/absence-day';
 import { ApiError } from '../../../services/errors/api-error';
+import { absenceDateLabel, absentChildrenLabel } from '../../../utils/absence-day-labels';
 import { formatDate, parseDate } from '../../../utils/input-masks';
 import { plural } from '../../../utils/plural';
 import { formatBirthDate } from '../../../utils/profile-format';
 
 type Request = { type: 'date'; date?: string } | { type: 'neighbor'; date: string; direction: -1 | 1 };
-type Section = { key: string; branch: string; title: string; data: AbsenceDayRow[] };
-type Filter = 'branch' | 'group';
+type Scope = { groupId?: string; branchId?: string; name: string };
+const allGroups: Scope = { name: 'Все группы' };
 
-function countLabel(absent: number, total: number | null): string {
-  return total !== null && total >= absent ? `${absent} из ${total}` : String(absent);
-}
-
-function sectionsFor(day: AbsenceDay, branchId: string | null, groupId: string | null, lateOnly: boolean): Section[] {
-  return day.branches
-    .filter((branch) => !branchId || branchId === branch.id)
-    .flatMap((branch) => branch.groups
-      .filter((group) => !groupId || groupId === group.id)
-      .map((group) => {
-        const data = group.absences
-          .filter((row) => !lateOnly || row.late)
-          .sort((first, second) => first.childName.localeCompare(second.childName, 'ru'));
-        return {
-          key: group.id,
-          branch: day.branches.length > 1 ? branch.name : '',
-          title: `${group.name} · не будет ${countLabel(data.length, group.totalChildren)}`,
-          data,
-        };
-      }))
-    .filter((section) => !lateOnly || section.data.length > 0);
+function scopeOptions(report: AbsenceDay, scope: Scope, select: (value: Scope) => void): SheetSection[] {
+  return [
+    { key: 'all', title: '', data: [{ key: 'all', label: allGroups.name,
+      selected: !scope.groupId && !scope.branchId, onPress: () => select(allGroups) }] },
+    ...report.branches.map(branch => ({
+      key: branch.id, title: report.branches.length > 1 ? branch.name : '',
+      data: [
+        ...(report.branches.length > 1 ? [{ key: 'branch-' + branch.id, label: 'Все группы филиала',
+          selected: scope.branchId === branch.id, onPress: () => select({ branchId: branch.id, name: branch.name }) }] : []),
+        ...branch.groups.map(group => ({ key: group.id, label: group.name, selected: scope.groupId === group.id,
+          onPress: () => select({ groupId: group.id, name: group.name }) })),
+      ],
+    })),
+  ];
 }
 
 export default function AbsencesScreen() {
   const c = usePalette();
-  const styles = useStyles();
-  const listStyles = useVisitListStyles();
+  const s = useStyles();
+  const params = useLocalSearchParams<{ groupId?: string; groupName?: string; date?: string }>();
+  const [scope, setScope] = useState<Scope>(() => params.groupId ? { groupId: params.groupId, name: params.groupName || 'Выбранная группа' } : allGroups);
   const [report, setReport] = useState<AbsenceDay | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | undefined>();
-  const [draftDate, setDraftDate] = useState('');
-  const [dateError, setDateError] = useState<string | undefined>();
-  const [branchId, setBranchId] = useState<string | null>(null);
-  const [groupId, setGroupId] = useState<string | null>(null);
+  const [error, setError] = useState<string>();
   const [lateOnly, setLateOnly] = useState(false);
-  const [filter, setFilter] = useState<Filter | null>(null);
-  const [details, setDetails] = useState<{ row: AbsenceDayRow; date: string } | null>(null);
+  const [sheet, setSheet] = useState<'scope' | 'time' | 'date' | null>(null);
+  const [details, setDetails] = useState<AbsenceDayRow | null>(null);
   const active = useRef<AbortController | null>(null);
-  const selected = useRef<string | undefined>(undefined);
-  const lastRequest = useRef<Request>({ type: 'date' });
+  const selected = useRef(params.date && /^\d{4}-\d{2}-\d{2}$/.test(params.date) ? params.date : undefined);
+  const lastRequest = useRef<Request>({ type: 'date', date: selected.current });
 
   const load = useCallback(async (request: Request) => {
     active.current?.abort();
     const controller = new AbortController();
     active.current = controller;
     lastRequest.current = request;
-    setError(undefined);
     setDetails(null);
+    setSheet(null);
+    setError(undefined);
     setLoading(true);
     try {
-      const next = request.type === 'date'
-        ? await getAbsenceDay(request.date, controller.signal)
+      const next = request.type === 'date' ? await getAbsenceDay(request.date, controller.signal)
         : await getNeighboringAbsenceDay(request.date, request.direction, controller.signal);
       if (controller.signal.aborted) return;
       selected.current = request.type === 'date' ? request.date : next.date;
       setReport(next);
-      setDraftDate(formatBirthDate(next.date) ?? '');
-      setDateError(undefined);
       if (!next.deadline) setLateOnly(false);
-      if (request.type === 'neighbor' || request.date) {
-        setBranchId((id) => next.branches.some((branch) => branch.id === id) ? id : null);
-        setGroupId((id) => next.branches.some((branch) => branch.groups.some((group) => group.id === id)) ? id : null);
-      }
     } catch (cause) {
-      if (!controller.signal.aborted) {
-        if (cause instanceof ApiError && (cause.status === 401 || cause.status === 403)) {
-          setReport(null);
-          setDetails(null);
-          setError('У вас нет доступа к списку отсутствующих');
-        } else {
-          setError('Не удалось загрузить список отсутствующих');
-        }
+      if (controller.signal.aborted) return;
+      if (cause instanceof ApiError && (cause.status === 401 || cause.status === 403)) {
+        setReport(null);
+        setError('У вас нет доступа к списку отсутствующих');
+      } else {
+        setError('Не удалось загрузить список отсутствующих');
       }
     } finally {
       if (!controller.signal.aborted) {
@@ -105,253 +91,189 @@ export default function AbsencesScreen() {
     return () => active.current?.abort();
   }, [load]));
 
-  const sections = useMemo(() => report?.working
-    ? sectionsFor(report, branchId, groupId, lateOnly)
-    : [], [report, branchId, groupId, lateOnly]);
-  const branches = report?.branches ?? [];
-  const groups = branches.filter((branch) => !branchId || branch.id === branchId).flatMap((branch) => branch.groups);
-  const branch = branches.find((item) => item.id === branchId);
-  const group = groups.find((item) => item.id === groupId);
-  const scope = group ? [group] : groups;
-  // У группы «Без группы» сервер может не знать численность, а общий итог может её исключать.
-  const unavailableTotal = scope.some((item) => item.totalChildren == null && item.absences.length > 0);
-  const totals = !branch && !group
-    ? { children: report?.totalChildren ?? null, absent: report?.absentChildren ?? 0, late: report?.lateChildren ?? 0 }
-    : scope.reduce((sum, item) => ({
-      children: sum.children + (item.totalChildren ?? 0),
-      absent: sum.absent + item.absences.length,
-      late: sum.late + item.absences.filter((row) => row.late).length,
-    }), { children: 0, absent: 0, late: 0 });
+  const sections = useMemo(() => report?.working ? report.branches
+    .filter(branch => !scope.branchId || scope.branchId === branch.id)
+    .flatMap(branch => branch.groups.filter(group => !scope.groupId || group.id === scope.groupId)
+      .map(group => ({
+        key: group.id, name: group.name, branch: branch.name, total: group.totalChildren,
+        absent: group.absences.length, late: group.absences.filter(row => row.late).length,
+        data: group.absences.filter(row => !lateOnly || row.late).sort((a, b) => a.childName.localeCompare(b.childName, 'ru')),
+      }))) : [], [report, scope, lateOnly]);
+  const completeScope = !scope.groupId && !scope.branchId;
+  const absent = completeScope ? report?.absentChildren ?? 0 : sections.reduce((total, section) => total + section.absent, 0);
+  const late = completeScope ? report?.lateChildren ?? 0 : sections.reduce((total, section) => total + section.late, 0);
+  const options = report ? scopeOptions(report, scope, setScope) : [];
+  const canSelectScope = !!report && (!completeScope || report.branches.length > 1 || report.branches.some(b => b.groups.length > 1));
+  const chosen = sections[0];
+  const duplicateName = scope.groupId && chosen && report?.branches.some(branch =>
+    branch.groups.some(group => group.id !== chosen.key && group.name === chosen.name));
+  const scopeName = scope.groupId && chosen ? [chosen.name, duplicateName && chosen.branch].filter(Boolean).join(' · ') : scope.name;
+  const missingScope = !!report?.working && !completeScope && sections.length === 0;
+  const summary = absentChildrenLabel(absent);
+  const empty = report?.working && !missingScope && !loading && !error && (lateOnly ? late === 0 : absent === 0);
+  const hasLateFilter = !!report?.deadline && (late > 0 || lateOnly);
+  const dayLabel = report ? absenceDateLabel(report.date, true) : '';
 
-  function applyDate() {
-    const parsed = parseDate(draftDate);
-    if (!parsed) {
-      setDateError('Введите дату в формате ДД.ММ.ГГГГ');
-      return;
-    }
-    void load({ type: 'date', date: parsed.iso });
-  }
-
-  function changeBranch(id: string | null) {
-    setBranchId(id);
-    setGroupId(null);
-  }
-
-  const options: SheetOption[] = filter === 'branch'
-    ? [
-      { key: 'all-branches', label: 'Все филиалы', selected: !branchId, onPress: () => changeBranch(null) },
-      ...branches.map((item) => ({
-        key: item.id, label: item.name, selected: item.id === branchId, onPress: () => changeBranch(item.id),
-      })),
-    ]
-    : [
-      { key: 'all-groups', label: 'Все группы', selected: !groupId, onPress: () => setGroupId(null) },
-      ...groups.map((item) => ({
-        key: item.id, label: item.name, selected: item.id === groupId, onPress: () => setGroupId(item.id),
-      })),
-    ];
-
-  if (!report && loading) return <View style={styles.screen}><LoadState status="loading" onRetry={() => {}} /></View>;
-
-  return (
-    <View style={styles.screen}>
-      <SectionList
-        sections={sections}
-        keyExtractor={(item) => item.id}
-        stickySectionHeadersEnabled={false}
-        keyboardShouldPersistTaps="handled"
-        contentContainerStyle={listStyles.listContainer}
-        refreshControl={<RefreshControl refreshing={loading} onRefresh={() => void load({ type: 'date', date: selected.current })} />}
-        ListHeaderComponent={
-          <View>
-            {report ? (
-              <>
-                <View style={styles.dayBar}>
-                  <Pressable
-                    accessibilityRole="button"
-                    accessibilityLabel="Предыдущий рабочий день"
-                    disabled={loading}
-                    onPress={() => void load({ type: 'neighbor', date: report.date, direction: -1 })}
-                    style={({ pressed }) => [styles.arrow, pressed && styles.arrowPressed]}
-                  >
-                    <IconSymbol name="chevron.right" size={20} style={styles.arrowBack} color={loading ? c.textTertiary : c.actionPrimary} />
-                  </Pressable>
-                  <Text accessibilityRole="header" style={styles.heading}>{formatBirthDate(report.date)}</Text>
-                  <Pressable
-                    accessibilityRole="button"
-                    accessibilityLabel="Следующий рабочий день"
-                    disabled={loading}
-                    onPress={() => void load({ type: 'neighbor', date: report.date, direction: 1 })}
-                    style={({ pressed }) => [styles.arrow, pressed && styles.arrowPressed]}
-                  >
-                    <IconSymbol name="chevron.right" size={20} color={loading ? c.textTertiary : c.actionPrimary} />
-                  </Pressable>
-                </View>
-                <View style={styles.dateForm}>
-                  <View style={styles.dateInput}>
-                    <FormField
-                      label="Дата"
-                      placeholder="ДД.ММ.ГГГГ"
-                      keyboardType="numeric"
-                      value={draftDate}
-                      onChangeText={(value) => { setDraftDate(formatDate(value)); setDateError(undefined); }}
-                      onSubmitEditing={applyDate}
-                      error={dateError}
-                      returnKeyType="go"
-                      editable={!loading}
-                    />
-                  </View>
-                  <View style={styles.dateAction}>
-                    <ActionButton label="Показать" variant="text" onPress={applyDate} disabled={loading} />
-                  </View>
-                </View>
-                {report.working && (
-                  <>
-                    <Text style={listStyles.total}>Не придут {countLabel(totals.absent, unavailableTotal ? null : totals.children)}</Text>
-                    {report.deadline ? <Text style={styles.secondary}>Срок {report.deadline}. После срока — {totals.late}</Text> : null}
-                    {branches.length > 1 || groups.length > 1 || report.deadline ? (
-                      <View style={styles.filters}>
-                        {branches.length > 1 && (
-                          <ActionButton label={branch?.name ?? 'Все филиалы'} variant="text" onPress={() => setFilter('branch')} />
-                        )}
-                        {groups.length > 1 && (
-                          <ActionButton label={group?.name ?? 'Все группы'} variant="text" onPress={() => setFilter('group')} />
-                        )}
-                        {report.deadline && (
-                          <ActionButton
-                            label={lateOnly ? 'После срока · включено' : 'Только после срока'}
-                            variant="text"
-                            onPress={() => setLateOnly((value) => !value)}
-                          />
-                        )}
-                      </View>
-                    ) : null}
-                  </>
-                )}
-              </>
-            ) : null}
-            {error ? (
-              <>
-                <StatusMessage message={error} tone="error" />
-                <ActionButton label="Повторить" variant="text" onPress={() => void load(lastRequest.current)} />
-              </>
-            ) : null}
-            {report && !report.working ? <StatusMessage message="Сад в этот день не работает" /> : null}
-            {report?.working && !error && totals.absent === 0 && !lateOnly ? (
-              <StatusMessage message="Пока никто не предупредил" />
-            ) : null}
-            {report?.working && !error && lateOnly && sections.length === 0 ? (
-              <StatusMessage message="Нет сообщений после срока" />
-            ) : null}
-            {report?.working && !error && lateOnly && sections.length > 0 ? (
-              <StatusMessage message="Показаны сообщения после срока. Оплата указана для каждого ребёнка." />
-            ) : null}
+  if (!report && loading) return <View style={s.screen}><LoadState status="loading" onRetry={() => {}} /></View>;
+  return <View style={s.screen}>
+    <SectionList
+      sections={sections.filter(section => section.data.length > 0)}
+      keyExtractor={row => row.id}
+      stickySectionHeadersEnabled={false}
+      contentContainerStyle={s.content}
+      refreshControl={<RefreshControl refreshing={loading} onRefresh={() => void load({ type: 'date', date: selected.current })} />}
+      ListHeaderComponent={<View style={s.controls}>
+        {report && <>
+          <View style={s.dayBar}>
+            <Pressable accessibilityRole="button" accessibilityLabel="Предыдущий рабочий день" disabled={loading}
+              style={s.arrow} onPress={() => void load({ type: 'neighbor', date: report.date, direction: -1 })}>
+              <Ionicons name="chevron-back" size={19} color={loading ? c.disabled : c.actionPrimary} />
+            </Pressable>
+            <Pressable accessibilityRole="button" accessibilityLabel={`Выбрать дату. ${dayLabel}`} disabled={loading}
+              style={s.dateControl} onPress={() => setSheet('date')}>
+              <Ionicons name="calendar-outline" size={18} color={c.actionPrimary} />
+              <Text style={[s.headline, s.dateTitle]}>{dayLabel}</Text>
+            </Pressable>
+            <Pressable accessibilityRole="button" accessibilityLabel="Следующий рабочий день" disabled={loading}
+              style={s.arrow} onPress={() => void load({ type: 'neighbor', date: report.date, direction: 1 })}>
+              <Ionicons name="chevron-forward" size={19} color={loading ? c.disabled : c.actionPrimary} />
+            </Pressable>
           </View>
-        }
-        renderSectionHeader={({ section }) => (
-          <View style={styles.section}>
-            {section.branch ? <Text style={styles.secondary}>{section.branch}</Text> : null}
-            <Text accessibilityRole="header" style={listStyles.sectionTitle}>{section.title}</Text>
-          </View>
-        )}
-        renderItem={({ item, index, section }) => (
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={`Подробнее об отсутствии: ${item.childName}`}
-            onPress={() => report && setDetails({ row: item, date: report.date })}
-            style={({ pressed }) => [
-              listStyles.row,
-              index === 0 && listStyles.rowFirst,
-              index === section.data.length - 1 && listStyles.rowLast,
-              pressed && styles.rowPressed,
-            ]}
-          >
-            <AbsenceRow row={item} date={report?.date} />
-            <IconSymbol name="chevron.right" size={20} color={c.textSecondary} />
-          </Pressable>
-        )}
-      />
-      <OptionSheet
-        visible={Boolean(filter)}
-        title={filter === 'branch' ? 'Филиал' : 'Группа'}
-        sections={[{ key: 'filters', title: '', data: options }]}
-        onClose={() => setFilter(null)}
-      />
-      {details && (
-        <AbsenceDetails row={details.row} date={details.date} onClose={() => setDetails(null)} />
-      )}
+          {(canSelectScope || hasLateFilter) && <View style={s.filters}>
+            {canSelectScope && <Pressable accessibilityRole="button" accessibilityLabel={`Группы. ${scopeName}`}
+              onPress={() => setSheet('scope')} style={s.scope}>
+              <Ionicons name="people-outline" size={20} color={c.textSecondary} />
+              <Text style={[s.headline, s.fill]}>{scopeName}</Text>
+              <Ionicons name="chevron-down" size={16} color={c.textSecondary} />
+            </Pressable>}
+            {hasLateFilter && <Pressable accessibilityRole="button" accessibilityLabel="Фильтр по времени сообщения"
+              accessibilityState={{ selected: lateOnly }} onPress={() => setSheet('time')} style={[s.arrow, s.filterButton, lateOnly && s.active]}>
+              <Ionicons name="filter-outline" size={19} color={lateOnly ? c.actionPrimary : c.textSecondary} />
+            </Pressable>}
+          </View>}
+          {report.working && absent > 0 && <Text style={s.summary}>
+            {lateOnly ? `Сообщили позже · ${late} из ${absent}` : summary.charAt(0).toUpperCase() + summary.slice(1)}
+          </Text>}
+          {!report.working && <StatusMessage message="Сад в этот день не работает" />}
+          {missingScope && !loading && !error && <StatusMessage message={scope.groupId
+            ? 'На эту дату нет данных по выбранной группе' : 'На эту дату нет данных по выбранному филиалу'} />}
+          {empty && <View style={s.empty}>
+            <Text style={s.secondary}>{lateOnly ? 'Все предупредили вовремя' : 'На эту дату сообщений нет'}</Text>
+            <ActionButton variant="text" label={lateOnly ? 'Показать все сообщения' : 'Выбрать дату'}
+              onPress={() => lateOnly ? setLateOnly(false) : setSheet('date')} />
+          </View>}
+        </>}
+        {error && <><StatusMessage message={error} tone="error" />
+          <ActionButton label="Повторить" variant="text" onPress={() => void load(lastRequest.current)} /></>}
+      </View>}
+      renderSectionHeader={({ section }) => scope.groupId ? null : <View style={s.groupHead}>
+        <View style={s.fill}>
+          {!scope.branchId && (report?.branches.length ?? 0) > 1 && <Text style={s.secondary}>{section.branch}</Text>}
+          <Text accessibilityRole="header" style={s.headline}>{section.name}</Text>
+        </View>
+        <Text style={s.secondary}>{section.total != null && section.total >= section.data.length
+          ? `${section.data.length} из ${section.total}` : section.data.length}</Text>
+      </View>}
+      renderItem={({ item, section, index }) => <Pressable accessibilityRole="button"
+        accessibilityLabel={`Подробнее об отсутствии: ${item.childName}`} onPress={() => setDetails(item)}
+        style={({ pressed }) => [s.row, scope.groupId && index === 0 && s.first, index === section.data.length - 1 && s.last, pressed && s.active]}>
+        <View style={s.fill}>
+          <Text style={s.headline}>{item.childName}</Text>
+          <Text style={s.secondary}>{item.reason} · {periodLabel(item.from, item.to, report!.date)}</Text>
+          {item.late && <View style={s.late}><Ionicons name="time-outline" size={14} color={c.textSecondary} />
+            <Text style={s.caption}>Сообщили позже</Text></View>}
+        </View>
+        <Ionicons name="chevron-forward" size={17} color={c.textSecondary} />
+      </Pressable>}
+    />
+    <OptionSheet visible={sheet === 'scope' || sheet === 'time'} title={sheet === 'time' ? 'Время сообщения' : 'Группы'} onClose={() => setSheet(null)}
+      sections={[
+        ...(sheet === 'scope' ? options : []),
+        ...(sheet === 'time' ? [{ key: 'time', title: '', data: [
+          { key: 'all-messages', label: 'Все сообщения', selected: !lateOnly, onPress: () => setLateOnly(false) },
+          { key: 'late', label: 'Сообщили позже', selected: lateOnly, onPress: () => setLateOnly(true) },
+        ] }] : []),
+      ]} />
+    {sheet === 'date' && report && <DateSheet date={report.date} close={() => setSheet(null)}
+      choose={date => void load({ type: 'date', date })} />}
+    {details && report && <AbsenceDetails row={details} report={report} close={() => setDetails(null)} />}
+  </View>;
+}
+
+function DateSheet({ date, close, choose }: { date: string; close: () => void; choose: (iso: string) => void }) {
+  const [manual, setManual] = useState(false);
+  const [draft, setDraft] = useState(formatBirthDate(date) ?? '');
+  const [error, setError] = useState<string>();
+  const apply = () => {
+    const parsed = parseDate(draft);
+    if (parsed) choose(parsed.iso);
+    else setError('Введите дату в формате ДД.ММ.ГГГГ');
+  };
+  return <BottomSheet title="Выбрать дату" onClose={close}>
+    {manual ? <>
+      <FormField label="Дата" placeholder="ДД.ММ.ГГГГ" keyboardType="numeric" value={draft}
+        onChangeText={value => { setDraft(formatDate(value)); setError(undefined); }}
+        onSubmitEditing={apply} returnKeyType="go" error={error} />
+      <ActionButton label="Показать" onPress={apply} />
+    </> : <AbsenceCalendar selected={date} min="0100-01-01" max="9999-12-31" onChoose={choose} />}
+    <ActionButton label={manual ? 'Выбрать в календаре' : 'Ввести дату'} variant="text" onPress={() => setManual(!manual)} />
+  </BottomSheet>;
+}
+
+function AbsenceDetails({ row, report, close }: { row: AbsenceDayRow; report: AbsenceDay; close: () => void }) {
+  const s = useStyles();
+  const meta = [
+    { label: 'Предупредить до', value: report.deadline },
+    { label: 'Сообщение получено', value: row.created },
+    { label: `Оплата за ${absenceDateLabel(report.date)}`, value: row.late ? (row.charged ? 'Начислена' : 'Снята') : null },
+  ].filter(item => item.value);
+  return <BottomSheet title="Отсутствие" onClose={close}>
+    <View style={s.fill}>
+      <Text accessibilityRole="header" style={s.headline}>{row.childName}</Text>
+      <Text style={s.secondary}>{row.reason} · {periodLabel(row.from, row.to, report.date)}</Text>
+      {row.remainingDays != null && row.remainingDays > 0 && <Text style={s.secondary}>
+        Ещё {row.remainingDays} {plural(row.remainingDays, ['рабочий день', 'рабочих дня', 'рабочих дней'])}
+      </Text>}
     </View>
-  );
+    {(row.comment || row.author) && <View style={s.fill}>
+      {row.comment && <Text style={s.text}>«{row.comment}»</Text>}
+      {row.author && <Text style={s.secondary}>{row.author}</Text>}
+    </View>}
+    {meta.length > 0 && <View>{meta.map(item => <View key={item.label} style={s.meta}>
+      <Text style={s.metaLabel}>{item.label}</Text><Text style={s.metaValue}>{item.value}</Text>
+    </View>)}</View>}
+  </BottomSheet>;
 }
 
-function AbsenceRow({ row, date, detailed = false }: { row: AbsenceDayRow; date?: string; detailed?: boolean }) {
-  const styles = useStyles();
-  const listStyles = useVisitListStyles();
-  const from = formatBirthDate(row.from);
-  const to = formatBirthDate(row.to);
-  const days = row.remainingDays;
-  return (
-    <View style={detailed ? styles.detailsBody : styles.rowBody}>
-      <View style={styles.rowBody}>
-        <Text accessibilityRole={detailed ? 'header' : undefined} style={[listStyles.rowTitle, styles.rowName]}>
-          {row.childName}
-        </Text>
-        <Text style={styles.secondary}>{row.from === row.to ? from : `${from} — ${to}`}</Text>
-      </View>
-      <View style={styles.rowBody}>
-        <Text style={detailed ? styles.comment : styles.secondary}>
-          {row.reason}
-          {days !== null && days > 0 ? ` · ещё ${days} ${plural(days, ['рабочий день', 'рабочих дня', 'рабочих дней'])}` : ''}
-        </Text>
-        {detailed && row.comment ? <Text style={styles.comment}>«{row.comment}»</Text> : null}
-      </View>
-      {detailed && (row.author || row.created) ? (
-        <Text style={styles.secondary}>
-          {row.author ? `Сообщил(а) ${row.author}` : 'Сообщение получено'}
-          {row.created ? ` · ${row.created}` : ''}
-        </Text>
-      ) : null}
-      {row.late ? (
-        <Text style={row.charged ? styles.charged : styles.secondary}>
-          {formatBirthDate(date ?? null)} · сообщили после срока{row.charged ? ' · день оплачивается' : ' · оплата снята'}
-        </Text>
-      ) : null}
-    </View>
-  );
-}
-
-function AbsenceDetails({ row, date, onClose }: { row: AbsenceDayRow; date: string; onClose: () => void }) {
-  return (
-    <BottomSheet title="Сообщение об отсутствии" onClose={onClose}>
-      <AbsenceRow row={row} date={date} detailed />
-    </BottomSheet>
-  );
-}
-
-const useStyles = makeStyles((c) => StyleSheet.create({
+const useStyles = makeStyles(c => StyleSheet.create({
   screen: { flex: 1, backgroundColor: c.background },
-  dayBar: {
-    borderRadius: radius.card,
-    backgroundColor: c.card,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: space.md,
-  },
-  arrow: { width: controlHeight.touch, minHeight: controlHeight.touch, alignItems: 'center', justifyContent: 'center' },
-  arrowBack: { transform: [{ rotate: '180deg' }] },
-  arrowPressed: { backgroundColor: c.primarySoft, borderRadius: radius.control },
-  heading: { color: c.text, fontSize: typeSize.body, fontWeight: '700', paddingVertical: space.sm },
-  dateForm: { flexDirection: 'row', gap: space.sm },
-  dateInput: { flex: 1 },
-  dateAction: { marginTop: space.xxl },
-  filters: { flexDirection: 'row', flexWrap: 'wrap', marginBottom: space.sm },
-  section: { marginTop: space.sm },
-  rowBody: { flex: 1, minWidth: 0, gap: space.xxs },
-  rowPressed: { backgroundColor: c.primarySoft },
-  rowName: { fontWeight: '600' },
-  comment: { color: c.text, fontSize: typeSize.label },
-  secondary: { color: c.textSecondary, fontSize: typeSize.caption },
-  charged: { color: c.danger, fontSize: typeSize.caption, fontWeight: '600' },
-  detailsBody: { gap: space.md },
+  content: { alignSelf: 'center', width: '100%', maxWidth: 480, paddingHorizontal: space.lg, paddingTop: space.md, paddingBottom: space.xxl },
+  controls: { gap: space.sm, marginBottom: space.sm },
+  dayBar: { alignSelf: 'center', maxWidth: '100%', flexDirection: 'row', alignItems: 'center', borderRadius: radius.card, backgroundColor: c.card },
+  arrow: { width: controlHeight.touch, minHeight: controlHeight.touch, justifyContent: 'center', alignItems: 'center' },
+  dateControl: { flexShrink: 1, flexDirection: 'row', alignItems: 'center', gap: space.sm, paddingHorizontal: space.sm, minHeight: controlHeight.touch },
+  dateTitle: { flexShrink: 1, textAlign: 'center' },
+  filters: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
+  scope: { flex: 1, borderRadius: radius.card, backgroundColor: c.card, flexDirection: 'row', alignItems: 'center', gap: space.md,
+    minHeight: controlHeight.field, paddingHorizontal: space.lg, paddingVertical: space.sm },
+  filterButton: { borderRadius: radius.control, backgroundColor: c.card, marginLeft: 'auto' },
+  active: { backgroundColor: c.primarySoft },
+  empty: { paddingVertical: space.xxl, alignItems: 'center', gap: space.sm },
+  summary: { color: c.text, fontSize: typeSize.body, paddingHorizontal: space.xxs, marginTop: space.xs },
+  groupHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space.sm, backgroundColor: c.card,
+    paddingHorizontal: space.lg, paddingVertical: space.md, borderTopLeftRadius: radius.card, borderTopRightRadius: radius.card,
+    borderBottomWidth: StyleSheet.hairlineWidth, borderColor: c.separator },
+  row: { flexDirection: 'row', alignItems: 'center', gap: space.sm, paddingVertical: space.md, paddingHorizontal: space.lg, backgroundColor: c.card,
+    minHeight: controlHeight.action, borderBottomWidth: StyleSheet.hairlineWidth, borderColor: c.separator },
+  first: { borderTopLeftRadius: radius.card, borderTopRightRadius: radius.card },
+  last: { borderBottomLeftRadius: radius.card, borderBottomRightRadius: radius.card, marginBottom: space.md, borderBottomWidth: 0 },
+  fill: { flexGrow: 1, flexShrink: 1, minWidth: 0, gap: space.xxs },
+  headline: { color: c.text, fontSize: typeSize.body, fontWeight: '600' },
+  text: { color: c.text, fontSize: typeSize.body },
+  secondary: { color: c.textSecondary, fontSize: typeSize.label },
+  late: { flexDirection: 'row', gap: space.xxs, alignItems: 'center' },
+  caption: { color: c.textSecondary, fontSize: typeSize.caption },
+  meta: { borderTopWidth: StyleSheet.hairlineWidth, borderColor: c.separator, paddingVertical: space.md, flexDirection: 'row', gap: space.sm, alignItems: 'center' },
+  metaLabel: { flex: 1, color: c.textSecondary, fontSize: typeSize.label },
+  metaValue: { flexShrink: 1, maxWidth: '55%', textAlign: 'right', color: c.text, fontSize: typeSize.label },
 }));

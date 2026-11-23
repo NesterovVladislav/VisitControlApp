@@ -4,7 +4,7 @@ import { visitControlApi } from '../../services/api';
 import { ApiError } from '../../services/errors/api-error';
 import { loadOrganizationBrand, saveOrganizationBrand } from '../../services/organization/organization-brand';
 import { RootState } from '../reducers';
-import { bootstrapSession, validationSucceeded } from '../reducers/auth';
+import { bootstrapSession, logoutRequested, validationSucceeded } from '../reducers/auth';
 import { brandLoaded } from '../reducers/organization';
 import { User } from '../types/auth';
 import { OrganizationBrand } from '../types/organization';
@@ -44,5 +44,7 @@ export function* loadBrandSaga(action: PayloadAction<User>) {
 
 export function* watchOrganization() {
   yield takeLeading(bootstrapSession.type, restoreBrandSaga);
-  yield takeLatest(validationSucceeded.type, loadBrandSaga);
+  yield takeLatest([validationSucceeded.type, logoutRequested.type], function* (action: ReturnType<typeof validationSucceeded> | ReturnType<typeof logoutRequested>) {
+    if (validationSucceeded.match(action)) yield* loadBrandSaga(action);
+  });
 }

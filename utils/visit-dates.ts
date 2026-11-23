@@ -21,7 +21,7 @@ export function localDayKey(iso: string): string {
 }
 
 /** «Сегодня», «Вчера, 24 сентября», «24 сентября», «24 сентября 2025» */
-export function dayTitle(iso: string, now: Date = new Date()): string {
+export function dayTitle(iso: string, now: Date = new Date(), includeTodayDate = false): string {
   const date = new Date(iso);
   if (!isValid(date)) {
     return 'Дата неизвестна';
@@ -29,7 +29,7 @@ export function dayTitle(iso: string, now: Date = new Date()): string {
   const days = Math.round((startOfDay(now) - startOfDay(date)) / 86_400_000);
   const dayMonth = `${date.getDate()} ${MONTHS[date.getMonth()]}`;
   if (days === 0) {
-    return 'Сегодня';
+    return includeTodayDate ? `Сегодня, ${dayMonth}` : 'Сегодня';
   }
   if (days === 1) {
     return `Вчера, ${dayMonth}`;

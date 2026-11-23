@@ -15,7 +15,7 @@ export function fullName(user: Pick<User, 'surname' | 'firstName' | 'patronymic'
 
 /** «МИ»: имя и фамилия, как принято в аватарах. */
 export function initials(user: Pick<User, 'surname' | 'firstName'>): string {
-  return `${user.firstName.charAt(0)}${user.surname.charAt(0)}`.toUpperCase();
+  return `${user.surname.charAt(0)}${user.firstName.charAt(0)}`.toUpperCase();
 }
 
 export function roleLabel(role: string): string {

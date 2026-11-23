@@ -114,13 +114,14 @@ describe('administrator route authorization', () => {
       mode: 'admin',
     });
 
+    expect(screen.queryByText('journal')).toBeNull();
     for (const tab of ['visits', 'requests', 'garden', 'people', 'more/index']) {
       expect(screen.getByText(tab)).toBeTruthy();
     }
     expect(dispatch).toHaveBeenCalledWith(expect.objectContaining({ type: 'requests/loadRequestsStart' }));
   });
 
-  it('gives an employee only visits and more, without registration requests', async () => {
+  it('gives an employee visits, journal and profile, without registration requests', async () => {
     const dispatch = jest.fn();
     mockUseAppDispatch.mockReturnValue(dispatch);
     const screen = await renderLayout({
@@ -132,6 +133,7 @@ describe('administrator route authorization', () => {
 
     expect(screen.getByText('visits')).toBeTruthy();
     expect(screen.getByText('more/index')).toBeTruthy();
+    expect(screen.getByText('journal')).toBeTruthy();
     expect(screen.queryByText('requests')).toBeNull();
     expect(screen.queryByText('garden')).toBeNull();
     expect(screen.queryByText('people')).toBeNull();

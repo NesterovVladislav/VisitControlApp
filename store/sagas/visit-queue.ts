@@ -13,6 +13,7 @@ import {
   loadQueueSuccess,
   openQueue,
   queueAvailability,
+  queueAccessDenied,
   queueFilterLoaded,
   rejectMarkStart,
   setQueueFilter,
@@ -31,6 +32,7 @@ export const QUEUE_MESSAGES = {
 
 const selectSessionEpoch = (state: RootState) => state.auth.sessionEpoch;
 const selectUserId = (state: RootState) => state.auth.user?.id ?? null;
+const selectRole = (state: RootState) => state.auth.user?.role;
 const selectQueue = (state: RootState) => state.visitQueue;
 
 function* isCurrentSession(expectedEpoch: number) {
@@ -61,7 +63,12 @@ function* openQueueSaga() {
   if (!filterLoaded && userId) {
     const filter: QueueFilter | null = yield call(loadQueueFilter, userId);
     if (!(yield* isCurrentSession(sessionEpoch))) return;
-    yield put(queueFilterLoaded(filter));
+    const role: string | undefined = yield select(selectRole);
+    if (role === 'EMPLOYEE' && filter?.withoutGroup) {
+      yield put(queueFilterLoaded(filter.groupIds.length ? { groupIds: filter.groupIds, withoutGroup: false } : null));
+    } else {
+      yield put(queueFilterLoaded(filter));
+    }
   }
   yield put(loadQueueStart({ silent: true }));
 }
@@ -76,6 +83,13 @@ function* loadQueueSaga() {
   } catch (error) {
     if (!(yield* isCurrentSession(sessionEpoch))) return;
     console.warn('[Visit Queue Saga] Failed to load queue', error instanceof ApiError ? error.status : error);
+    if (error instanceof ApiError && (error.status === 401 || error.status === 403)) {
+      yield put(queueAccessDenied());
+      if (error.data?.code === 'OUT_OF_SCOPE' && filter && !showAll) {
+        yield put(setQueueFilter(null));
+      }
+      return;
+    }
     yield put(loadQueueFailure());
   }
 }
@@ -136,6 +150,7 @@ export function toDecisionError(error: unknown): string | null {
   if (error.status === 409 || error.status === 404) {
     return QUEUE_MESSAGES.alreadyDecided;
   }
+  if (error.status === 403 && error.data?.code === 'OUT_OF_SCOPE') return 'У вас больше нет доступа к этой группе';
   if (error.status === 403 && error.data?.code === 'SELF_CONFIRMATION') {
     return QUEUE_MESSAGES.ownMark;
   }

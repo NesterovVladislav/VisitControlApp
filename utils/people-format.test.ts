@@ -14,9 +14,9 @@ describe('people format', () => {
 
   it('groups children of a parent by link', () => {
     expect(parentSubtitle({ gender: 'FEMALE', children: [child('Мария', 'PARENT'), child('Пётр', 'PARENT')] }))
-      .toBe('мама: Мария, Пётр');
+      .toBe('мама: Иванов Мария, Иванов Пётр');
     expect(parentSubtitle({ gender: 'FEMALE', children: [child('Мария', 'PARENT'), child('Илья', 'RELATIVE')] }))
-      .toBe('мама: Мария · родственница: Илья');
+      .toBe('мама: Иванов Мария · родственница: Иванов Илья');
     expect(parentSubtitle({ gender: 'MALE', children: [] })).toBe('детей не привязано');
   });
 

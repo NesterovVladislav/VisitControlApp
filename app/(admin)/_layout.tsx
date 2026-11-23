@@ -1,6 +1,8 @@
 import { Redirect, Tabs } from 'expo-router';
 import React, { useEffect } from 'react';
-import { AppState } from 'react-native';
+import Ionicons from '@expo/vector-icons/Ionicons';
+import { RootPageHeader } from '@/components/profile-page-header';
+import { AppState, View } from 'react-native';
 import { HapticTab } from '@/components/haptic-tab';
 import { brandHeaderTitle } from '@/components/header-brand-title';
 import { IconSymbol } from '@/components/ui/icon-symbol';
@@ -17,7 +19,7 @@ const QUEUE_BADGE_POLL_MS = 30_000;
 
 /**
  * Рабочий режим персонала, см. docs/admin-screens.md. Администратор видит пять вкладок, сотрудник —
- * только «Посещение» и «Ещё»: он не разбирает заявки, не ведёт сад и не создаёт людей.
+ * «Посещение», «Журнал» и «Профиль»: он не разбирает заявки, не ведёт сад и не создаёт людей.
  */
 export default function AdminLayout() {
   const c = usePalette();
@@ -74,10 +76,21 @@ export default function AdminLayout() {
     return <Redirect href="/children" />;
   }
 
+  function employeeIcon(name: 'checkmark-circle-outline' | 'time-outline' | 'person-outline', color: string, focused: boolean) {
+    return <View style={{ width: 46, height: 32, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: focused ? c.primarySoft : 'transparent' }}>
+      <Ionicons name={name} size={22} color={color} />
+    </View>;
+  }
+
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: c.primary,
+        tabBarActiveTintColor: isAdmin ? c.primary : c.actionPrimary,
+        tabBarInactiveTintColor: c.textSecondary,
+        tabBarShowLabel: isAdmin,
+        ...(!isAdmin && {
+          header: ({ options }) => <RootPageHeader title={options.title ?? ''} />,
+        }),
         tabBarButton: HapticTab,
         headerTitle: brandHeaderTitle,
       }}
@@ -89,9 +102,16 @@ export default function AdminLayout() {
           // У вкладки свой стек: список филиалов → филиал
           headerShown: false,
           tabBarBadge: queueEnabled && waitingVisits > 0 ? waitingVisits : undefined,
-          tabBarIcon: ({ color }) => <IconSymbol size={26} name="checkmark.circle.fill" color={color} />,
+          tabBarAccessibilityLabel: 'Посещение',
+          tabBarIcon: ({ color, focused }) => isAdmin ? <IconSymbol size={26} name="checkmark.circle.fill" color={color} /> : employeeIcon('checkmark-circle-outline', color, focused),
         }}
       />
+      <Tabs.Screen name="journal" options={{
+        ...(isAdmin ? { href: null } : {}),
+        title: 'Журнал',
+        tabBarAccessibilityLabel: 'Журнал',
+        tabBarIcon: ({ color, focused }) => employeeIcon('time-outline', color, focused),
+      }} />
       <Tabs.Screen
         name="requests"
         options={{
@@ -126,8 +146,9 @@ export default function AdminLayout() {
       <Tabs.Screen
         name="more/index"
         options={{
-          title: 'Ещё',
-          tabBarIcon: ({ color }) => <IconSymbol size={26} name="ellipsis" color={color} />,
+          title: isAdmin ? 'Ещё' : 'Профиль',
+          tabBarAccessibilityLabel: isAdmin ? 'Ещё' : 'Профиль',
+          tabBarIcon: ({ color, focused }) => isAdmin ? <IconSymbol size={26} name="ellipsis" color={color} /> : employeeIcon('person-outline', color, focused),
         }}
       />
     </Tabs>

@@ -9,7 +9,7 @@ describe('profile format', () => {
   });
 
   it('builds initials from the first name and surname', () => {
-    expect(initials(user)).toBe('МИ');
+    expect(initials(user)).toBe('ИМ');
   });
 
   it('names roles and genders in Russian', () => {

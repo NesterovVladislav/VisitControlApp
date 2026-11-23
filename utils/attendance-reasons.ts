@@ -1,9 +1,9 @@
 export const attendanceReasons = {
-  ILLNESS: { mark: 'Б', label: 'Болезнь' },
-  VACATION: { mark: 'О', label: 'Отпуск' },
-  FAMILY: { mark: 'С', label: 'Семейные обстоятельства' },
-  OTHER: { mark: 'Д', label: 'Другое' },
-};
+  ILLNESS: { icon: 'thermometer', label: 'Болезнь' },
+  VACATION: { icon: 'briefcase', label: 'Отпуск' },
+  FAMILY: { icon: 'home', label: 'Семейные обстоятельства' },
+  OTHER: { icon: 'more-horizontal', label: 'Другое' },
+} as const;
 
 export function attendanceReason(code: string) {
   return Object.prototype.hasOwnProperty.call(attendanceReasons, code)

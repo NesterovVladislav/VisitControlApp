@@ -1,3 +1,4 @@
+jest.mock('react-native-safe-area-context', () => jest.requireActual('react-native-safe-area-context/jest/mock').default);
 import { fireEvent, render } from '@testing-library/react-native';
 import { Alert, Platform } from 'react-native';
 
@@ -100,7 +101,7 @@ describe('registration request screen', () => {
     const screen = await render(<RequestScreen />);
 
     expect(screen.getByText('1 ребёнок в заявке')).toBeTruthy();
-    expect(screen.getByRole('radio', { name: 'Маша: Новый ребёнок — добавить в сад' }).props.accessibilityState)
+    expect(screen.getByRole('radio', { name: 'Иванова Маша: Новый ребёнок — добавить в сад' }).props.accessibilityState)
       .toMatchObject({ checked: true });
 
     const { action } = await approve(screen);
@@ -115,7 +116,7 @@ describe('registration request screen', () => {
     expect(screen.getByRole('button', { name: 'Подтвердить' }).props.accessibilityState).toMatchObject({
       disabled: true,
     });
-    await fireEvent.press(screen.getByRole('radio', { name: 'Маша: Это Петрова Маша, 01.05.2022 — уже в саду' }));
+    await fireEvent.press(screen.getByRole('radio', { name: 'Иванова Маша: Это Петрова Маша, 01.05.2022 — уже в саду' }));
 
     const { action, message } = await approve(screen);
     expect(action.payload.decisions).toEqual({ 'c-1': { kind: 'LINK', childId: 'u-9' } });
@@ -126,7 +127,7 @@ describe('registration request screen', () => {
     given({ ...request, children: [masha] });
     const screen = await render(<RequestScreen />);
 
-    await fireEvent.press(screen.getByRole('radio', { name: 'Маша: Не добавлять' }));
+    await fireEvent.press(screen.getByRole('radio', { name: 'Иванова Маша: Не добавлять' }));
 
     const { action } = await approve(screen);
     expect(action.payload.decisions).toEqual({ 'c-1': { kind: 'SKIP' } });

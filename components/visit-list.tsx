@@ -1,3 +1,4 @@
+import { personName } from '@/utils/people-format';
 import React from 'react';
 import {
   ActivityIndicator,
@@ -73,7 +74,7 @@ export function PresenceSections({
           ]}
         >
           <View style={[visitListStyles.dot, visitListStyles.dotIn]} />
-          <Text style={visitListStyles.rowTitle}>{`${item.firstName} ${item.surname}`.trim()}</Text>
+          <Text style={visitListStyles.rowTitle}>{personName(item)}</Text>
         </View>
       )}
       ListEmptyComponent={<Text style={visitListStyles.message}>{emptyText}</Text>}

@@ -11,6 +11,7 @@ jest.mock('../../services/api', () => ({
   },
 }));
 
+import { ApiError } from '../../services/errors/api-error';
 import { visitControlApi } from '../../services/api';
 import {
   approveRequest,
@@ -23,8 +24,11 @@ import {
   resendPassword,
   resendPasswordSuccess,
 } from '../reducers/requests';
-import {
+import visitsReducer, {
   loadJournalFailure,
+  loadJournalMore,
+  journalAccessDenied,
+  presentAccessDenied,
   loadJournalStart,
   loadJournalSuccess,
   loadPresentStart,
@@ -62,7 +66,7 @@ function deferred<T>() {
 function startWatcher(watcher: typeof watchRequests | typeof watchVisits) {
   const state = {
     auth: { sessionEpoch: 1 },
-    visits: { journal: { page: 0, last: false, status: 'loaded' } },
+    visits: { journal: { revision: 1, page: 0, last: false, status: 'loaded' } },
   };
   const dispatched: unknown[] = [];
   const channel = stdChannel();
@@ -177,6 +181,67 @@ describe('admin saga session isolation', () => {
 
     expect(run.dispatched).not.toContainEqual(expect.objectContaining({ type: loadJournalSuccess.type }));
     expect(run.dispatched).not.toContainEqual(expect.objectContaining({ type: loadJournalFailure.type }));
+    run.task.cancel();
+    await run.task.toPromise();
+  });
+
+  it('discards a page requested before the journal was refreshed', async () => {
+    const pending = deferred<{ items: []; page: number; last: boolean }>();
+    api.getVisits.mockReturnValue(pending.promise);
+    const run = startWatcher(watchVisits);
+    run.channel.put(loadJournalMore());
+    expect(api.getVisits).toHaveBeenCalledWith(1);
+    run.state.visits.journal.revision += 1;
+    pending.resolve({ items: [], page: 1, last: true });
+    await settle();
+    expect(run.dispatched).not.toContainEqual(expect.objectContaining({ type: loadJournalSuccess.type }));
+    run.task.cancel();
+    await run.task.toPromise();
+  });
+
+  it('finishes pagination after a refresh overtakes the previous next-page request', async () => {
+    const first = { items: [], page: 0, last: false };
+    const stale = deferred<{ items: []; page: number; last: boolean }>();
+    api.getVisits.mockResolvedValueOnce(first).mockReturnValueOnce(stale.promise)
+      .mockResolvedValueOnce(first).mockResolvedValueOnce({ items: [], page: 1, last: true });
+
+    const channel = stdChannel();
+    let visits = visitsReducer(undefined, { type: 'init' });
+    function dispatch(action: { type: string }) {
+      visits = visitsReducer(visits, action);
+      channel.put(action);
+      return action;
+    }
+    const task = runSaga({ channel, getState: () => ({ auth: { sessionEpoch: 1 }, visits }), dispatch }, watchVisits);
+    try {
+      dispatch(loadJournalStart());
+      await settle();
+      dispatch(loadJournalMore());
+      dispatch(loadJournalStart({ refresh: true }));
+      await settle();
+      dispatch(loadJournalMore());
+      await settle();
+      stale.resolve({ items: [], page: 1, last: false });
+      await settle();
+
+      expect(api.getVisits.mock.calls.map(([page]) => page)).toEqual([0, 1, 0, 1]);
+      expect(visits.journal).toMatchObject({ loadingMore: false, page: 1, last: true });
+    } finally {
+      task.cancel();
+      await task.toPromise();
+    }
+  });
+
+  it('clears the journal and presence snapshots when the employee loses access', async () => {
+    const forbidden = new ApiError('forbidden', 403);
+    api.getVisits.mockRejectedValueOnce(forbidden);
+    api.getPresence.mockRejectedValueOnce(forbidden);
+    const run = startWatcher(watchVisits);
+    run.channel.put(loadJournalStart());
+    run.channel.put(loadPresentStart());
+    await settle();
+    expect(run.dispatched).toContainEqual(journalAccessDenied());
+    expect(run.dispatched).toContainEqual(presentAccessDenied());
     run.task.cancel();
     await run.task.toPromise();
   });

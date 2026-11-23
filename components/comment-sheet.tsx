@@ -1,7 +1,8 @@
+import { AppModal } from './ui/android-safe-window';
+import { SheetControl } from './ui/sheet-control';
 import React, { useEffect, useState } from 'react';
 import {
   KeyboardAvoidingView,
-  Modal,
   Pressable,
   StyleSheet,
   Text,
@@ -64,12 +65,12 @@ export default function CommentSheet({
   const disabled = required && trimmed.length === 0;
 
   return (
-    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+    <AppModal visible={visible} animationType="fade" transparent onRequestClose={onClose}>
       {/* На Android с edgeToEdgeEnabled система не сжимает окно под клавиатуру, поэтому padding нужен и там. */}
       <KeyboardAvoidingView style={styles.root} behavior="padding">
         <Pressable style={styles.backdrop} onPress={onClose} accessibilityLabel="Закрыть" />
         <View style={styles.sheet}>
-          <Text style={styles.title}>{title}</Text>
+          <View style={styles.header}><Text style={styles.title}>{title}</Text><SheetControl onPress={onClose} /></View>
           {message ? <Text style={styles.message}>{message}</Text> : null}
           {presets && presets.length > 0 ? (
             <View style={styles.presets}>
@@ -101,9 +102,6 @@ export default function CommentSheet({
             {text.length} / {maxLength}
           </Text>
           <View style={styles.actions}>
-            <TouchableOpacity style={[styles.button, styles.cancel]} onPress={onClose} accessibilityRole="button">
-              <Text style={styles.cancelText}>Отмена</Text>
-            </TouchableOpacity>
             <TouchableOpacity
               style={[styles.button, destructive ? styles.confirmDanger : styles.confirm, disabled && styles.disabled]}
               onPress={() => onConfirm(trimmed)}
@@ -116,7 +114,7 @@ export default function CommentSheet({
           </View>
         </View>
       </KeyboardAvoidingView>
-    </Modal>
+    </AppModal>
   );
 }
 
@@ -137,7 +135,9 @@ const useStyles = makeStyles((c) =>
       paddingTop: 20,
       paddingBottom: 32,
     },
+    header: { flexDirection: 'row', alignItems: 'center' },
     title: {
+      flex: 1,
       fontSize: 18,
       fontWeight: '600',
       color: c.text,
@@ -212,15 +212,6 @@ const useStyles = makeStyles((c) =>
       alignItems: 'center',
       justifyContent: 'center',
       paddingHorizontal: 12,
-    },
-    cancel: {
-      marginRight: 12,
-      backgroundColor: c.fill,
-    },
-    cancelText: {
-      fontSize: 16,
-      fontWeight: '600',
-      color: c.text,
     },
     confirm: {
       backgroundColor: c.primary,

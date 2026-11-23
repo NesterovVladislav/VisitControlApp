@@ -40,9 +40,9 @@ export function queueSections(items: VisitQueueItem[]): QueueSection[] {
   return ordered;
 }
 
-/** «Приход — Иванова А. (родитель)» / «Забирает — Сидоров И. (родственник)» */
+/** «Приход — Иванова А. (родитель)» / «Уход — Сидоров И. (родственник)» */
 export function queueWhoLabel(item: Pick<VisitQueueItem, 'status' | 'representativeName' | 'linkRole'>): string {
-  const action = item.status === 'IN' ? 'Привёл(а)' : 'Забирает';
+  const action = item.status === 'IN' ? 'Приход' : 'Уход';
   const link = item.linkRole ? ` (${linkLabel(item.linkRole, null)})` : '';
   return `${action} — ${item.representativeName}${link}`;
 }

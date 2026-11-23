@@ -79,3 +79,21 @@ it('opens a named date button and shows the attendance record for that day', asy
   await fireEvent.press(view.getByRole('button', { name: /^15\.11\.2026/ }));
   expect(view.getByText('Праздник сада')).toBeVisible();
 });
+
+it('explains every calendar state with a labelled visual sample', async () => {
+  const view = await render(
+    <SafeAreaProvider initialMetrics={{ frame: { x: 0, y: 0, width: 390, height: 844 },
+      insets: { top: 24, right: 0, bottom: 48, left: 0 } }}>
+      <AttendanceCalendar month={calendarMonth('2026-11-18')} days={days} today="2026-11-18" />
+    </SafeAreaProvider>,
+  );
+  await fireEvent.press(view.getByRole('button', { name: 'Обозначения' }));
+  for (const name of ['Посещение', 'Причины отсутствия', 'Отметки календаря']) {
+    expect(view.getByRole('header', { name })).toBeVisible();
+  }
+  for (const name of ['Полный день', 'Первая половина дня', 'Вторая половина дня', 'Болезнь', 'Отпуск',
+    'Семейные обстоятельства', 'Другое', 'Запланированное отсутствие', 'Оплачиваемый пропуск', 'Сегодня',
+    'Нет отметки', 'Нерабочий день', 'Вне группы', 'Будущий день']) {
+    expect(view.getByLabelText(name)).toBeVisible();
+  }
+});

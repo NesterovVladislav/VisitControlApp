@@ -59,3 +59,18 @@ it('freezes the existing start and only exempts the original end from a new calc
   await fireEvent.press(screen.getByRole('button', { name: 'Повторить' }));
   expect(onRetry).toHaveBeenCalledTimes(1);
 });
+
+it('retains the first boundary while choosing the end in a different month', async () => {
+  const onConfirm = jest.fn();
+  const screen = await render(
+    <AbsencePeriodPicker initialFrom={null} initialTo={null} min="2026-11-19" maxLength={7}
+      isWorkingDay={() => true} onClose={jest.fn()} onConfirm={onConfirm} />
+  );
+  const day = (name: string) => screen.getByRole('button', { name });
+  await fireEvent.press(day('30.11.2026'));
+  await fireEvent.press(day('Следующий месяц'));
+  await fireEvent.press(day('02.12.2026'));
+  expect(screen.getByRole('button', { name: '01.12.2026', selected: true })).toBeVisible();
+  await fireEvent.press(day('Выбрать даты'));
+  expect(onConfirm).toHaveBeenCalledWith('2026-11-30', '2026-12-02');
+});

@@ -6,7 +6,8 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { controlHeight, radius, space, typeSize } from '../constants/ui-tokens';
 import { makeStyles, usePalette } from '../hooks/use-palette';
 import { AbsenceDay, getAbsenceDay } from '../services/api/absence-day';
-import { formatBirthDate } from '../utils/profile-format';
+import Ionicons from '@expo/vector-icons/Ionicons';
+import { absenceEntrySummary } from '../utils/absence-day-labels';
 import { IconSymbol } from './ui/icon-symbol';
 
 export function useAbsenceDayEntry(enabled: boolean) {
@@ -35,28 +36,30 @@ export function useAbsenceDayEntry(enabled: boolean) {
   return { day, reload };
 }
 
-export function AbsenceDayEntry({ day }: { day: AbsenceDay | null }) {
+export function AbsenceDayEntry({ day, groupId, groupName }: { day: AbsenceDay | null; groupId?: string | null; groupName?: string }) {
   const router = useRouter();
   const c = usePalette();
   const styles = useStyles();
 
-  if (!day?.absentChildren) return null;
+  const group = groupId && day?.branches.flatMap(branch => branch.groups).find(item => item.id === groupId);
+  const count = groupId ? (group ? group.absences.length : undefined) : day?.absentChildren;
+  const hint = day && count != null ? absenceEntrySummary(day.date, count) : 'Открыть список';
 
   return (
     <View style={styles.container}>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={`Кого не будет ${formatBirthDate(day.date)}: ${day.absentChildren}`}
-        onPress={() => router.push('/visits/absences')}
+        accessibilityLabel={`Кого не будет. ${hint}`}
+        onPress={() => router.push({ pathname: '/visits/absences', params: {
+          ...(day && { date: day.date }), ...(groupId && { groupId, groupName: groupName ?? (group && group.name) ?? '' }),
+        } })}
         style={({ pressed }) => [styles.row, pressed && styles.pressed]}
       >
+        <View style={styles.icon}><Ionicons name="calendar-outline" size={20} color={c.actionPrimary} /></View>
         <View style={styles.copy}>
-          <Text style={styles.label}>Не придут {formatBirthDate(day.date)}</Text>
-          {day.deadline ? (
-            <Text style={styles.hint}>До срока — {day.absentChildren - day.lateChildren} · после срока — {day.lateChildren}</Text>
-          ) : null}
+          <Text style={styles.label}>Кого не будет</Text>
+          <Text style={styles.hint}>{hint}</Text>
         </View>
-        <Text style={styles.count}>{day.absentChildren}</Text>
         <IconSymbol name="chevron.right" size={20} color={c.textSecondary} />
       </Pressable>
     </View>
@@ -64,20 +67,20 @@ export function AbsenceDayEntry({ day }: { day: AbsenceDay | null }) {
 }
 
 const useStyles = makeStyles((c) => StyleSheet.create({
-  container: { alignSelf: 'center', width: '100%', maxWidth: 440, paddingHorizontal: space.xl },
+  container: { alignSelf: 'center', width: '100%', maxWidth: 480, paddingHorizontal: space.lg, paddingTop: space.md },
   row: {
     alignItems: 'center',
     backgroundColor: c.card,
     borderRadius: radius.card,
     flexDirection: 'row',
-    gap: space.sm,
+    gap: space.md,
     minHeight: controlHeight.touch,
     paddingHorizontal: space.lg,
     paddingVertical: space.md,
   },
   pressed: { backgroundColor: c.primarySoft },
-  copy: { flex: 1 },
+  icon: { width: 34, height: 34, borderRadius: radius.control, backgroundColor: c.primarySoft, alignItems: 'center', justifyContent: 'center' },
+  copy: { flex: 1, minWidth: 0 },
   label: { color: c.text, fontSize: typeSize.body, fontWeight: '600' },
   hint: { color: c.textSecondary, fontSize: typeSize.caption, marginTop: space.xxs },
-  count: { color: c.actionPrimary, fontSize: typeSize.body, fontWeight: '700' },
 }));

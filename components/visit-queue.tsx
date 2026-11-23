@@ -1,12 +1,12 @@
+import Ionicons from '@expo/vector-icons/Ionicons';
+import { ActionButton, BottomSheet } from './ui';
+import { radius, space } from '../constants/ui-tokens';
 import { useFocusEffect } from '@react-navigation/native';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
   AppState,
-  Modal,
-  Pressable,
-  ScrollView,
   SectionList,
   StyleSheet,
   Text,
@@ -30,6 +30,7 @@ import {
   setQueueShowAll,
 } from '../store/reducers/visit-queue';
 import { loadPresentStart } from '../store/reducers/visits';
+import { isAdminRole } from '../store/types/auth';
 import { QueueFilter, VisitQueueItem } from '../store/types/visits';
 import { plural } from '../utils/plural';
 import {
@@ -50,6 +51,7 @@ const QUEUE_POLL_MS = 15_000;
  */
 export default function VisitQueue() {
   const styles = useStyles();
+  const c = usePalette();
   const visitListStyles = useVisitListStyles();
   const dispatch = useAppDispatch();
   const { items, otherCount, status, refreshing, filter, showAll, decidingIds, error } = useAppSelector(
@@ -58,6 +60,13 @@ export default function VisitQueue() {
   const userId = useAppSelector((state) => state.auth.user?.id ?? null);
   const presenceGroups = useAppSelector((state) => state.visits.present.data.groups);
   const groups = useMemo(() => presenceGroups ?? [], [presenceGroups]);
+  const allowUngrouped = useAppSelector(state => isAdminRole(state.auth.user?.role));
+  const branches = useAppSelector(state => state.visits.present.data.branches);
+  const selectableGroups = useMemo(() => groups.map(group => {
+    const branch = branches?.find(item => item.id === group.branchId);
+    return branch && branches.length > 1 ? { ...group, name: [group.name, branch.name].join(' · ') } : group;
+  }), [groups, branches]);
+  const showGroupPicker = groups.length > 1 || Boolean(filter || otherCount || (allowUngrouped && groups.length));
   const [pickingGroups, setPickingGroups] = useState(false);
   const [rejecting, setRejecting] = useState<VisitQueueItem | null>(null);
   const [scanning, setScanning] = useState(false);
@@ -92,7 +101,7 @@ export default function VisitQueue() {
       <SectionList
         sections={sections}
         keyExtractor={(item) => item.id}
-        contentContainerStyle={visitListStyles.listContainer}
+        contentContainerStyle={[visitListStyles.listContainer, styles.list]}
         stickySectionHeadersEnabled={false}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={() => dispatch(loadQueueStart({ refresh: true }))} />
@@ -100,20 +109,19 @@ export default function VisitQueue() {
         ListHeaderComponent={
           <View>
             <TouchableOpacity style={styles.scanButton} onPress={() => setScanning(true)} accessibilityRole="button">
+              <Ionicons name="qr-code-outline" size={20} color={c.actionPrimary} />
               <Text style={styles.scanButtonText}>Сканировать QR-код родителя</Text>
             </TouchableOpacity>
-            <View style={styles.filterRow}>
+            {showGroupPicker && <TouchableOpacity accessibilityRole="button" accessibilityLabel="Выбрать группы очереди" style={styles.filterRow} onPress={() => setPickingGroups(true)}>
               <Text style={styles.filterText} numberOfLines={2}>
-                {showAll ? 'Все группы' : filterLabel(filter, groups)}
+                {showAll ? 'Все группы' : filterLabel(filter, selectableGroups)}
               </Text>
-              <TouchableOpacity onPress={() => setPickingGroups(true)} accessibilityRole="button" hitSlop={8}>
-                <Text style={styles.link}>Изменить</Text>
-              </TouchableOpacity>
-            </View>
+              <IconSymbol name="chevron.down" size={20} color={c.textSecondary} />
+            </TouchableOpacity>}
           </View>
         }
         renderSectionHeader={({ section }) => (
-          <Text style={visitListStyles.sectionTitle}>{section.title.toUpperCase()}</Text>
+          <Text style={visitListStyles.sectionTitle}>{section.title}</Text>
         )}
         renderItem={({ item }) => (
           <QueueCard
@@ -154,7 +162,8 @@ export default function VisitQueue() {
       />
       <GroupPicker
         visible={pickingGroups}
-        groups={groups}
+        groups={selectableGroups}
+        allowUngrouped={allowUngrouped}
         filter={filter}
         onClose={() => setPickingGroups(false)}
         onApply={(next) => {
@@ -196,7 +205,7 @@ export default function VisitQueue() {
 
 /** «Петя Иванов» или «Иванова А.» — для инициалов в заглушке фотографии. */
 function nameParts(name: string): { firstName: string; surname: string } {
-  const [firstName = '', surname = ''] = name.split(' ');
+  const [surname = '', firstName = ''] = name.split(' ');
   return { firstName, surname };
 }
 function QueueCard({
@@ -223,7 +232,6 @@ function QueueCard({
           <Avatar {...nameParts(item.childName)} photoUrl={item.childPhotoUrl} size={44} />
         </View>
         <Text style={styles.childName}>
-          {arriving ? '→ ' : '← '}
           {item.childName}
         </Text>
         <Text style={styles.time}>{queueTime(item)}</Text>
@@ -271,12 +279,14 @@ function QueueCard({
  */
 function GroupPicker({
   visible,
+  allowUngrouped,
   groups,
   filter,
   onClose,
   onApply,
 }: {
   visible: boolean;
+  allowUngrouped: boolean;
   groups: { id: string; name: string }[];
   filter: QueueFilter | null;
   onClose: () => void;
@@ -290,9 +300,9 @@ function GroupPicker({
   useEffect(() => {
     if (visible) {
       setGroupIds(filter?.groupIds ?? []);
-      setWithoutGroup(filter?.withoutGroup ?? false);
+      setWithoutGroup(allowUngrouped && Boolean(filter?.withoutGroup));
     }
-  }, [visible, filter]);
+  }, [visible, filter, allowUngrouped]);
 
   function toggle(id: string) {
     setGroupIds((current) => (current.includes(id) ? current.filter((item) => item !== id) : [...current, id]));
@@ -311,26 +321,19 @@ function GroupPicker({
       selected: groupIds.includes(group.id),
       onPress: () => toggle(group.id),
     })),
-    {
+    ...(allowUngrouped ? [{
       key: 'without-group',
       label: 'Без группы',
       selected: withoutGroup,
       onPress: () => setWithoutGroup((current) => !current),
-    },
+    }] : []),
   ];
 
   return (
-    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
-      <Pressable style={styles.backdrop} onPress={onClose} accessibilityLabel="Закрыть" />
-      <View style={styles.sheet}>
-        <View style={styles.sheetHeader}>
-          <Text style={styles.sheetTitle}>Мои группы</Text>
-          <TouchableOpacity onPress={apply} accessibilityRole="button" hitSlop={8}>
-            <Text style={styles.link}>Готово</Text>
-          </TouchableOpacity>
-        </View>
-        <Text style={styles.sheetHint}>Очередь покажет отметки только выбранных групп. Ничего не выбрано — все.</Text>
-        <ScrollView>
+    visible ? <BottomSheet title="Мои группы" onClose={onClose}
+      footer={<ActionButton label="Готово" onPress={apply} />}>
+        <Text style={styles.sheetHint}>Выберите группы для очереди. Пустой выбор показывает все доступные группы.</Text>
+        <View>
           {rows.map((row) => (
             <TouchableOpacity
               key={row.key}
@@ -343,28 +346,30 @@ function GroupPicker({
               {row.selected ? <IconSymbol name="checkmark" size={20} color={c.primary} /> : null}
             </TouchableOpacity>
           ))}
-        </ScrollView>
-      </View>
-    </Modal>
+        </View>
+    </BottomSheet> : null
   );
 }
 
 const useStyles = makeStyles((c) =>
   StyleSheet.create({
+    list: { maxWidth: 480, paddingHorizontal: space.lg, paddingTop: space.md },
     scanButton: {
-      minHeight: 48,
-      marginBottom: 14,
-      borderRadius: 8,
+      flexDirection: 'row', gap: space.sm,
+      minHeight: 46,
+      marginBottom: space.sm,
+      borderRadius: radius.card,
       alignItems: 'center',
       justifyContent: 'center',
-      backgroundColor: c.primary,
+      backgroundColor: c.card,
     },
     scanButtonText: {
       fontSize: 16,
       fontWeight: '600',
-      color: c.onPrimary,
+      color: c.actionPrimary,
     },
     filterRow: {
+      minHeight: 46, paddingHorizontal: space.lg, backgroundColor: c.card, borderRadius: radius.card,
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'space-between',
@@ -461,38 +466,15 @@ const useStyles = makeStyles((c) =>
     rejectText: {
       fontSize: 16,
       fontWeight: '600',
-      color: c.danger,
+      color: c.actionPrimary,
     },
     confirm: {
-      backgroundColor: c.primary,
+      backgroundColor: c.actionPrimary,
     },
     confirmText: {
       fontSize: 16,
       fontWeight: '600',
-      color: c.onPrimary,
-    },
-    backdrop: {
-      flex: 1,
-      backgroundColor: c.overlay,
-    },
-    sheet: {
-      maxHeight: '70%',
-      backgroundColor: c.background,
-      borderTopLeftRadius: 14,
-      borderTopRightRadius: 14,
-      paddingHorizontal: 20,
-      paddingBottom: 32,
-    },
-    sheetHeader: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      paddingTop: 16,
-    },
-    sheetTitle: {
-      fontSize: 17,
-      fontWeight: '600',
-      color: c.text,
+      color: c.onActionPrimary,
     },
     sheetHint: {
       marginTop: 6,

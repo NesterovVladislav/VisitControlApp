@@ -1,3 +1,4 @@
+import { personName } from '@/utils/people-format';
 import { PayloadAction } from '@reduxjs/toolkit';
 import * as Haptics from 'expo-haptics';
 import { all, call, put, select, takeEvery, takeLatest } from 'redux-saga/effects';
@@ -50,7 +51,7 @@ function* isCurrentSession(expectedEpoch: number) {
 }
 
 function byName(a: Child, b: Child): number {
-  return `${a.firstName} ${a.surname}`.localeCompare(`${b.firstName} ${b.surname}`, 'ru');
+  return personName(a).localeCompare(personName(b), 'ru');
 }
 
 export function* loadStatusSaga(action: PayloadAction<string>) {

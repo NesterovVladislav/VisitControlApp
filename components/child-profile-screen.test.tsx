@@ -1,6 +1,7 @@
 import { fireEvent, render } from '@testing-library/react-native';
 
 import ChildProfileScreen from '../app/profile/child/[id]';
+import EditChildProfile from '../app/profile/child/edit/[id]';
 import ChildChangesList from './child-changes-list';
 import ProfileChildren from './profile-children';
 import { useAppDispatch, useAppSelector } from '../store';
@@ -14,7 +15,7 @@ jest.mock('../store', () => ({
   useAppSelector: jest.fn(),
 }));
 jest.mock('./ui/icon-symbol', () => ({ IconSymbol: () => null }));
-jest.mock('@react-navigation/native', () => ({ useFocusEffect: jest.fn() }));
+jest.mock('@react-navigation/native', () => ({ useFocusEffect: jest.fn(), usePreventRemove: jest.fn(), useIsFocused: () => true, useNavigation: () => ({ dispatch: jest.fn() }) }));
 jest.mock('@react-navigation/elements', () => ({ useHeaderHeight: () => 0 }));
 jest.mock('expo-router', () => ({
   useRouter: () => ({ back: jest.fn(), push: mockPush }),
@@ -86,9 +87,18 @@ describe('child data in the profile', () => {
     expect(mockPush).toHaveBeenCalledWith({ pathname: '/profile/child/[id]', params: { id: 'c1' } });
   });
 
-  it('sends a parent change for the kindergarten to confirm', async () => {
+  it('opens approved child data for reading before editing', async () => {
     givenState('PARENT', { ownChildren: [petya] });
     const screen = await render(<ChildProfileScreen />);
+    expect(screen.getByText('12.03.2021')).toBeVisible();
+    expect(screen.queryByDisplayValue('Иванов')).toBeNull();
+    await fireEvent.press(screen.getByText('Редактировать'));
+    expect(mockPush).toHaveBeenCalledWith({ pathname: '/profile/child/edit/[id]', params: { id: 'c1' } });
+  });
+
+  it('sends a parent change for the kindergarten to confirm', async () => {
+    givenState('PARENT', { ownChildren: [petya] });
+    const screen = await render(<EditChildProfile />);
 
     expect(screen.getByText(/Изменение проверит администратор сада/)).toBeTruthy();
     expect(screen.getByDisplayValue('12.03.2021')).toBeTruthy();
@@ -103,7 +113,7 @@ describe('child data in the profile', () => {
 
   it('does not send unchanged data', async () => {
     givenState('PARENT', { ownChildren: [petya] });
-    const screen = await render(<ChildProfileScreen />);
+    const screen = await render(<EditChildProfile />);
 
     await fireEvent.press(screen.getByText('Отправить на подтверждение'));
 
@@ -126,12 +136,12 @@ describe('child data in the profile', () => {
 
     expect(screen.getByText('Сад отклонил изменение')).toBeTruthy();
     expect(screen.getByText('Причина: Нужен документ')).toBeTruthy();
-    expect(screen.getByText('Отправить на подтверждение')).toBeTruthy();
+    expect(screen.getByText('Редактировать')).toBeTruthy();
   });
 
   it('saves at once for an administrator or a director', async () => {
     givenState('DIRECTOR', { ownChildren: [petya] });
-    const screen = await render(<ChildProfileScreen />);
+    const screen = await render(<EditChildProfile />);
 
     expect(screen.getByText('Изменение применится сразу.')).toBeTruthy();
     expect(screen.getByText('Сохранить')).toBeTruthy();
