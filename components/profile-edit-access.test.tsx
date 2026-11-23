@@ -1,6 +1,7 @@
 import { fireEvent, render } from '@testing-library/react-native';
 
 import ParentAccount from './parent-account';
+import WorkProfile from '../app/(admin)/more';
 import AboutScreen from '../app/profile/about';
 import ProfileDetails from '../app/profile/details';
 import ProfileScreen from '../app/profile';
@@ -159,6 +160,27 @@ describe('parent account navigation', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockUseAppDispatch.mockReturnValue(jest.fn());
+  });
+
+  it.each([false, true])('retains family and account actions in the work profile (linked child: %s)', async (linked) => {
+    const dispatch = jest.fn();
+    mockUseAppDispatch.mockReturnValue(dispatch);
+    const children = linked ? [{ id: 'child', firstName: 'Ева', surname: 'Белова', linkRole: 'PARENT' }] : [];
+    const screen = await renderProfile('EMPLOYEE', { children });
+    await screen.rerender(<WorkProfile />);
+    await fireEvent.press(screen.getByText('Личные данные'));
+    expect(mockPush).toHaveBeenCalledWith('/profile/details');
+    await fireEvent.press(screen.getByText('Мои дети'));
+    expect(mockPush).toHaveBeenCalledWith('/profile/my-children');
+    expect(screen.queryByRole('button', { name: 'Удалить аккаунт' })).toBeNull();
+    expect(screen.queryByText('Режим сотрудника')).toBeNull();
+    if (linked) {
+      await fireEvent.press(screen.getByText('Режим родителя'));
+      expect(dispatch).toHaveBeenCalledWith(switchMode('parent'));
+      expect(mockReplace).toHaveBeenCalledWith('/children');
+    } else {
+      expect(screen.queryByText('Режим родителя')).toBeNull();
+    }
   });
 
   it('keeps contact details off the tab and opens them before editing', async () => {

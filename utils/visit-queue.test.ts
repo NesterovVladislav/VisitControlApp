@@ -35,9 +35,9 @@ describe('visit queue', () => {
 
   it('says who brings or picks up the child and who they are to the child', () => {
     expect(queueWhoLabel({ status: 'IN', representativeName: 'Иванова А.', linkRole: 'PARENT' }))
-      .toBe('Привёл(а) — Иванова А. (родитель)');
+      .toBe('Приход — Иванова А. (родитель)');
     expect(queueWhoLabel({ status: 'OUT', representativeName: 'Сидоров И.', linkRole: null }))
-      .toBe('Забирает — Сидоров И.');
+      .toBe('Уход — Сидоров И.');
   });
 
   it('names the chosen groups', () => {

@@ -13,7 +13,7 @@ jest.mock('../store', () => ({
   useAppSelector: jest.fn(),
 }));
 jest.mock('../components/ui/icon-symbol', () => ({ IconSymbol: () => null }));
-jest.mock('@react-navigation/native', () => ({ useFocusEffect: jest.fn() }));
+jest.mock('@react-navigation/native', () => ({ useFocusEffect: jest.fn(), useIsFocused: () => true }));
 jest.mock('expo-router', () => ({
   useRouter: () => ({ push: mockPush }),
   useLocalSearchParams: () => mockParams,
@@ -187,8 +187,8 @@ describe('presence by branch', () => {
 
     // Число на переключателе — все, кто ждёт, в том числе в других группах
     expect(screen.getByText('Очередь 3')).toBeTruthy();
-    expect(screen.getByText('→ Иванова Мария')).toBeTruthy();
-    expect(screen.getByText('Привёл(а) — Иванова А. (родитель)')).toBeTruthy();
+    expect(screen.getByText('Иванова Мария')).toBeTruthy();
+    expect(screen.getByText('Приход — Иванова А. (родитель)')).toBeTruthy();
     expect(screen.getByText('«Привела бабушка»')).toBeTruthy();
 
     await fireEvent.press(screen.getByText('Принять'));

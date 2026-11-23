@@ -108,7 +108,7 @@ function childRow(dayKey: string, entries: VisitEntry[], today: boolean): Journa
   const last = intervals[intervals.length - 1];
   const open = Boolean(last?.in && !last.out);
   return {
-    key: `${dayKey}|${sorted[0].childId}`,
+    key: `${dayKey}|${sorted[0].group?.id ?? WITHOUT_GROUP_KEY}|${sorted[0].childId}`,
     childName: sorted[0].childName,
     intervals,
     broughtBy,
@@ -126,9 +126,9 @@ function childRow(dayKey: string, entries: VisitEntry[], today: boolean): Journa
  * Журнал по дням, внутри дня — по группам (нынешняя группа ребёнка), в группе — по строке на ребёнка.
  * Группы по названию, «Без группы» — в конце дня; дети по имени. Филиал в заголовке — если филиалов несколько.
  */
-export function journalSections(items: VisitEntry[], showBranch: boolean, now: Date = new Date()): JournalSection[] {
+export function journalSections(items: VisitEntry[], showBranch: boolean, now = new Date(), includeTodayDate = false): JournalSection[] {
   const todayKey = localDayKey(now.toISOString());
-  // Дни в порядке ленты (новые сверху); внутри дня — отметки по детям
+  // Группа из отметки сохраняется, даже если ребёнка перевели в середине дня.
   const days = new Map<string, { title: string; byChild: Map<string, VisitEntry[]> }>();
   for (const entry of items) {
     // Отклонённые садом и отменённые родителем отметки — не посещения
@@ -138,17 +138,19 @@ export function journalSections(items: VisitEntry[], showBranch: boolean, now: D
     const dayKey = localDayKey(entry.datetime);
     let day = days.get(dayKey);
     if (!day) {
-      day = { title: dayTitle(entry.datetime, now), byChild: new Map() };
+      day = { title: dayTitle(entry.datetime, now, includeTodayDate), byChild: new Map() };
       days.set(dayKey, day);
     }
-    day.byChild.set(entry.childId, [...(day.byChild.get(entry.childId) ?? []), entry]);
+    const membership = `${entry.group?.id ?? WITHOUT_GROUP_KEY}|${entry.childId}`;
+    const history = day.byChild.get(membership);
+    if (history) history.push(entry);
+    else day.byChild.set(membership, [entry]);
   }
 
   const result: JournalSection[] = [];
   for (const [dayKey, day] of days) {
     const groups = new Map<string, { name: string; branchName: string | null; rows: JournalChildRow[] }>();
     for (const entries of day.byChild.values()) {
-      // Группа — по последней отметке: у всех отметок ребёнка она одна и та же, нынешняя
       const group = entries[0].group;
       const groupKey = group?.id ?? WITHOUT_GROUP_KEY;
       if (!groups.has(groupKey)) {

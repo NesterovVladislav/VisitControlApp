@@ -57,7 +57,7 @@ export interface VisitEntry {
   status: 'IN' | 'OUT';
   /** ISO-время; на экране — часы сада, см. toWallClockIso */
   datetime: string;
-  /** Нынешняя группа ребёнка (не на день отметки); null — без группы или старый бэкенд */
+  /** Группа, переданная сервером для этой отметки; null — без группы или старый бэкенд */
   group: { id: string; name: string; branchName: string | null } | null;
   /** Решение сада; нет — отметке подтверждение не требовалось */
   confirmation?: VisitConfirmation | null;
@@ -157,6 +157,7 @@ export interface VisitsState {
     items: VisitEntry[];
     status: LoadStatus;
     refreshing: boolean;
+    revision: number;
     /** Номер последней загруженной страницы, с нуля */
     page: number;
     last: boolean;

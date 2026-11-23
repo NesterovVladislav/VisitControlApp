@@ -33,6 +33,13 @@ export function CompactBackHeader({ title, onBack, backLabel = 'Назад', rig
   );
 }
 
+export function RootPageHeader({ title }: { title: string }) {
+  const styles = useStyles();
+  return <SafeAreaView edges={['top', 'left', 'right']} style={styles.surface}>
+    <CompactBackHeader title={title} />
+  </SafeAreaView>;
+}
+
 function ProfilePageHeader({ back, navigation, options }: NativeStackHeaderProps) {
   const colors = usePalette();
   const styles = useStyles();

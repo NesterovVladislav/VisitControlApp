@@ -2,14 +2,13 @@ import { useFocusEffect } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  ActivityIndicator,
   FlatList,
-  SectionList,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native';
+import { space } from '../../../constants/ui-tokens';
 import { AbsenceDayEntry, useAbsenceDayEntry } from '../../../components/absence-day-entry';
 import { RefreshControl } from '../../../components/ui/refresh-control';
 import SegmentedControl from '../../../components/segmented-control';
@@ -19,10 +18,13 @@ import VisitQueue from '../../../components/visit-queue';
 import { useOpenGroupMembers } from '../../../hooks/use-open-group-members';
 import { useAppDispatch, useAppSelector } from '../../../store';
 import { loadQueueStart, openQueue } from '../../../store/reducers/visit-queue';
-import { loadJournalMore, loadJournalStart, loadPresentStart } from '../../../store/reducers/visits';
+import { loadJournalStart, loadPresentStart } from '../../../store/reducers/visits';
 import { plural } from '../../../utils/plural';
 import { BranchSummary, branchSections, branchSummaries, singleBranchId } from '../../../utils/presence';
-import { confirmationLabel, intervalLabels, journalSections, representativesLabel } from '../../../utils/journal';
+import JournalList from '../../../components/staff-journal';
+import StaffPresenceList from '../../../components/staff-presence-list';
+import { StaffGroupSelect, staffGroups } from '../../../components/staff-group-select';
+import type { StaffGroup } from '../../../components/staff-group-select';
 import { makeStyles, usePalette } from '../../../hooks/use-palette';
 
 type Mode = 'queue' | 'present' | 'journal';
@@ -42,6 +44,11 @@ const MODE_OPTIONS: { value: Mode; label: string }[] = [
 export default function VisitsScreen() {
   const styles = useStyles();
   const dispatch = useAppDispatch();
+  const employee = useAppSelector(state => state.auth.user?.role === 'EMPLOYEE');
+  const presence = useAppSelector(state => state.visits.present.data);
+  const groups = useMemo(() => staffGroups(presence), [presence]);
+  const [selection, setSelection] = useState<StaffGroup>();
+  const selected = groups.find(group => group.id === selection?.id);
   const [mode, setMode] = useState<Mode>('present');
   const queueEnabled = useAppSelector((state) => state.visitQueue.enabled === true);
   const waiting = useAppSelector((state) => state.visitQueue.items.length + state.visitQueue.otherCount);
@@ -55,30 +62,29 @@ export default function VisitsScreen() {
     }
   }, [queueEnabled, waiting]);
 
+  const options = useMemo(() => {
+    const modes = employee ? MODE_OPTIONS.filter(option => option.value !== 'journal') : MODE_OPTIONS;
+    return queueEnabled
+      ? [{ value: 'queue' as const, label: waiting ? `Очередь ${waiting}` : 'Очередь' }, ...modes]
+      : modes;
+  }, [employee, queueEnabled, waiting]);
+  const shown = options.some(option => option.value === mode) ? mode : 'present';
+
   // При каждом возврате на вкладку и смене режима — свежие данные: родители отмечают детей в течение дня
   useFocusEffect(
     useCallback(() => {
       // Включено ли подтверждение и сколько ждут — нужно в любом режиме: это число на переключателе
       dispatch(openQueue());
-      if (mode === 'queue') {
+      if (shown === 'queue') {
         dispatch(loadQueueStart());
         // Группы для выбора «моих групп» берутся из «Кто в саду»
         dispatch(loadPresentStart());
       } else {
-        dispatch(mode === 'present' ? loadPresentStart() : loadJournalStart());
+        dispatch(shown === 'present' ? loadPresentStart() : loadJournalStart());
       }
-    }, [dispatch, mode])
+    }, [dispatch, shown])
   );
 
-  const options = useMemo(
-    () =>
-      queueEnabled
-        ? [{ value: 'queue' as Mode, label: waiting > 0 ? `Очередь ${waiting}` : 'Очередь' }, ...MODE_OPTIONS]
-        : MODE_OPTIONS,
-    [queueEnabled, waiting]
-  );
-  // Подтверждение выключили, пока очередь была на экране
-  const shown: Mode = mode === 'queue' && !queueEnabled ? 'present' : mode;
   const { day, reload: reloadAbsences } = useAbsenceDayEntry(shown === 'present');
 
   const reloadPresent = (refresh: boolean) => {
@@ -88,11 +94,16 @@ export default function VisitsScreen() {
 
   return (
     <View style={styles.screen}>
-      <View style={styles.switcher}>
-        <SegmentedControl options={options} value={shown} onChange={setMode} />
-      </View>
-      {shown === 'present' && <AbsenceDayEntry day={day} />}
-      {shown === 'queue' ? <VisitQueue /> : shown === 'present' ? <PresentList onReload={reloadPresent} /> : <Journal />}
+      {options.length > 1 && <View style={styles.switcher}>
+        <SegmentedControl options={options} value={shown} onChange={setMode} compact />
+      </View>}
+      {employee && shown === 'present' && <StaffGroupSelect groups={groups} selected={selected} onSelect={setSelection} />}
+      {shown === 'present' && <AbsenceDayEntry day={day} groupId={employee ? selected?.id : undefined} groupName={employee ? selected?.name : undefined} />}
+      {shown === 'queue' && <VisitQueue />}
+      {shown === 'present' && (employee
+        ? <StaffPresenceList groupId={selected?.id} onReload={reloadPresent} />
+        : <PresentList onReload={reloadPresent} />)}
+      {shown === 'journal' && <JournalList />}
     </View>
   );
 }
@@ -201,101 +212,6 @@ function BranchList({
   );
 }
 
-function Journal() {
-  const c = usePalette();
-  const styles = useStyles();
-  const visitListStyles = useVisitListStyles();
-  const dispatch = useAppDispatch();
-  const { items, status, refreshing, last, loadingMore, loadMoreFailed } = useAppSelector(
-    (state) => state.visits.journal
-  );
-  const showBranch = useAppSelector((state) => state.visits.present.data.branches.length > 1);
-
-  // День → группа → по строке на ребёнка: когда пришёл и ушёл, кто привёл и забрал
-  const sections = useMemo(() => journalSections(items, showBranch), [items, showBranch]);
-
-  if (status !== 'loaded') {
-    return <LoadState status={status} onRetry={() => dispatch(loadJournalStart())} />;
-  }
-
-  const loadMore = () => {
-    if (!last && !loadingMore && !loadMoreFailed) {
-      dispatch(loadJournalMore());
-    }
-  };
-
-  let footer: React.ReactElement | null = null;
-  if (loadingMore) {
-    footer = <ActivityIndicator style={styles.footer} color={c.textTertiary} />;
-  } else if (loadMoreFailed) {
-    footer = (
-      <TouchableOpacity style={styles.footer} onPress={() => dispatch(loadJournalMore())}>
-        <Text style={styles.link}>Не удалось загрузить. Повторить</Text>
-      </TouchableOpacity>
-    );
-  }
-
-  return (
-    <SectionList
-      sections={sections}
-      keyExtractor={(row) => row.key}
-      contentContainerStyle={items.length === 0 ? visitListStyles.emptyContainer : visitListStyles.listContainer}
-      refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={() => dispatch(loadJournalStart({ refresh: true }))} />
-      }
-      stickySectionHeadersEnabled={false}
-      renderSectionHeader={({ section }) => (
-        <View>
-          {section.dayTitle ? <Text style={styles.dayTitle}>{section.dayTitle}</Text> : null}
-          <Text style={visitListStyles.sectionTitle}>{section.title.toUpperCase()}</Text>
-        </View>
-      )}
-      renderItem={({ item, index, section }) => {
-        const labels = intervalLabels(item);
-        return (
-          <View
-            style={[
-              visitListStyles.row,
-              styles.journalRow,
-              index === 0 && visitListStyles.rowFirst,
-              index === section.data.length - 1 && visitListStyles.rowLast,
-            ]}
-          >
-            <View
-              style={[visitListStyles.dot, styles.journalDot, item.inNow ? visitListStyles.dotIn : visitListStyles.dotOut]}
-              accessibilityLabel={item.inNow ? 'В саду' : 'Не в саду'}
-            />
-            <View style={styles.rowText}>
-              <Text style={visitListStyles.rowTitle}>{item.childName}</Text>
-              {/* Каждое пребывание за день — отдельным блоком: своё время и свои взрослые */}
-              {item.intervals.map((interval, intervalIndex) => {
-                const representatives = representativesLabel(interval);
-                const confirmation = confirmationLabel(interval);
-                return (
-                  <View key={intervalIndex} style={intervalIndex > 0 && styles.nextInterval}>
-                    <Text style={styles.intervals}>{labels[intervalIndex]}</Text>
-                    {representatives ? <Text style={styles.rowSubtitle}>{representatives}</Text> : null}
-                    {confirmation ? <Text style={styles.rowSubtitle}>{confirmation}</Text> : null}
-                  </View>
-                );
-              })}
-              {item.comments.map((comment, commentIndex) => (
-                <Text key={commentIndex} style={styles.rowSubtitle}>
-                  «{comment}»
-                </Text>
-              ))}
-            </View>
-          </View>
-        );
-      }}
-      onEndReached={loadMore}
-      onEndReachedThreshold={0.5}
-      ListFooterComponent={footer}
-      ListEmptyComponent={<Text style={visitListStyles.message}>Отметок пока нет</Text>}
-    />
-  );
-}
-
 const useStyles = makeStyles((c) =>
   StyleSheet.create({
     screen: {
@@ -303,10 +219,10 @@ const useStyles = makeStyles((c) =>
       backgroundColor: c.background,
     },
     switcher: {
-      paddingHorizontal: 20,
-      paddingTop: 16,
+      paddingHorizontal: space.lg,
+      paddingTop: space.md,
       width: '100%',
-      maxWidth: 440,
+      maxWidth: 480,
       alignSelf: 'center',
     },
     branchRow: {
@@ -330,36 +246,6 @@ const useStyles = makeStyles((c) =>
     countPresent: {
       color: c.success,
       fontWeight: '600',
-    },
-    dayTitle: {
-      fontSize: 17,
-      fontWeight: '600',
-      color: c.text,
-      marginTop: 12,
-      marginBottom: 4,
-    },
-    journalRow: {
-      alignItems: 'flex-start',
-    },
-    journalDot: {
-      marginTop: 6,
-    },
-    nextInterval: {
-      marginTop: 8,
-    },
-    intervals: {
-      marginTop: 2,
-      fontSize: 15,
-      fontVariant: ['tabular-nums'],
-      color: c.text,
-    },
-    footer: {
-      paddingVertical: 16,
-      alignItems: 'center',
-    },
-    link: {
-      color: c.primary,
-      fontSize: 15,
     },
   })
 );

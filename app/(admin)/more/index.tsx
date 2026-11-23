@@ -2,6 +2,8 @@ import { personName } from '@/utils/people-format';
 import { useRouter } from 'expo-router';
 import React from 'react';
 import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import ParentAccount from '@/components/parent-account';
+import { EMPLOYEE_ROLE } from '@/store/types/auth';
 import ProfileSummary from '@/components/profile-summary';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useAppDispatch, useAppSelector } from '../../../store';
@@ -27,6 +29,8 @@ export default function MoreScreen() {
       { text: 'Выйти', style: 'destructive', onPress: () => dispatch(logoutRequested({ reason: 'user' })) },
     ]);
   }
+
+  if (user?.role === EMPLOYEE_ROLE) return <ParentAccount employee />;
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.container}>

@@ -55,6 +55,7 @@ function SessionNavigator({ phase }: { phase: AuthPhase }) {
         <Stack.Screen name="profile/delete-account" options={{ header: renderProfilePageHeader, title: 'Удаление аккаунта', headerBackTitle: 'Профиль' }} />
         <Stack.Screen name="profile/about" options={{ header: renderProfilePageHeader, title: 'О приложении', headerBackTitle: 'Профиль' }} />
         <Stack.Screen name="profile/details" options={{ header: renderProfilePageHeader, title: 'Личные данные', headerBackTitle: 'Профиль' }} />
+        <Stack.Screen name="profile/my-children" options={{ header: renderProfilePageHeader, title: 'Мои дети' }} />
         <Stack.Screen name="profile/theme" options={{ header: renderProfilePageHeader, title: 'Тема', headerBackTitle: 'Профиль' }} />
         <Stack.Screen
           name="profile/edit"

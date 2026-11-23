@@ -109,3 +109,17 @@ describe('journal by groups', () => {
     expect(confirmationLabel(journalSections(items, false, now)[0].data[0])).toBeNull();
   });
 });
+
+it('keeps stays in separate groups when the same child changes group during one day', () => {
+  const first = { id: 'a', name: 'Ромашка', branchName: 'Северный' };
+  const second = { id: 'b', name: 'Ромашка', branchName: 'Центральный' };
+  const sections = journalSections([
+    entry('c', 'Орлов Лев', 'IN', at(29, 15), second),
+    entry('c', 'Орлов Лев', 'OUT', at(29, 12), first),
+    entry('c', 'Орлов Лев', 'IN', at(29, 8), first),
+  ], true, now);
+  expect(sections.map(section => intervalLabels(section.data[0]))).toEqual([
+    ['08:00 → 12:00'], ['15:00 → ещё в саду'],
+  ]);
+  expect(new Set(sections.map(section => section.data[0].key)).size).toBe(2);
+});

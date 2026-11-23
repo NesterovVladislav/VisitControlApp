@@ -1,4 +1,4 @@
-import { call, put, select, takeLatest, takeLeading } from 'redux-saga/effects';
+import { call, put, race, select, take, takeLatest, takeLeading } from 'redux-saga/effects';
 import { visitControlApi } from '../../services/api';
 import { ApiError } from '../../services/errors/api-error';
 import {
@@ -7,6 +7,8 @@ import {
   loadJournalStart,
   loadJournalSuccess,
   loadPresentFailure,
+  presentAccessDenied,
+  journalAccessDenied,
   loadPresentStart,
   loadPresentSuccess,
 } from '../reducers/visits';
@@ -18,6 +20,10 @@ const selectSessionEpoch = (state: RootState) => state.auth.sessionEpoch;
 function* isCurrentSession(expectedEpoch: number) {
   const currentEpoch: number = yield select(selectSessionEpoch);
   return currentEpoch === expectedEpoch;
+}
+
+function denied(error: unknown) {
+  return error instanceof ApiError && (error.status === 403 || error.status === 401);
 }
 
 function logFailure(what: string, error: unknown) {
@@ -33,20 +39,25 @@ function* loadPresentSaga() {
   } catch (error) {
     if (!(yield* isCurrentSession(sessionEpoch))) return;
     logFailure('present children', error);
-    yield put(loadPresentFailure());
+    yield put(denied(error) ? presentAccessDenied() : loadPresentFailure());
   }
 }
 
+const journalRevision = (state: RootState) => state.visits.journal.revision;
+
 function* loadJournalPage(page: number) {
+  const revision: number = yield select(journalRevision);
   const sessionEpoch: number = yield select(selectSessionEpoch);
   try {
     const result: VisitPage = yield call([visitControlApi, visitControlApi.getVisits], page);
     if (!(yield* isCurrentSession(sessionEpoch))) return;
-    yield put(loadJournalSuccess(result));
+    const currentRevision: number = yield select(journalRevision);
+    if (currentRevision === revision) yield put(loadJournalSuccess(result));
   } catch (error) {
     if (!(yield* isCurrentSession(sessionEpoch))) return;
     logFailure(`journal page ${page}`, error);
-    yield put(loadJournalFailure({ page }));
+    const currentRevision: number = yield select(journalRevision);
+    if (currentRevision === revision) yield put(denied(error) ? journalAccessDenied() : loadJournalFailure({ page }));
   }
 }
 
@@ -55,13 +66,14 @@ function* loadJournalFirstPageSaga() {
 }
 
 function* loadJournalMoreSaga() {
-  const { page, last, status }: RootState['visits']['journal'] = yield select(
+  const { page, last, status, refreshing }: RootState['visits']['journal'] = yield select(
     (state: RootState) => state.visits.journal
   );
-  if (last || status !== 'loaded') {
+  if (last || refreshing || status !== 'loaded') {
     return;
   }
-  yield call(loadJournalPage, page + 1);
+  // Освободить обработчик пагинации сразу при обновлении первой страницы.
+  yield race({ nextPage: call(loadJournalPage, page + 1), refresh: take(loadJournalStart.type) });
 }
 
 export function* watchVisits() {

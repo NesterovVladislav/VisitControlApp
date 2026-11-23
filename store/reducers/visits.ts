@@ -12,6 +12,7 @@ const initialState: VisitsState = {
     items: [],
     status: 'idle',
     refreshing: false,
+    revision: 0,
     page: 0,
     last: false,
     loadingMore: false,
@@ -40,6 +41,12 @@ const visitsSlice = createSlice({
       state.present.status = 'loaded';
       state.present.refreshing = false;
     },
+    presentAccessDenied: (state) => {
+      state.present = { ...initialState.present, status: 'failed' };
+    },
+    journalAccessDenied: (state) => {
+      state.journal = { ...initialState.journal, revision: state.journal.revision + 1, status: 'failed' };
+    },
     loadPresentFailure: (state) => {
       state.present.refreshing = false;
       // Уже показанный список оставляем на экране
@@ -50,15 +57,18 @@ const visitsSlice = createSlice({
 
     /** Первая страница журнала: открытие, возврат на вкладку, потянули вниз */
     loadJournalStart: (state, action: PayloadAction<RefreshPayload>) => {
-      if (action.payload?.refresh) {
+      state.journal.revision += 1;
+      state.journal.loadingMore = false;
+      state.journal.loadMoreFailed = false;
+      if (action.payload?.refresh || state.journal.status === 'loaded') {
         state.journal.refreshing = true;
-      } else if (state.journal.status !== 'loaded') {
+      } else {
         state.journal.status = 'loading';
       }
     },
     loadJournalMore: (state) => {
       // Дальше грузить нечего; saga проверяет то же условие и запрос не отправляет
-      if (state.journal.last || state.journal.status !== 'loaded') {
+      if (state.journal.refreshing || state.journal.last || state.journal.status !== 'loaded') {
         return;
       }
       state.journal.loadingMore = true;
@@ -69,6 +79,8 @@ const visitsSlice = createSlice({
       const journal = state.journal;
       if (page === 0) {
         journal.items = items;
+        journal.loadingMore = false;
+        journal.loadMoreFailed = false;
         journal.status = 'loaded';
         journal.refreshing = false;
       } else if (page === journal.page + 1) {
@@ -106,6 +118,8 @@ export const {
   loadPresentStart,
   loadPresentSuccess,
   loadPresentFailure,
+  presentAccessDenied,
+  journalAccessDenied,
   loadJournalStart,
   loadJournalMore,
   loadJournalSuccess,

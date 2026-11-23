@@ -16,6 +16,8 @@ interface SegmentedControlProps<T extends string> {
   onChange: (value: T) => void;
   error?: string;
   disabled?: boolean;
+  /** Внешние интервалы задаёт экран. */
+  compact?: boolean;
 }
 
 /**
@@ -28,11 +30,12 @@ export default function SegmentedControl<T extends string>({
   onChange,
   error,
   disabled = false,
+  compact = false,
 }: SegmentedControlProps<T>) {
   const styles = useStyles();
   const formFieldStyles = useFormFieldStyles();
   return (
-    <View style={styles.container}>
+    <View style={!compact && styles.container}>
       {label ? <Text style={styles.label}>{label}</Text> : null}
       <View style={[styles.group, error && styles.groupError]} accessibilityRole="radiogroup">
         {options.map((option, index) => {
